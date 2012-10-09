@@ -335,10 +335,10 @@ def fit_portrait_function(params, model=None, p=None, data=None, d=None, errs=No
     else: Cdm = params[1]*Dconst/P
     for nn in xrange(len(freqs)):
         err = errs[nn]
-        mm = 0.0
-        for kk in xrange(len(model[nn])):
-            mm += np.real(data[nn,kk]*np.conj(model[nn,kk])*np.exp(2j*np.pi*kk*(phase+(Cdm*(pow(freqs[nn],-2)-pow(nu_ref,-2))))))
-        m += (mm**2)*err/p[nn]
+        freq = freqs[nn]
+        phasor = np.exp(np.arange(len(model[nn])) * 2.0j*np.pi*(phase+(Cdm*(freq**-2.0 - nu_ref**-2.0))))
+        mm = np.real(data[nn,:] * np.conj(model[nn,:]) * phasor).sum()
+        m += (mm**2.0)*err/p[nn]
     #print phase,params[1]
     return d-m
 
@@ -350,11 +350,12 @@ def fit_portrait_function_deriv(params, model=None, p=None, data=None, d=None, e
     d_phi,d_Ddm = 0.0,0.0
     for nn in xrange(len(freqs)):
         err = errs[nn]
-        g1,gp2,gd2 = 0.0,0.0,0.0
-        for kk in xrange(len(model[nn])):
-            g1 += np.real(data[nn,kk]*np.conj(model[nn,kk])*np.exp(2j*np.pi*kk*(phase+(Cdm*(pow(freqs[nn],-2)-pow(nu_ref,-2))))))
-            gp2 += np.real((2j*np.pi*kk)*data[nn,kk]*np.conj(model[nn,kk])*np.exp(2j*np.pi*kk*(phase+(Cdm*(pow(freqs[nn],-2)-pow(nu_ref,-2))))))
-            gd2 += np.real((2j*np.pi*kk*(pow(freqs[nn],-2)-pow(nu_ref,-2))*(Dconst/P))*data[nn,kk]*np.conj(model[nn,kk])*np.exp(2j*np.pi*kk*(phase+(Cdm*(pow(freqs[nn],-2)-pow(nu_ref,-2))))))
+        freq = freqs[nn]
+        harmind = np.arange(len(model[nn]))
+        phasor = np.exp(harmind * 2.0j*np.pi*(phase+(Cdm*(freq**-2.0 - nu_ref**-2.0))))
+        g1 = np.real(data[nn,:]*np.conj(model[nn,:]) * phasor).sum()
+        gp2 = np.real(2j*np.pi*harmind * data[nn,:] * np.conj(model[nn,:]) * phasor).sum()
+        gd2 = np.real(2j*np.pi*harmind * (freq**-2.0 - nu_ref**-2.0)*(Dconst/P) *data[nn,:] * np.conj(model[nn,:]) * phasor).sum()
         d_phi += -2*g1*gp2*err/p[nn]
         d_Ddm += -2*g1*gd2*err/p[nn]
     #print d_phi,d_Ddm
@@ -368,15 +369,16 @@ def fit_portrait_function_2deriv(params, model=None, p=None, data=None, d=None, 
     d2_phi,d2_Ddm = 0.0,0.0
     for nn in xrange(len(freqs)):
         err = errs[nn]
-        g1,gp2,gp3,gd2,gd3 = 0.0,0.0,0.0,0.0,0.0
-        for kk in xrange(len(model[nn])):
-            g1 += np.real(data[nn,kk]*np.conj(model[nn,kk])*np.exp(2j*np.pi*kk*(phase+(Cdm*(pow(freqs[nn],-2)-pow(nu_ref,-2))))))
-            gp2 += np.real((2j*np.pi*kk)*data[nn,kk]*np.conj(model[nn,kk])*np.exp(2j*np.pi*kk*(phase+(Cdm*(pow(freqs[nn],-2)-pow(nu_ref,-2))))))
-            gp3 += np.real(pow(2j*np.pi*kk,2)*data[nn,kk]*np.conj(model[nn,kk])*np.exp(2j*np.pi*kk*(phase+(Cdm*(pow(freqs[nn],-2)-pow(nu_ref,-2))))))
-            gd2 += np.real((2j*np.pi*kk*(pow(freqs[nn],-2)-pow(nu_ref,-2))*(Dconst/P))*data[nn,kk]*np.conj(model[nn,kk])*np.exp(2j*np.pi*kk*(phase+(Cdm*(pow(freqs[nn],-2)-pow(nu_ref,-2))))))
-            gd3 += np.real(pow(2j*np.pi*kk*(pow(freqs[nn],-2)-pow(nu_ref,-2))*(Dconst/P),2)*data[nn,kk]*np.conj(model[nn,kk])*np.exp(2j*np.pi*kk*(phase+(Cdm*(pow(freqs[nn],-2)-pow(nu_ref,-2))))))
-        d2_phi += -2*err*(pow(gp2,2)+(g1*gp3))/p[nn]
-        d2_Ddm += -2*err*(pow(gd2,2)+(g1*gd3))/p[nn]
+        freq = freqs[nn]
+        harmind = np.arange(len(model[nn]))
+        phasor = np.exp(harmind * 2.0j*np.pi*(phase+(Cdm*(freq**-2.0 - nu_ref**-2.0))))
+        g1 = np.real(data[nn,:]*np.conj(model[nn,:]) * phasor).sum()
+        gp2 = np.real(2.0j*np.pi*harmind * data[nn,:] * np.conj(model[nn,:]) * phasor).sum()
+        gd2 = np.real(2.0j*np.pi*harmind * (freq**-2.0 - nu_ref**-2.0)*(Dconst/P) *data[nn,:] * np.conj(model[nn,:]) * phasor).sum()
+        gp3 = np.real(pow(2.0j*np.pi*harmind,2.0)*data[nn,:] * np.conj(model[nn,:])* phasor).sum()
+        gd3 = np.real(pow(2.0j*np.pi*harmind*(freq**-2.0 - nu_ref**-2.0)*(Dconst/P),2) * data[nn,:] * np.conj(model[nn,:]) * phasor).sum()
+        d2_phi += -2.0*err*(pow(gp2,2.0)+(g1*gp3))/p[nn]
+        d2_Ddm += -2.0*err*(pow(gd2,2.0)+(g1*gd3))/p[nn]
     return np.array([d2_phi,d2_Ddm])
 
 def wiener_filter(prof,noise):
