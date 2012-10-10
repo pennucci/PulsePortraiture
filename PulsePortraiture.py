@@ -469,7 +469,7 @@ class GetTOAs:
                     phaseguess = first_guess(dataportrait,modelx,nguess=5000)
                     #if phaseguess > 0.5: phaseguess = phaseguess - 1    #FIX good fix?
                     Ddmguess = 0.0
-                else:
+                else:   #To first order this only speeds things up marginally, same answers found, unless it breaks...
                     phaseguess = self.phis[nn-1]    #FIX Might not be a good idea if RFI or something throws it completely off, whereas first phaseguess only depends on pulse profile...
                     Ddmguess = self.Ddms[nn-1]
                 print "Phase guess: %.8f ; Ddm guess: %.5f"%(phaseguess,Ddmguess)
@@ -496,14 +496,15 @@ class GetTOAs:
                 #print nn,duration,phi,Ddm,scalesx,param_errs,red_chi2 #Also have it print red_chi_2
                 ###mark rc=1,2,4 points in different colors###
             if write_TOAs:
-                Ddm = np.array(self.Ddms).mean()
-                toas = [self.MJDs[nn] + ((phi*self.Ps[nn])/SECPERDAY) for nn in xrange(self.nsub)]
+                #Ddm = np.array(self.Ddms).mean()    #FIX
+                toas = [self.MJDs[nn] + ((self.phis[nn]*self.Ps[nn])/SECPERDAY) for nn in xrange(self.nsub)]
                 toa_errs = [np.array(self.param_errs)[nn,0]*self.Ps[nn]*1e6 for nn in xrange(self.nsub)]
-                sys.stdout = open("%s_TOAs.tim"%self.datafile,"a")
+                #sys.stdout = open("%s_TOAs.tim"%self.datafile,"a")
                 for nn in range(self.nsub):
+                    Ddm = self.Ddms[nn]
                     write_princeton_toa(int(np.floor(toas[nn])),np.fmod(toas[nn],1),toa_errs[nn],self.nu0,Ddm,obs=obs)
             duration = time.time()-start
-            print "Fitting took %.1f min, ~%.1f min/TOA"%(duration/60.,duration/(60*self.nsub))
+            print "Fitting took %.1f min, ~%.3f min/TOA"%(duration/60.,duration/(60*self.nsub))
 
         else:
             print "Well good for you."
