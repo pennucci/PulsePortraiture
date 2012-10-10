@@ -777,7 +777,7 @@ def load_data(filenm,tscrunch=False,pscrunch=False,quiet=False,rm_baseline=(0,0)
     #Get data
     ports = arch.get_data()[:,0,:,:]*Gfudge     #FIX Here assumes pscrunched in second index
     Ps = np.array([arch.get_Integration(ii).get_folding_period() for ii in xrange(nsub)],dtype=np.double)
-    MJDs = np.array([arch.get_Integration(ii).get_epoch() for ii in xrange(nsub)],dtype=np.double)
+    MJDs = [arch.get_Integration(ii).get_epoch() for ii in xrange(nsub)]
     #Get weights !!!Careful about this!!!
     weights = arch.get_weights()
     normweights = np.array([np.divide(map(int,weights[ii]),map(int,weights[ii])) for ii in xrange(len(weights))])
