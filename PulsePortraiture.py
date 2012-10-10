@@ -5,7 +5,6 @@
 ###
 
 from PPlib import *
-import psrchive as pr
 import sys,time
 
 #class PulsePortraiture:
