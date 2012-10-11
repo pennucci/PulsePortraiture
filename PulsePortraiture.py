@@ -496,15 +496,16 @@ class GetTOAs:
                 #print nn,duration,phi,Ddm,scalesx,param_errs,red_chi2 #Also have it print red_chi_2
                 ###mark rc=1,2,4 points in different colors###
             if write_TOAs:
-                #Ddm = np.array(self.Ddms).mean()    #FIX
+                Ddm = np.array(self.Ddms).mean()    #FIX
                 toas = [self.epochs[nn] + pr.MJD((self.phis[nn]*self.Ps[nn])/SECPERDAY) for nn in xrange(self.nsub)]
                 toa_errs = [np.array(self.param_errs)[nn,0]*self.Ps[nn]*1e6 for nn in xrange(self.nsub)]
-                #sys.stdout = open("%s_TOAs.tim"%self.datafile,"a")
+                sys.stdout = open("%s_%d_%d_%d.tim"%(self.source,self.nbin,self.nchan,self.nsub),"a")
                 for nn in range(self.nsub):
                     Ddm = self.Ddms[nn]
                     write_princeton_toa(toas[nn].intday(),toas[nn].fracday(),toa_errs[nn],self.nu0,Ddm,obs=obs)
+            sys.stdout = sys.__stdout__
             duration = time.time()-start
-            print "Fitting took %.1f min, ~%.3f min/TOA"%(duration/60.,duration/(60*self.nsub))
+            print "Fitting took %.1f min, ~%.3f min/TOA, mean TOA error is %.3f us"%(duration/60.,duration/(60*self.nsub),np.array(self.param_errs)[:,0].mean()*self.Ps.mean()*1e6)
 
         else:
             print "Well good for you."
