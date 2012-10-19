@@ -2,8 +2,7 @@
 
 #Calls PulsePortraiture to generate TOAs and DM corrections
 
-from PulsePortraiture import *
-from optparse import OptionParser
+from optparse import OptionParser,sys
 
 usage = "usage: %prog [options]"
 parser = OptionParser(usage)
@@ -33,6 +32,8 @@ if options.datafile is None and options.metafile is None or options.modelfile is
            to 2D template to generate TOAs and DM correction.\n"
     parser.print_help()
     sys.exit()
+
+from PulsePortraiture import *
 
 #Make template
 datafile = options.datafile

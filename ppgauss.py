@@ -2,8 +2,7 @@
 
 #Calls PulsePortraiture to generate analytic Gaussian template portrait
 
-from PulsePortraiture import DataPortrait,ModelPortrait,sys
-from optparse import OptionParser
+from optparse import OptionParser,sys
 
 usage = "usage: %prog [options]"
 parser = OptionParser(usage)
@@ -32,6 +31,8 @@ if options.datafile is None:
     print "\nppgauss.py - generate a 2D phase-frequency model portrait from Gaussian components.\n"
     parser.print_help()
     sys.exit()
+
+from PulsePortraiture import DataPortrait,ModelPortrait
 
 #Make template
 datafile = options.datafile

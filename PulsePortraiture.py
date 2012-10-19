@@ -412,7 +412,6 @@ class GetTOAs:
                 self.scales.append(np.median(scalesnode.trace()))
         elif lsfit:
             if write_TOAs:      #FIX
-                import sys
                 obs = self.arch.get_telescope()
                 obs_codes = ["@","0","1","2"]
                 obs = "1"
