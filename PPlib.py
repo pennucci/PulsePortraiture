@@ -381,14 +381,15 @@ def fit_portrait_function_2deriv(params, model=None, p=None, data=None, d=None, 
         d2_Ddm += -2.0*err*(pow(gd2,2.0)+(g1*gd3))/p[nn]
     return np.array([d2_phi,d2_Ddm])
 
-def wiener_filter(prof,noise):
+def wiener_filter(prof,noise):      #FIX does not work
     """
-    prof is noise-free template
+    prof is noisy template
     noise is standard deviation of the gaussian noise in the data
     """
     FFT = fft.rfft(prof)
-    pows = np.real(FFT*np.conj(FFT))        #Normalization?
+    pows = np.real(FFT*np.conj(FFT)) / len(prof)        #Check Normalization
     return pows/(pows+(noise**2))
+    #return (pows - (noise**2)) / pows
 
 def brickwall_filter(n,kc):
     """
@@ -397,7 +398,7 @@ def brickwall_filter(n,kc):
     fk[:kc] = 1.0
     return fk
 
-def find_kc(prof,noise):            #Check this eventually, with new get_noise
+def find_kc(prof,noise):
     """
     """
     wf = wiener_filter(prof,noise)
@@ -495,7 +496,7 @@ def fit_powlaws(data, freqs, nu0, weights, initial_params, errs):
 def fit_portrait(data,model,initial_params,P=None,freqs=None,nu_ref=np.inf,scales=False):        #COMMENTS EVERYWHERE! #get_scales function
     """
     """
-    errs = get_noise(data,tau=True,chans=True,fd=True,frac=3) #Precision, 1/variance.  FIX Need to use better filtering instead of frac        #WRONG WRONG WRONG EVERYWHERE!  FOURIER VARIANCE
+    errs = get_noise(data,tau=True,chans=True,fd=True,frac=4) #Precision, 1/variance.  FIX Need to use better filtering instead of frac        #WRONG WRONG WRONG EVERYWHERE!  FOURIER VARIANCE
     dFFT = fft.rfft(data,axis=1)
     mFFT = fft.rfft(model,axis=1)
     d = np.real(np.sum(np.transpose(errs*np.transpose(dFFT*np.conj(dFFT)))))
@@ -587,7 +588,7 @@ def make_model(phases,freqs,modelfile=None,refparams=None,As=None,alphas=None,nu
         if not quiet: print "Made model with %d frequency channels, %d profile bins, %.0f MHz bandwidth centered on %.2f MHz"%(nchan,nbin,(freqs[-1]-freqs[0])+((freqs[-1]-freqs[-2])),nu0)
         return model
 
-def get_noise(data,frac=4,tau=False,chans=False,fd=False):     #Make sure to use on portraits w/o zapped freq. channels, i.e. portxs     FIX: MAKE SIMPLER!!!    FIX: Implement k_max from wiener/brick-wall filter fit
+def get_noise(data,frac=4,tau=False,chans=False,fd=False):     #FIX: Make sure to use on portraits w/o zapped freq. channels, i.e. portxs     FIX: MAKE SIMPLER!!!    FIX: Implement k_max from wiener/brick-wall filter fit
     """
     """
     shape = data.shape
@@ -649,6 +650,7 @@ def get_scales(data,model,phase,Ddm,P,freqs,nu_ref):
 
 def rotate_portrait(port,phase,Ddm=None,P=None,freqs=None,nu_ref=np.inf):
     """
+    Positive values of phase and Ddm rotate to earlier phase.
     """
     pFFT = fft.rfft(port,axis=1)
     for nn in xrange(len(pFFT)):
@@ -687,7 +689,7 @@ def plot_PL_results(M,withprof=1,witherrors=1, negative=0):
 def write_model(filenm,source,refparams,As,alphas,nu0):
     """
     """
-    outfile = open(filenm+".model","w")
+    outfile = open(filenm,"w")
     outfile.write("%s\n"%source)
     outfile.write("%.8f\n"%nu0)
     outfile.write("%.8f\n"%refparams[0])
@@ -696,7 +698,7 @@ def write_model(filenm,source,refparams,As,alphas,nu0):
         comp = refparams[1+nn*3:4+nn*3]
         outfile.write("%.8f\t %.8f\t %.8f\t %.8f\t %.8f\n"%(comp[0],comp[1],comp[2],As[nn],alphas[nn]))
     outfile.close()
-    print filenm+".model written."
+    print "%s written."%filenm
     return 0
 
 def load_data(filenm,tscrunch=False,pscrunch=False,quiet=False,rm_baseline=(0,0),Gfudge=1.0):
@@ -871,3 +873,26 @@ def make_fake():
     model = 12.1*rotate_portrait(fake,-0.17)
     fake += noise
     return fake,model
+
+def write_princeton_toa(toa_MJDi, toa_MJDf, toaerr, freq, dm, obs='@', name=' '*13):
+    """
+    RIPPED FROM PRESTO
+
+    Princeton Format
+
+    columns     item
+    1-1     Observatory (one-character code) '@' is barycenter
+    2-2     must be blank
+    16-24   Observing frequency (MHz)
+    25-44   TOA (decimal point must be in column 30 or column 31)
+    45-53   TOA uncertainty (microseconds)
+    69-78   DM correction (pc cm^-3)
+    """
+    # Splice together the fractional and integer MJDs
+    toa = "%5d"%int(toa_MJDi) + ("%.13f"%toa_MJDf)[1:]
+    if dm!=0.0:
+        print obs+" %13s %8.3f %s %8.3f              %9.4f" % \
+              (name, freq, toa, toaerr, dm)
+    else:
+        print obs+" %13s %8.3f %s %8.3f" % \
+              (name, freq, toa, toaerr)
