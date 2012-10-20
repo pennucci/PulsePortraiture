@@ -439,10 +439,11 @@ class GetTOAs:
                     phaseguess = first_guess(dataportrait,modelx,nguess=10000)
                     #if phaseguess > 0.5: phaseguess = phaseguess - 1    #FIX good fix?
                     Ddmguess = 0.0
+                    if not quiet: print "Phase guess: %.8f ; Ddm guess: %.5f"%(phaseguess,Ddmguess)
                 #else:   #To first order this only speeds things up marginally, same answers found, unless it breaks...
                 #    phaseguess = self.phis[nn-1]    #FIX Might not be a good idea if RFI or something throws it completely off, whereas first phaseguess only depends on pulse profile...
                 #    Ddmguess = self.Ddms[nn-1]
-                if not quiet: print "Phase guess: %.8f ; Ddm guess: %.5f"%(phaseguess,Ddmguess)
+                #if not quiet: print "Phase guess: %.8f ; Ddm guess: %.5f"%(phaseguess,Ddmguess)
                 P = self.Ps[nn]
                 MJD = self.MJDs[nn]
                 #NEED status bar?
@@ -476,6 +477,11 @@ class GetTOAs:
             sys.stdout = sys.__stdout__
             duration = time.time()-start
             print "\nFitting took %.1f min, ~%.3f min/TOA, mean TOA error is %.3f us"%(duration/60.,duration/(60*self.nsub),np.array(self.param_errs)[:,0].mean()*self.Ps.mean()*1e6)
+        show_Ddmerr = 0
+        if show_Ddmerr:
+            for nn in range(self.nsub):
+                print "%.2e"%np.array(self.param_errs)[nn,1]
+
 
         else:
             print "Well good for you."
