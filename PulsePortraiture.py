@@ -21,7 +21,7 @@ class DataPortrait:
         """
         fig = plt.figure()
         profplot = fig.add_subplot(211)
-        interactor = GaussianSelector(profplot,self.prof,self.noise_stdev,self.datafile,minspanx=None,minspany=None,useblit=True)
+        interactor = GaussianSelector(profplot,self.prof,self.noise_stdev,self.datafile,minspanx=None,minspany=None,useblit=True)   #FIX self.noise_stdev is not the number you want
         plt.show()
         self.init_params = interactor.fit_params
         self.ngauss = (len(self.init_params) - 1)/3
@@ -259,7 +259,7 @@ class DataPortrait:
             if writemodel: write_model(outfile,self.source,modelparams,As,alphas,self.nu0)    #FIX do not overwrite model file if exists...
             dofit = 1
             if dofit == 1:
-                phaseguess = first_guess(self.portx,self.modelx,nguess=10000)
+                phaseguess = first_guess(self.portx,self.modelx,nguess=5000)
                 Ddmguess = 0.0
                 phi,Ddm,nfeval,rc,scalesx,param_errs,red_chi2 = fit_portrait(self.portx,self.modelx,np.array([phaseguess,Ddmguess]),self.P,self.freqsx,self.nu0,scales=True)
                 phierr = param_errs[0]
@@ -280,7 +280,7 @@ class DataPortrait:
     def make_smoothed_model_portrait(self,port,frac=4):
         """
         """
-        chan_noise = get_noise(port,frac=4,tau=False,chans=True,fd=False)
+        chan_noise = get_noise(port,frac=4,tau=False,chans=True,fd=False)   #FIX get_noise iccorect
         portfft = fft.rfft(port,axis=1)
         kcs = np.array([find_kc(port[kk],chan_noise[kk]) for kk in xrange(len(port))])
         fil = np.array([brickwall_filter(len(pows[0]),kcs[kk]) for kk in xrange(len(port))])
@@ -355,7 +355,7 @@ class GetTOAs:
             for nn in range(self.nsub):
                 start = time.time()
                 dataportrait = self.portxs[nn]
-                noise0 = get_noise(dataportrait,frac=4,tau=True)     #FIX
+                noise0 = get_noise(dataportrait,frac=4,tau=True)     #FIX get_noise inccorect
                 portx_fft = np.fft.rfft(dataportrait,axis=1)
                 pw = self.portweights[nn]
                 model,modelx = screen_portrait(mp.model,pw)
@@ -416,7 +416,7 @@ class GetTOAs:
                 obs_codes = ["@","0","1","2"]
                 obs = "1"
             print "Each of the %d TOAs are approximately %.2f s"%(self.nsub,self.arch.integration_length()/self.nsub)
-            print "Doing Fourier-domain least-squares fit via chi_2 minimization...or something like that...\n"  #FIX
+            print "Doing Fourier-domain least-squares fit via chi_2 minimization...\n"  #FIX
             start = time.time()
             self.phis = []
             self.Ddms = []
@@ -436,7 +436,7 @@ class GetTOAs:
                 if nn == 0:
                     #phaseguess,ampguess = first_guess(dataportrait,modelx,nguess=20)    #FIX how does it tell the diff between say, +0.85 and -0.15
                     #print "Phase and amplitude guesses %.5f %.5f"%(phaseguess, ampguess)
-                    phaseguess = first_guess(dataportrait,modelx,nguess=10000)
+                    phaseguess = first_guess(dataportrait,modelx,nguess=5000)
                     #if phaseguess > 0.5: phaseguess = phaseguess - 1    #FIX good fix?
                     Ddmguess = 0.0
                     if not quiet: print "Phase guess: %.8f ; Ddm guess: %.5f"%(phaseguess,Ddmguess)
@@ -447,7 +447,7 @@ class GetTOAs:
                 P = self.Ps[nn]
                 MJD = self.MJDs[nn]
                 #NEED status bar?
-                print "Fitting for TOA %d...more info here"%(nn+1)      #FIX
+                print "Fitting for TOA %d...put more info here"%(nn+1)      #FIX
                 phi,Ddm,nfeval,rc,scalex,param_errs,red_chi2 = fit_portrait(self.portxs[nn],modelx,np.array([phaseguess,Ddmguess]),P,freqsx,self.nu0,scales=True)
                 self.phis.append(phi)
                 self.Ddms.append(Ddm)
@@ -482,9 +482,6 @@ class GetTOAs:
             for nn in range(self.nsub):
                 print "%.2e"%np.array(self.param_errs)[nn,1]
 
-
-        else:
-            print "Well good for you."
     def show_subint(self,subint,fignum=None):
         """
         subint 1 = python index 0

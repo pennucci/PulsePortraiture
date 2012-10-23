@@ -327,6 +327,8 @@ def fit_pl_function(params, freqs, nu0, weights=None, fjac=None, data=None, errs
     return [0, (d - powlaw(f,nu0,A,alpha)) / errs]
 
 def fit_portrait_function(params, model=None, p=None, data=None, d=None, errs=None, P=None, freqs=None, nu_ref=np.inf):
+    """
+    """
     phase = params[0]
     m = 0.0
     if P == None or freqs == None:
@@ -339,7 +341,7 @@ def fit_portrait_function(params, model=None, p=None, data=None, d=None, errs=No
         phasor = np.exp(np.arange(len(model[nn])) * 2.0j*np.pi*(phase+(Cdm*(freq**-2.0 - nu_ref**-2.0))))
         mm = np.real(data[nn,:] * np.conj(model[nn,:]) * phasor).sum()
         m += (mm**2.0)*err/p[nn]
-    #print phase,params[1]
+    #print d,m,d-m
     return d-m
 
 def fit_portrait_function_deriv(params, model=None, p=None, data=None, d=None, errs=None, P=None, freqs=None, nu_ref=np.inf):
@@ -493,12 +495,16 @@ def fit_powlaws(data, freqs, nu0, weights, initial_params, errs):
     residuals = data - powlaw(freqs,nu0,fit_params[0],fit_params[1])
     return fit_params, fit_errs, chi_sq, dof, residuals
 
-def fit_portrait(data,model,initial_params,P=None,freqs=None,nu_ref=np.inf,scales=False):        #COMMENTS EVERYWHERE! #get_scales function
+def fit_portrait(data,model,initial_params,P=None,freqs=None,nu_ref=np.inf,scales=False):
     """
     """
-    errs = get_noise(data,tau=True,chans=True,fd=True,frac=4) #Precision, 1/variance.  FIX Need to use better filtering instead of frac        #WRONG WRONG WRONG EVERYWHERE!  FOURIER VARIANCE
+    #errs = get_noise(data,tau=True,chans=True,fd=True,frac=4) #tau = precision = 1/variance.  FIX Need to use better filtering instead of frac     #FIX get_noise is not right
     dFFT = fft.rfft(data,axis=1)
     mFFT = fft.rfft(model,axis=1)
+    unnorm_errs = np.real(dFFT[:,-len(dFFT[0])/4:]).std(axis=1)**-2.    #Variance FIX
+    norm_dFFT = np.transpose((unnorm_errs**0.5)*np.transpose(dFFT))
+    norm_errs = np.real(norm_dFFT[:,-len(norm_dFFT[0])/4:]).std(axis=1)**-2.
+    errs = unnorm_errs
     d = np.real(np.sum(np.transpose(errs*np.transpose(dFFT*np.conj(dFFT)))))
     p = np.real(np.sum(mFFT*np.conj(mFFT),axis=1))
     other_args = (mFFT,p,dFFT,d,errs,P,freqs,nu_ref)
@@ -588,7 +594,7 @@ def make_model(phases,freqs,modelfile=None,refparams=None,As=None,alphas=None,nu
         if not quiet: print "Made model with %d frequency channels, %d profile bins, %.0f MHz bandwidth centered on %.2f MHz"%(nchan,nbin,(freqs[-1]-freqs[0])+((freqs[-1]-freqs[-2])),nu0)
         return model
 
-def get_noise(data,frac=4,tau=False,chans=False,fd=False):     #FIX: Make sure to use on portraits w/o zapped freq. channels, i.e. portxs     FIX: MAKE SIMPLER!!!    FIX: Implement k_max from wiener/brick-wall filter fit
+def get_noise(data,frac=4,tau=False,chans=False,fd=False):     #FIX: Make sure to use on portraits w/o zapped freq. channels, i.e. portxs     FIX: MAKE SIMPLER!!!    FIX: Implement k_max from wiener/brick-wall filter fit        #FIX This is not right 
     """
     """
     shape = data.shape
@@ -644,7 +650,7 @@ def get_scales(data,model,phase,Ddm,P,freqs,nu_ref):
     mFFT = fft.rfft(model,axis=1)
     p = np.real(np.sum(mFFT*np.conj(mFFT),axis=1))
     Cdm = Ddm*Dconst/P
-    for kk in range(len(mFFT[0])):
+    for kk in range(len(mFFT[0])):  #FIX vectorize
         scales += np.real(dFFT[:,kk]*np.conj(mFFT[:,kk])*np.exp(2j*np.pi*kk*(phase+(Cdm*(pow(freqs,-2)-pow(nu_ref,-2))))))/p
     return scales
 
@@ -703,7 +709,7 @@ def write_model(filenm,source,refparams,As,alphas,nu0):
 
 def load_data(filenm,tscrunch=False,pscrunch=False,quiet=False,rm_baseline=(0,0),Gfudge=1.0):
     """
-    Will read data using PSRCHIVE.  If not already done, it will dedisperse and pscrunch.
+    Will read data using PSRCHIVE.
     """
     #Load archive
     arch = pr.Archive_load(filenm)
@@ -756,7 +762,7 @@ def load_data(filenm,tscrunch=False,pscrunch=False,quiet=False,rm_baseline=(0,0)
 #        #Estimate noise
 #        noise_stdev = np.zeros(4)     #Stokes
 #        for ss in range(4):
-#            noise_stdev[ss] = get_noise(portx[ss])   #Stokes #FIX
+#            noise_stdev[ss] = get_noise(portx[ss])   #Stokes #FIX This is probably not right
 #        #Make flux profile
 #        #fluxprof = port.sum(1)/nbin  #This is about equal to bscrunch to ~6 places     #Stokes
 #        #fluxprofx = ma.masked_array(fluxprof,mask=maskweights).compressed()            #Stokes
@@ -792,7 +798,7 @@ def load_data(filenm,tscrunch=False,pscrunch=False,quiet=False,rm_baseline=(0,0)
     #Estimate noise
     noise_stdev = np.zeros(nsub)
     for nn in range(nsub):
-        noise_stdev[nn] = get_noise(portxs[nn])     #FIX Check
+        noise_stdev[nn] = get_noise(portxs[nn])     #FIX This is probably not right
     fluxprof = port.sum(1)/nbin  #This is about equal to bscrunch to ~6 places
     fluxprofx = ma.masked_array(fluxprof,mask=np.array(map(round,maskweights.mean(axis=0)))).compressed()
     freqsx = ma.masked_array(freqs,mask=np.array(map(round,maskweights.mean(axis=0)))).compressed()     #FIX will not work if portxs have different sizes/different things zapped
