@@ -14,7 +14,7 @@ class DataPortrait:
         #Reading the data
         self.datafile = datafile
         self.Gfudge = Gfudge
-        (self.source,self.arch,self.port,self.portx,self.noise_stdev,self.fluxprof,self.fluxprofx,self.prof,self.nbin,self.phases,self.nu0,self.bw,self.nchan,self.chanwidth,self.lofreq,self.freqs,self.freqsx,self.nsub,self.P,self.MJD,self.weights,self.normweights,self.maskweights,self.portweights) = load_data(datafile,tscrunch=True,pscrunch=True,quiet=False,rm_baseline=(0,0),Gfudge=self.Gfudge)
+        (self.source,self.arch,self.port,self.portx,self.noise_stdev,self.fluxprof,self.fluxprofx,self.prof,self.nbin,self.phases,self.nu0,self.bw,self.nchan,self.chanwidth,self.lofreq,self.freqs,self.freqsx,self.nsub,self.P,self.MJD,self.weights,self.normweights,self.maskweights,self.portweights) = load_data(datafile,dedisperse=True,tscrunch=True,pscrunch=True,quiet=False,rm_baseline=(0,0),Gfudge=self.Gfudge)
 
     def fit_profile(self):
         """
@@ -215,7 +215,7 @@ class DataPortrait:
                 plt.plot(self.phases,residuals,'k')
                 plt.xlabel("Phase [rot]")
                 plt.ylabel("Data-Fit Residuals")
-                print "Fit %d done..."%(ii+1)
+                print "Subband %d fit done..."%(ii+1)
                 if makemovie:
                     fname = '_tmp%03d.png'%(ii+1)
                     plt.savefig(fname)
@@ -276,17 +276,7 @@ class DataPortrait:
                     self.port = rotate_portrait(self.port,phi,Ddm,self.P,self.freqs,self.nu0)
                     self.portx = rotate_portrait(self.portx,phi,Ddm,self.P,self.freqsx,self.nu0)
 
-
-    def make_smoothed_model_portrait(self,port,frac=4):
-        """
-        """
-        chan_noise = get_noise(port,frac=4,tau=False,chans=True,fd=False)   #FIX get_noise iccorect
-        portfft = fft.rfft(port,axis=1)
-        kcs = np.array([find_kc(port[kk],chan_noise[kk]) for kk in xrange(len(port))])
-        fil = np.array([brickwall_filter(len(pows[0]),kcs[kk]) for kk in xrange(len(port))])
-        self.smooth_model = fft.irfft(fil*portfft,axis=1)
-
-class ModelPortrait:
+class ModelPortrait_Gaussian:
     """
     """
     def __init__(self,modelfile,nchan,nbin,bw,lofreq,portweights=None,quiet=False,Gfudge=1.0):  #FIX make smarter to query DataPortrait...?
@@ -319,21 +309,37 @@ class ModelPortrait:
         #Need to make pretty, axes and what not
         plt.show()
 
+class ModelPortrait_Smoothed:
+    """
+    """
+    def __init__(self,modelfile,quiet=False,Gfudge=1.0):    #FIX need to interpolate, or somehow account for missing channels in model...
+        """
+        """
+        self.Gfudge = Gfudge
+        self.modelfile = modelfile
+        (self.source,self.arch,self.port,self.portx,self.noise_stdev,self.fluxprof,self.fluxprofx,self.prof,self.nbin,self.phases,self.nu0,self.bw,self.nchan,self.chanwidth,self.lofreq,self.freqs,self.freqsx,self.nsub,self.P,self.MJD,self.weights,self.normweights,self.maskweights,self.portweights) = load_data(modelfile,dedisperse=True,tscrunch=True,pscrunch=True,quiet=False,rm_baseline=(0,0),Gfudge=self.Gfudge)
+        self.model = self.port
+        self.modelx = self.portx
 
 class GetTOAs:
     """
     """
-    def __init__(self,datafile,modelfile,outfile=None,mcmc=False,iters=20000,burn=10000,thin=100,starti=0,lsfit=True,write_TOAs=True,quiet=False,Gfudge=1.0):    #How much to thin? Burn?
+    def __init__(self,datafile,modelfile,mtype=None,outfile=None,mcmc=False,iters=20000,burn=10000,thin=100,starti=0,lsfit=True,write_TOAs=True,quiet=False,Gfudge=1.0):    #How much to thin? Burn?
         """
         """
         self.datafile=datafile
         self.modelfile=modelfile
+        self.mtype=mtype
         self.outfile=outfile
         self.Gfudge=Gfudge
-        (self.source,self.arch,self.ports,self.portxs,self.noise_stdev,self.fluxprof,self.fluxprofx,self.prof,self.nbin,self.phases,self.nu0,self.bw,self.nchan,self.chanwidth,self.lofreq,self.freqs,self.freqsx,self.nsub,self.Ps,self.epochs,self.weights,self.normweights,self.maskweights,self.portweights) = load_data(datafile,tscrunch=False,pscrunch=True,quiet=False,rm_baseline=(0,0),Gfudge=self.Gfudge)
+        (self.source,self.arch,self.ports,self.portxs,self.noise_stdev,self.fluxprof,self.fluxprofx,self.prof,self.nbin,self.phases,self.nu0,self.bw,self.nchan,self.chanwidth,self.lofreq,self.freqs,self.freqsx,self.nsub,self.Ps,self.epochs,self.weights,self.normweights,self.maskweights,self.portweights) = load_data(datafile,dedisperse=True,tscrunch=False,pscrunch=True,quiet=False,rm_baseline=(0,0),Gfudge=self.Gfudge)
         self.MJDs = np.array([self.epochs[ii].in_days() for ii in xrange(self.nsub)],dtype=np.double)
         print '\n'
-        self.modelportrait=ModelPortrait(modelfile,self.nchan,self.nbin,self.bw,self.lofreq,portweights=None,quiet=False,Gfudge=1.0)
+        if self.mtype == "gauss": self.modelportrait=ModelPortrait_Gaussian(modelfile,self.nchan,self.nbin,self.bw,self.lofreq,portweights=None,quiet=False,Gfudge=1.0)
+        elif self.mtype == "smooth": self.modelportrait=ModelPortrait_Smoothed(modelfile,quiet=False,Gfudge=self.Gfudge)
+        else:
+            print 'Model type must be either "gauss" or "smooth".'
+            sys.exit()
         mp=self.modelportrait
         print '\n'
         #self.TOAs = np.empty(self.nsub,dtype=np.double)
@@ -433,11 +439,22 @@ class GetTOAs:
                 pw = self.portweights[nn]
                 model,modelx = screen_portrait(mp.model,pw)
                 freqsx = ma.masked_array(self.freqs,mask=self.maskweights[nn]).compressed()
+                nu0 = self.nu0
+                ####################
+                #DOPPLER CORRECTION#
+                ####################
+                dc = self.arch.get_Integration(nn).get_doppler_factor()
+                freqsx = correct_freqs_doppler(freqsx,dc)
+                nu0 = correct_freqs_doppler(self.nu0,dc)
+                ####################
                 if nn == 0:
                     #phaseguess,ampguess = first_guess(dataportrait,modelx,nguess=20)    #FIX how does it tell the diff between say, +0.85 and -0.15
                     #print "Phase and amplitude guesses %.5f %.5f"%(phaseguess, ampguess)
                     phaseguess = first_guess(dataportrait,modelx,nguess=5000)
                     #if phaseguess > 0.5: phaseguess = phaseguess - 1    #FIX good fix?
+                    #self.DM = self.arch.get_dispersion_measure()
+                    self.DM = 0.0
+                    #Ddmguess = self.DM
                     Ddmguess = 0.0
                     if not quiet: print "Phase guess: %.8f ; Ddm guess: %.5f"%(phaseguess,Ddmguess)
                 #else:   #To first order this only speeds things up marginally, same answers found, unless it breaks...
@@ -448,7 +465,7 @@ class GetTOAs:
                 MJD = self.MJDs[nn]
                 #NEED status bar?
                 print "Fitting for TOA %d...put more info here"%(nn+1)      #FIX
-                phi,Ddm,nfeval,rc,scalex,param_errs,red_chi2 = fit_portrait(self.portxs[nn],modelx,np.array([phaseguess,Ddmguess]),P,freqsx,self.nu0,scales=True)
+                phi,Ddm,nfeval,rc,scalex,param_errs,red_chi2 = fit_portrait(self.portxs[nn],modelx,np.array([phaseguess,Ddmguess]),P,freqsx,nu0,scales=True)
                 self.phis.append(phi)
                 self.Ddms.append(Ddm)
                 self.nfevals.append(nfeval)
@@ -467,15 +484,18 @@ class GetTOAs:
                 #duration = time.time()-start
                 #print nn,duration,phi,Ddm,scalesx,param_errs,red_chi2 #Also have it print red_chi_2
                 ###mark rc=1,2,4 points in different colors###
+                #self.show_fit(nn)
             if write_TOAs:
                 toas = [self.epochs[nn] + pr.MJD((self.phis[nn]*self.Ps[nn])/(3600*24.)) for nn in xrange(self.nsub)]
                 toa_errs = [np.array(self.param_errs)[nn,0]*self.Ps[nn]*1e6 for nn in xrange(self.nsub)]
                 if self.outfile: sys.stdout = open(self.outfile,"a")
                 for nn in range(self.nsub):
-                    Ddm = self.Ddms[nn]
+                    Ddm = self.Ddms[nn] - self.DM
+                    #Should write which freqs? topo or bary?
                     write_princeton_toa(toas[nn].intday(),toas[nn].fracday(),toa_errs[nn],self.nu0,Ddm,obs=obs)
             sys.stdout = sys.__stdout__
             duration = time.time()-start
+            #print self.red_chi2s
             print "\nFitting took %.1f min, ~%.3f min/TOA, mean TOA error is %.3f us"%(duration/60.,duration/(60*self.nsub),np.array(self.param_errs)[:,0].mean()*self.Ps.mean()*1e6)
         show_Ddmerr = 0
         if show_Ddmerr:
@@ -484,12 +504,12 @@ class GetTOAs:
 
     def show_subint(self,subint,fignum=None):
         """
-        subint 1 = python index 0
+        subint 0 = python index 0
         """
         if fignum: portfig = plt.figure(fignum)
         else: portfig = plt.figure()
         #plt.subplot(111)
-        ii = subint - 1
+        ii = subint
         plt.xlabel("Phase [rot]")
         plt.ylabel("Frequency [MHz]")
         plt.title("Subint %d"%(subint))
@@ -497,13 +517,13 @@ class GetTOAs:
         #Need to make pretty, axes and what not
         plt.show()
 
-    def show_fit(self,subint=1,fignum=None):
+    def show_fit(self,subint=0,fignum=None):
         """
-        subint 1 = python index 0
+        subint 0 = python index 0
         """
         if fignum: portfig = plt.figure(fignum)
         else: fitfig = plt.figure()
-        ii = subint-1
+        ii = subint
         phi = self.phis[ii]
         Ddm = self.Ddms[ii]
         scales = self.scales[ii]

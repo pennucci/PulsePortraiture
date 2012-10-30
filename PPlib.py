@@ -342,6 +342,8 @@ def fit_portrait_function(params, model=None, p=None, data=None, d=None, errs=No
         mm = np.real(data[nn,:] * np.conj(model[nn,:]) * phasor).sum()
         m += (mm**2.0)*err/p[nn]
     #print d,m,d-m
+    #return -m
+    #print phase,params[1]
     return d-m
 
 def fit_portrait_function_deriv(params, model=None, p=None, data=None, d=None, errs=None, P=None, freqs=None, nu_ref=np.inf):
@@ -588,10 +590,10 @@ def make_model(phases,freqs,modelfile=None,refparams=None,As=None,alphas=None,nu
             amp = powlaw(freq,nu0,A,alpha)
             model[ff] += amp*gaussian_profile(nbin,mu,fwhm)
     if modelfile:
-        if not quiet: print "Made model for %s with %d frequency channels, %d profile bins, %.0f MHz bandwidth centered on %.2f MHz"%(source,nchan,nbin,(freqs[-1]-freqs[0])+((freqs[-1]-freqs[-2])),nu0)
+        if not quiet: print "Made %d component model for %s with %d frequency channels, %d profile bins, %.0f MHz bandwidth centered on %.2f MHz"%(ngauss, source,nchan,nbin,(freqs[-1]-freqs[0])+((freqs[-1]-freqs[-2])),nu0)
         return source,ngauss,refparams,As,alphas,nu0,model
     else:
-        if not quiet: print "Made model with %d frequency channels, %d profile bins, %.0f MHz bandwidth centered on %.2f MHz"%(nchan,nbin,(freqs[-1]-freqs[0])+((freqs[-1]-freqs[-2])),nu0)
+        if not quiet: print "Made %d component model with %d frequency channels, %d profile bins, %.0f MHz bandwidth centered on %.2f MHz"%((len(refparams)-1)/3, nchan,nbin,(freqs[-1]-freqs[0])+((freqs[-1]-freqs[-2])),nu0)
         return model
 
 def get_noise(data,frac=4,tau=False,chans=False,fd=False):     #FIX: Make sure to use on portraits w/o zapped freq. channels, i.e. portxs     FIX: MAKE SIMPLER!!!    FIX: Implement k_max from wiener/brick-wall filter fit        #FIX This is not right 
@@ -707,7 +709,7 @@ def write_model(filenm,source,refparams,As,alphas,nu0):
     print "%s written."%filenm
     return 0
 
-def load_data(filenm,tscrunch=False,pscrunch=False,quiet=False,rm_baseline=(0,0),Gfudge=1.0):
+def load_data(filenm,dedisperse=False,tscrunch=False,pscrunch=False,quiet=False,rm_baseline=(0,0),Gfudge=1.0):
     """
     Will read data using PSRCHIVE.
     """
@@ -725,7 +727,8 @@ def load_data(filenm,tscrunch=False,pscrunch=False,quiet=False,rm_baseline=(0,0)
     nbin = arch.get_nbin()
     phases = np.arange(nbin, dtype='d')/nbin
     #Dedisperse?
-    if not arch.get_dedispersed(): arch.dedisperse()
+    if dedisperse: arch.dedisperse()
+    else: arch.dededisperse()
     #This is where I think the bandpass is being removed (needs to be robust...)
     baseline_removed = 0
     if rm_baseline[0] + rm_baseline[1] == 0:
@@ -902,3 +905,8 @@ def write_princeton_toa(toa_MJDi, toa_MJDf, toaerr, freq, dm, obs='@', name=' '*
     else:
         print obs+" %13s %8.3f %s %8.3f" % \
               (name, freq, toa, toaerr)
+
+def correct_freqs_doppler(freqs,doppler_factor):
+    """
+    """
+    return doppler_factor*freqs

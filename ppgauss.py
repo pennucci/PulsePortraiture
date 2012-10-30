@@ -32,7 +32,7 @@ if options.datafile is None:
     parser.print_help()
     sys.exit()
 
-from PulsePortraiture import DataPortrait,ModelPortrait
+from PulsePortraiture import DataPortrait,ModelPortrait_Gaussian
 
 #Make template
 datafile = options.datafile
