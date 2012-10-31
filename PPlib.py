@@ -343,7 +343,7 @@ def fit_portrait_function(params, model=None, p=None, data=None, d=None, errs=No
         m += (mm**2.0)*err/p[nn]
     #print d,m,d-m
     #return -m
-    #print phase,params[1]
+    #print phase,params[1],d-m
     return d-m
 
 def fit_portrait_function_deriv(params, model=None, p=None, data=None, d=None, errs=None, P=None, freqs=None, nu_ref=np.inf):
@@ -908,5 +908,6 @@ def write_princeton_toa(toa_MJDi, toa_MJDf, toaerr, freq, dm, obs='@', name=' '*
 
 def correct_freqs_doppler(freqs,doppler_factor):
     """
+    Input topocentric frequencies, output barycentric frequencies.
     """
     return doppler_factor*freqs

@@ -443,9 +443,9 @@ class GetTOAs:
                 ####################
                 #DOPPLER CORRECTION#
                 ####################
-                dc = self.arch.get_Integration(nn).get_doppler_factor()
-                freqsx = correct_freqs_doppler(freqsx,dc)
-                nu0 = correct_freqs_doppler(self.nu0,dc)
+                #df = self.arch.get_Integration(nn).get_doppler_factor()
+                #freqsx = correct_freqs_doppler(freqsx,df)
+                #nu0 = correct_freqs_doppler(self.nu0,df)
                 ####################
                 if nn == 0:
                     #phaseguess,ampguess = first_guess(dataportrait,modelx,nguess=20)    #FIX how does it tell the diff between say, +0.85 and -0.15
