@@ -19,7 +19,8 @@ import scipy.optimize as opt
 import mpfit as mp
 
 cols = ['b','g','r','c','m','y','b','g','r','c','m','y','b','g','r','c','m','y','b','g','r','c','m','y','b','g','r','c','m','y']
-Dconst = 4.148808e3     #Dispersion constant (e**2/(2*pi*m_e*c)) [MHz**2 pc**-1 cm**3 s]
+#Dconst = 4.148808e3     #Dispersion constant (e**2/(2*pi*m_e*c)) [MHz**2 pc**-1 cm**3 s], used by PRESTO
+Dconst = 0.000241**-1   #"Traditional" dispersion constant, used by psrchive
 
 def gaussian_profile(N, phase, fwhm, norm=0):
     """
@@ -351,7 +352,7 @@ def fit_portrait_function_deriv(params, model=None, p=None, data=None, d=None, e
     """
     phase = params[0]
     Cdm = params[1]*Dconst/P
-    d_phi,d_Ddm = 0.0,0.0
+    d_phi,d_DM = 0.0,0.0
     for nn in xrange(len(freqs)):
         err = errs[nn]
         freq = freqs[nn]
@@ -361,16 +362,16 @@ def fit_portrait_function_deriv(params, model=None, p=None, data=None, d=None, e
         gp2 = np.real(2j*np.pi*harmind * data[nn,:] * np.conj(model[nn,:]) * phasor).sum()
         gd2 = np.real(2j*np.pi*harmind * (freq**-2.0 - nu_ref**-2.0)*(Dconst/P) *data[nn,:] * np.conj(model[nn,:]) * phasor).sum()
         d_phi += -2*g1*gp2*err/p[nn]
-        d_Ddm += -2*g1*gd2*err/p[nn]
-    #print d_phi,d_Ddm
-    return np.array([d_phi,d_Ddm])
+        d_DM += -2*g1*gd2*err/p[nn]
+    #print d_phi,d_DM
+    return np.array([d_phi,d_DM])
 
 def fit_portrait_function_2deriv(params, model=None, p=None, data=None, d=None, errs=None, P=None, freqs=None, nu_ref=np.inf):      #Covariance matrix...??
     """
     """
     phase = params[0]
     Cdm = params[1]*Dconst/P
-    d2_phi,d2_Ddm = 0.0,0.0
+    d2_phi,d2_DM = 0.0,0.0
     for nn in xrange(len(freqs)):
         err = errs[nn]
         freq = freqs[nn]
@@ -382,8 +383,8 @@ def fit_portrait_function_2deriv(params, model=None, p=None, data=None, d=None, 
         gp3 = np.real(pow(2.0j*np.pi*harmind,2.0)*data[nn,:] * np.conj(model[nn,:])* phasor).sum()
         gd3 = np.real(pow(2.0j*np.pi*harmind*(freq**-2.0 - nu_ref**-2.0)*(Dconst/P),2) * data[nn,:] * np.conj(model[nn,:]) * phasor).sum()
         d2_phi += -2.0*err*(pow(gp2,2.0)+(g1*gp3))/p[nn]
-        d2_Ddm += -2.0*err*(pow(gd2,2.0)+(g1*gd3))/p[nn]
-    return np.array([d2_phi,d2_Ddm])
+        d2_DM += -2.0*err*(pow(gd2,2.0)+(g1*gd3))/p[nn]
+    return np.array([d2_phi,d2_DM])
 
 def wiener_filter(prof,noise):      #FIX does not work
     """
@@ -511,7 +512,7 @@ def fit_portrait(data,model,initial_params,P=None,freqs=None,nu_ref=np.inf,scale
     p = np.real(np.sum(mFFT*np.conj(mFFT),axis=1))
     other_args = (mFFT,p,dFFT,d,errs,P,freqs,nu_ref)
     #minimize = opt.fmin #same as others, 14s
-    #minimize = opt.fmin_powell  #+1 phase, off in Ddm, 11s
+    #minimize = opt.fmin_powell  #+1 phase, off in DM, 11s
     #minimize = opt.fmin_l_bfgs_b #same answer as cg, ~10s,7.6s
 
     #minimize = opt.fmin_bfgs #doesn't work
@@ -524,19 +525,19 @@ def fit_portrait(data,model,initial_params,P=None,freqs=None,nu_ref=np.inf,scale
     results = minimize(fit_portrait_function,initial_params,fprime=fit_portrait_function_deriv,args=other_args,messages=0)
     #results = minimize(fit_portrait_function,initial_params,fprime=fit_portrait_function_deriv,args=other_args,bounds=[(0,1),(None)],messages=0)   #FIX bounds on phase?
     phi = results[0][0]
-    Ddm = results[0][1]
+    DM = results[0][1]
     nfeval = results[1]
     return_code = results[2]
     if return_code != 1:
         print "Fit failed for some reason.  Return code is %d; consult RCSTRINGS dictionary"%return_code
-    param_errs = list(pow(fit_portrait_function_2deriv(np.array([phi,Ddm]),mFFT,p,dFFT,d,errs,P,freqs,nu_ref),-0.5))
+    param_errs = list(pow(fit_portrait_function_2deriv(np.array([phi,DM]),mFFT,p,dFFT,d,errs,P,freqs,nu_ref),-0.5))
     DoF = len(data.ravel()) - (len(freqs)+2)    #minus 1?
-    red_chi2 = fit_portrait_function(np.array([phi,Ddm]),mFFT,p,dFFT,d,errs,P,freqs,nu_ref) / DoF
+    red_chi2 = fit_portrait_function(np.array([phi,DM]),mFFT,p,dFFT,d,errs,P,freqs,nu_ref) / DoF
     if scales:
-        scales = get_scales(data,model,phi,Ddm,P,freqs,nu_ref)
+        scales = get_scales(data,model,phi,DM,P,freqs,nu_ref)
         param_errs += list(pow(2*p*errs,-0.5))
-        return phi, Ddm, nfeval, return_code, scales, np.array(param_errs),red_chi2
-    else: return phi, Ddm, nfeval, return_code, np.array(param_errs),red_chi2
+        return phi, DM, nfeval, return_code, scales, np.array(param_errs),red_chi2
+    else: return phi, DM, nfeval, return_code, np.array(param_errs),red_chi2
 
 def first_guess(data,model,nguess=1000):       #is phaseguess/fit for phase the left/right shift for model/data?  #FIX FOR NEW VERSION!
     """
@@ -644,29 +645,30 @@ def get_noise(data,frac=4,tau=False,chans=False,fd=False):     #FIX: Make sure t
                 if tau: return np.median(noise)**-2     #not statistically rigorous
                 else: return np.median(noise)
 
-def get_scales(data,model,phase,Ddm,P,freqs,nu_ref):
+def get_scales(data,model,phase,DM,P,freqs,nu_ref):
     """
     """
     scales = np.zeros(len(model))
     dFFT = fft.rfft(data,axis=1)
     mFFT = fft.rfft(model,axis=1)
     p = np.real(np.sum(mFFT*np.conj(mFFT),axis=1))
-    Cdm = Ddm*Dconst/P
+    Cdm = DM*Dconst/P
     for kk in range(len(mFFT[0])):  #FIX vectorize
         scales += np.real(dFFT[:,kk]*np.conj(mFFT[:,kk])*np.exp(2j*np.pi*kk*(phase+(Cdm*(pow(freqs,-2)-pow(nu_ref,-2))))))/p
     return scales
 
-def rotate_portrait(port,phase,Ddm=None,P=None,freqs=None,nu_ref=np.inf):
+def rotate_portrait(port,phase,DM=None,P=None,freqs=None,nu_ref=np.inf):
     """
-    Positive values of phase and Ddm rotate to earlier phase.
+    Positive values of phase and DM rotate to earlier phase.
     """
     pFFT = fft.rfft(port,axis=1)
     for nn in xrange(len(pFFT)):
-        for kk in xrange(len(pFFT[nn])):
-            if Ddm is None and freqs is None: pFFT[nn,kk] *= np.exp(2j*np.pi*kk*phase)
-            else:
-                Cdm = Ddm*Dconst/P
-                pFFT[nn,kk] *= np.exp(2j*np.pi*kk*(phase+(Cdm*(pow(freqs[nn],-2)-pow(nu_ref,-2)))))
+        if DM is None and freqs is None: pFFT[nn,:] *= np.exp(np.arange(len(pFFT[nn])) * 2.0j*np.pi*phase)
+        else:
+            Cdm = DM*Dconst/P
+            freq = freqs[nn]
+            phasor = np.exp(np.arange(len(pFFT[nn])) * 2.0j*np.pi*(phase+(Cdm*(freq**-2.0 - nu_ref**-2.0))))
+            pFFT[nn,:] *= phasor
     return fft.irfft(pFFT)
 
 def plot_PL_results(M,withprof=1,witherrors=1, negative=0):
@@ -883,7 +885,7 @@ def make_fake():
     fake += noise
     return fake,model
 
-def write_princeton_toa(toa_MJDi, toa_MJDf, toaerr, freq, dm, obs='@', name=' '*13):
+def write_princeton_toa(toa_MJDi, toa_MJDf, toaerr, freq, DM, obs='@', name=' '*13):
     """
     RIPPED FROM PRESTO
 
@@ -899,9 +901,9 @@ def write_princeton_toa(toa_MJDi, toa_MJDf, toaerr, freq, dm, obs='@', name=' '*
     """
     # Splice together the fractional and integer MJDs
     toa = "%5d"%int(toa_MJDi) + ("%.13f"%toa_MJDf)[1:]
-    if dm!=0.0:
+    if DM!=0.0:
         print obs+" %13s %8.3f %s %8.3f              %9.4f" % \
-              (name, freq, toa, toaerr, dm)
+              (name, freq, toa, toaerr, DM)
     else:
         print obs+" %13s %8.3f %s %8.3f" % \
               (name, freq, toa, toaerr)

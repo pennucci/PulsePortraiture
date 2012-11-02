@@ -54,5 +54,5 @@ if not metafile:
 else:
     datafiles = open(metafile,"r").readlines()
     for datafile in datafiles:
-        gt = GetTOAs(datafile[:-1],modelfile,outfile,quiet=quiet)
+        gt = GetTOAs(datafile[:-1],modelfile,mtype,outfile,quiet=quiet)
         if showplot: gt.show_results()
