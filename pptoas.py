@@ -26,13 +26,16 @@ parser.add_option("-o", "--outfile",
                   help="Name of output .tim file name. Will append. [default=stdout]")
 parser.add_option("--DM",
                   action="store", metavar="DM", dest="DM0", default=None,
-                  help="Nominal DM [pc cm**-3] (float).  If unspecified, will use the DM stored in the archive.")
+                  help="Nominal DM [pc cm**-3] (float) from which to measure offset.  If unspecified, will use the DM stored in the archive.")
 parser.add_option("--no_bary_DM",
                   action="store_false", dest="bary_DM", default=True,
                   help='Do not Doppler-correct the fitted DM to make "barycentric DM".')
 parser.add_option("--one_DM",
                   action="store_true", dest="one_DM", default=False,
-                  help="Returns single DM value in output .tim file for the epoch instead of a fitted DM per subintegration.")
+                  help="Returns single DM value in output .tim file for the epoch instead of a fitted DM per subint.")
+parser.add_option("--errfile",
+                  action="store", metavar="errfile", dest="errfile", default=None,
+                  help="If specified, will write the fitted DM errors to errfile. Will append.")
 parser.add_option("--showplot",
                   action="store_true", dest="showplot", default=False,
                   help="Plot fit results. Only useful if nsubint > 1.")
@@ -54,18 +57,20 @@ datafile = options.datafile
 metafile = options.metafile
 modelfile = options.modelfile
 mtype = options.mtype
-DM0 = float(options.DM0)
+if options.DM0: DM0 = float(options.DM0)
+else: DM0 = None
 bary_DM = options.bary_DM
 one_DM = options.one_DM
 outfile = options.outfile
+errfile = options.errfile
 showplot = options.showplot
 quiet = options.quiet
 
 if not metafile:
-    gt = GetTOAs(datafile,modelfile,mtype,DM0,bary_DM,one_DM,outfile,quiet=quiet)
+    gt = GetTOAs(datafile,modelfile,mtype,DM0,bary_DM,one_DM,outfile,errfile,quiet=quiet)
     if showplot: gt.show_results()
 else:
     datafiles = open(metafile,"r").readlines()
     for datafile in datafiles:
-        gt = GetTOAs(datafile[:-1],modelfile,mtype,DM0,bary_DM,one_DM,outfile,quiet=quiet)
+        gt = GetTOAs(datafile[:-1],modelfile,mtype,DM0,bary_DM,one_DM,outfile,errfile,quiet=quiet)
         if showplot: gt.show_results()

@@ -320,7 +320,7 @@ class ModelPortrait_Smoothed:
 class GetTOAs:
     """
     """
-    def __init__(self,datafile,modelfile,mtype=None,DM0=None,bary_DM=True,one_DM=False,outfile=None,mcmc=False,iters=20000,burn=10000,thin=100,starti=0,lsfit=True,write_TOAs=True,quiet=False,Gfudge=1.0):    #How much to thin? Burn?
+    def __init__(self,datafile,modelfile,mtype=None,DM0=None,bary_DM=True,one_DM=False,outfile=None,errfile=None,mcmc=False,iters=20000,burn=10000,thin=100,starti=0,lsfit=True,write_TOAs=True,quiet=False,Gfudge=1.0):    #How much to thin? Burn?
         """
         """
         self.datafile=datafile
@@ -512,11 +512,13 @@ class GetTOAs:
             sys.stdout = sys.__stdout__
             duration = time.time()-start
             print "\nFitting took %.1f min, ~%.3f min/TOA, mean TOA error is %.3f us"%(duration/60.,duration/(60*self.nsub),self.phi_errs.mean()*self.Ps.mean()*1e6)
-        show_DMerr = 0
-        if show_DMerr:
-            for nn in range(self.nsub):
-                print "%.2e"%self.DM_errs[nn]
-
+            if errfile:
+                ef = open(errfile,"a")
+                for nn in range(self.nsub):
+                    if nn != self.nsub-1: ef.write("%.5e\n"%self.DM_errs[nn])
+                    else: ef.write("%.5e"%self.DM_errs[nn])
+        else:
+            print "Invalid."
     def show_subint(self,subint,fignum=None):
         """
         subint 0 = python index 0
@@ -614,7 +616,7 @@ class GetTOAs:
         plt.fill(xverts,yverts,"m",alpha=0.25,ec='none')
         plt.xlabel("MJD")
         plt.ylabel(r"DM [pc cm$^{3}$]")
-        ax3.text(0.15,0.9,r"$\Delta$ DM = %.2e +/- %.2e"%(self.DeltaDM_mean,self.DeltaDM_err),ha='center',va='center',transform=ax3.transAxes)
+        ax3.text(0.15,0.9,r"$\Delta$ DM = %.2e $\pm$ %.2e"%(self.DeltaDM_mean,self.DeltaDM_err),ha='center',va='center',transform=ax3.transAxes)
         plt.show()
 
     def show_hists(self):
