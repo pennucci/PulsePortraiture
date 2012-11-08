@@ -327,7 +327,7 @@ def fit_pl_function(params, freqs, nu0, weights=None, fjac=None, data=None, errs
     f=np.array(f)
     return [0, (d - powlaw(f,nu0,A,alpha)) / errs]
 
-def fit_portrait_function(params, model=None, p=None, data=None, d=None, errs=None, P=None, freqs=None, nu_ref=np.inf):
+def fit_portrait_function(params, model=None, p=None, data=None, d=None, errs=None, P=None, freqs=None, nu_ref=np.inf, test=False):
     """
     """
     phase = params[0]
@@ -344,10 +344,10 @@ def fit_portrait_function(params, model=None, p=None, data=None, d=None, errs=No
         m += (mm**2.0)*err/p[nn]
     #print d,m,d-m
     #return -m
-    #print phase,params[1],d-m
+    if test: print phase,params[1],d-m
     return d-m
 
-def fit_portrait_function_deriv(params, model=None, p=None, data=None, d=None, errs=None, P=None, freqs=None, nu_ref=np.inf):
+def fit_portrait_function_deriv(params, model=None, p=None, data=None, d=None, errs=None, P=None, freqs=None, nu_ref=np.inf, test=False):
     """
     """
     phase = params[0]
@@ -366,7 +366,7 @@ def fit_portrait_function_deriv(params, model=None, p=None, data=None, d=None, e
     #print d_phi,d_DM
     return np.array([d_phi,d_DM])
 
-def fit_portrait_function_2deriv(params, model=None, p=None, data=None, d=None, errs=None, P=None, freqs=None, nu_ref=np.inf):      #Covariance matrix...??
+def fit_portrait_function_2deriv(params, model=None, p=None, data=None, d=None, errs=None, P=None, freqs=None, nu_ref=np.inf, test=False):      #Covariance matrix...??
     """
     """
     phase = params[0]
@@ -498,7 +498,7 @@ def fit_powlaws(data, freqs, nu0, weights, initial_params, errs):
     residuals = data - powlaw(freqs,nu0,fit_params[0],fit_params[1])
     return fit_params, fit_errs, chi_sq, dof, residuals
 
-def fit_portrait(data,model,initial_params,P=None,freqs=None,nu_ref=np.inf,scales=False):
+def fit_portrait(data,model,initial_params,P=None,freqs=None,nu_ref=np.inf,scales=False,test=False):
     """
     """
     #errs = get_noise(data,tau=True,chans=True,fd=True,frac=4) #tau = precision = 1/variance.  FIX Need to use better filtering instead of frac     #FIX get_noise is not right
@@ -510,7 +510,7 @@ def fit_portrait(data,model,initial_params,P=None,freqs=None,nu_ref=np.inf,scale
     errs = unnorm_errs
     d = np.real(np.sum(np.transpose(errs*np.transpose(dFFT*np.conj(dFFT)))))
     p = np.real(np.sum(mFFT*np.conj(mFFT),axis=1))
-    other_args = (mFFT,p,dFFT,d,errs,P,freqs,nu_ref)
+    other_args = (mFFT,p,dFFT,d,errs,P,freqs,nu_ref,test)
     #minimize = opt.fmin #same as others, 14s
     #minimize = opt.fmin_powell  #+1 phase, off in DM, 11s
     #minimize = opt.fmin_l_bfgs_b #same answer as cg, ~10s,7.6s
@@ -591,7 +591,7 @@ def make_model(phases,freqs,modelfile=None,refparams=None,As=None,alphas=None,nu
             amp = powlaw(freq,nu0,A,alpha)
             model[ff] += amp*gaussian_profile(nbin,mu,fwhm)
     if modelfile:
-        if not quiet: print "Made %d component model for %s with %d frequency channels, %d profile bins, %.0f MHz bandwidth centered on %.2f MHz"%(ngauss, source,nchan,nbin,(freqs[-1]-freqs[0])+((freqs[-1]-freqs[-2])),nu0)
+        if not quiet: print "Made %d component model for %s with %d frequency channels, %d profile bins, %.0f MHz bandwidth centered on %.2f MHz"%(ngauss,source,nchan,nbin,(freqs[-1]-freqs[0])+((freqs[-1]-freqs[-2])),nu0)
         return source,ngauss,refparams,As,alphas,nu0,model
     else:
         if not quiet: print "Made %d component model with %d frequency channels, %d profile bins, %.0f MHz bandwidth centered on %.2f MHz"%((len(refparams)-1)/3, nchan,nbin,(freqs[-1]-freqs[0])+((freqs[-1]-freqs[-2])),nu0)
@@ -720,12 +720,14 @@ def load_data(filenm,dedisperse=False,tscrunch=False,pscrunch=False,quiet=False,
     source = arch.get_source()
     if not quiet: print "Reading data from %s on source %s..."%(filenm,source)
     #Get some metadata
-    nu0 = arch.get_centre_frequency()   #I'm taking this to be the center of the continuous band, not some bin edge value
+    nu0 = arch.get_centre_frequency()   #Center of the band
     bw = arch.get_bandwidth()
     nchan = arch.get_nchan()
-    chanwidth = bw/nchan
-    lofreq = nu0-(bw/2)
-    freqs = np.linspace(lofreq+(chanwidth/2.0),lofreq+bw-(chanwidth/2.0),nchan)     #Centers of frequency channels
+    #By-hand frequency calculation, equivalent to below from psrchive
+    #chanwidth = bw/nchan
+    #lofreq = nu0-(bw/2)
+    #freqs = np.linspace(lofreq+(chanwidth/2.0),lofreq+bw-(chanwidth/2.0),nchan)     #Centers of frequency channels
+    freqs = np.array([arch.get_Integration(0).get_centre_frequency(ii) for ii in range(nchan)])
     nbin = arch.get_nbin()
     phases = np.arange(nbin, dtype='d')/nbin
     #Dedisperse?
@@ -782,7 +784,7 @@ def load_data(filenm,dedisperse=False,tscrunch=False,pscrunch=False,quiet=False,
 #            # channels         = %d\n\
 #            unzapped chan.     = %d"%(nu0,bw,nbin,nchan,len(portx[0]))
 #        arch.refresh()
-#        return source,arch,port,portx,noise_stdev,prof,nbin,phases,nu0,bw,nchan,chanwidth,lofreq,freqs,freqsx,nsub,P,weights,normweights,maskweights,portweights    #Stokes
+#        return source,arch,port,portx,noise_stdev,prof,nbin,phases,nu0,bw,nchan,freqs,freqsx,nsub,P,weights,normweights,maskweights,portweights    #Stokes
 #    else:
     #tscrunch?
     if tscrunch: arch.tscrunch()
@@ -818,8 +820,8 @@ def load_data(filenm,dedisperse=False,tscrunch=False,pscrunch=False,quiet=False,
         # unzapped chan.   ~ %d\n\
         # sub ints         = %d"%(nu0,bw,nbin,nchan,int(np.array(map(len,portxs)).mean()),nsub) #FIX might not work if subints masked differently
     arch.refresh()      #FIX return as is or as requested scrunched?
-    if tscrunch: return source,arch,ports[0],portxs[0],noise_stdev[0],fluxprof,fluxprofx,prof,nbin,phases,nu0,bw,nchan,chanwidth,lofreq,freqs,freqsx,nsub,Ps[0],MJDs[0],weights[0],normweights[0],maskweights[0],portweights[0]
-    else: return source,arch,ports,portxs,noise_stdev,fluxprof,fluxprofx,prof,nbin,phases,nu0,bw,nchan,chanwidth,lofreq,freqs,freqsx,nsub,Ps,MJDs,weights,normweights,maskweights,portweights
+    if tscrunch: return source,arch,ports[0],portxs[0],noise_stdev[0],fluxprof,fluxprofx,prof,nbin,phases,nu0,bw,nchan,freqs,freqsx,nsub,Ps[0],MJDs[0],weights[0],normweights[0],maskweights[0],portweights[0]
+    else: return source,arch,ports,portxs,noise_stdev,fluxprof,fluxprofx,prof,nbin,phases,nu0,bw,nchan,freqs,freqsx,nsub,Ps,MJDs,weights,normweights,maskweights,portweights
 
 def screen_portrait(port,portweights):
     """
@@ -911,5 +913,8 @@ def write_princeton_toa(toa_MJDi, toa_MJDf, toaerr, freq, DM, obs='@', name=' '*
 def correct_freqs_doppler(freqs,doppler_factor):
     """
     Input topocentric frequencies, output barycentric frequencies.
+    doppler_factor = nu_source / nu_observed = sqrt( (1+beta) / (1-beta))
+        for beta = v/c ; v positive for increasing source distance
+    NB: PSRCHIVE is defining doppler_factor as the inverse of the above.
     """
     return doppler_factor*freqs

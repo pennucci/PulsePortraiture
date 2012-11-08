@@ -2,10 +2,13 @@
 
 #Calls PulsePortraiture to generate analytic Gaussian template portrait
 
-from optparse import OptionParser,sys
+from optparse import OptionParser
 
 usage = "usage: %prog [options]"
 parser = OptionParser(usage)
+#parser.add_option("-h", "--help",
+#                  action="store_true", dest="help", default=False,
+#                  help="Show this help message and exit.")
 parser.add_option("-d", "--datafile",
                   action="store", metavar="archive", dest="datafile",
                   help="PSRCHIVE archive from which to generate Gaussian portrait.")
@@ -30,11 +33,10 @@ parser.add_option("--showplots",
 if options.datafile is None:
     print "\nppgauss.py - generate a 2D phase-frequency model portrait from Gaussian components.\n"
     parser.print_help()
-    sys.exit()
+    parser.exit()
 
 from PulsePortraiture import DataPortrait,ModelPortrait_Gaussian
 
-#Make template
 datafile = options.datafile
 outfile = options.outfile
 nsubfit = int(options.nsubfit)

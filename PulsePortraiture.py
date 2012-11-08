@@ -14,8 +14,8 @@ class DataPortrait:
         #Reading the data
         self.datafile = datafile
         self.Gfudge = Gfudge
-        (self.source,self.arch,self.port,self.portx,self.noise_stdev,self.fluxprof,self.fluxprofx,self.prof,self.nbin,self.phases,self.nu0,self.bw,self.nchan,self.chanwidth,self.lofreq,self.freqs,self.freqsx,self.nsub,self.P,self.MJD,self.weights,self.normweights,self.maskweights,self.portweights) = load_data(datafile,dedisperse=True,tscrunch=True,pscrunch=True,quiet=False,rm_baseline=(0,0),Gfudge=self.Gfudge)
-
+        (self.source,self.arch,self.port,self.portx,self.noise_stdev,self.fluxprof,self.fluxprofx,self.prof,self.nbin,self.phases,self.nu0,self.bw,self.nchan,self.freqs,self.freqsx,self.nsub,self.P,self.MJD,self.weights,self.normweights,self.maskweights,self.portweights) = load_data(datafile,dedisperse=True,tscrunch=True,pscrunch=True,quiet=False,rm_baseline=(0,0),Gfudge=self.Gfudge)
+        self.lofreq = self.freqs[0]-(self.bw/(2*self.nchan))
     def fit_profile(self):
         """
         """
@@ -261,7 +261,7 @@ class DataPortrait:
             if dofit == 1:
                 phaseguess = first_guess(self.portx,self.modelx,nguess=5000)
                 DMguess = 0.0
-                phi,DM,nfeval,rc,scalesx,param_errs,red_chi2 = fit_portrait(self.portx,self.modelx,np.array([phaseguess,DMguess]),self.P,self.freqsx,self.nu0,scales=True)
+                phi,DM,nfeval,rc,scalesx,param_errs,red_chi2 = fit_portrait(self.portx,self.modelx,np.array([phaseguess,DMguess]),self.P,self.freqsx,self.nu0,scales=True,test=False)
                 phierr = param_errs[0]
                 DMerr = param_errs[1]
                 print "Fit has phase offset of %.2e +/- %.2e [rot], DM of %.2e +/- %.2e [pc cm**-3], and red. chi**2 of %.2f."%(phi,phierr,DM,DMerr,red_chi2)
@@ -279,18 +279,14 @@ class DataPortrait:
 class ModelPortrait_Gaussian:
     """
     """
-    def __init__(self,modelfile,nchan,nbin,bw,lofreq,portweights=None,quiet=False,Gfudge=1.0):  #FIX make smarter to query DataPortrait...?
+    def __init__(self,modelfile,nbin,freqs,portweights=None,quiet=False,Gfudge=1.0):  #FIX make smarter to query DataPortrait...?
         """
         """
         self.modelfile = modelfile
-        self.nchan =  nchan
         self.nbin = nbin
-        self.bw = bw
-        self.lofreq = lofreq
+        self.freqs = freqs
         self.portweights = portweights
         self.Gfudge = Gfudge
-        self.chanwidth = bw/float(nchan)
-        self.freqs = np.linspace(lofreq+(self.chanwidth/2.0),lofreq+bw-(self.chanwidth/2.0),nchan)     #Centers of frequency channels
         self.phases = np.arange(nbin, dtype='d')/nbin
         self.source,self.ngauss,self.refparams,self.As,self.alphas,self.nu0,self.model = make_model(self.phases,self.freqs,modelfile,quiet=quiet)
         if portweights is not None: self.modelmasked,self.modelx = screen_portrait(self.model,portweights)
@@ -317,14 +313,14 @@ class ModelPortrait_Smoothed:
         """
         self.Gfudge = Gfudge
         self.modelfile = modelfile
-        (self.source,self.arch,self.port,self.portx,self.noise_stdev,self.fluxprof,self.fluxprofx,self.prof,self.nbin,self.phases,self.nu0,self.bw,self.nchan,self.chanwidth,self.lofreq,self.freqs,self.freqsx,self.nsub,self.P,self.MJD,self.weights,self.normweights,self.maskweights,self.portweights) = load_data(modelfile,dedisperse=True,tscrunch=True,pscrunch=True,quiet=False,rm_baseline=(0,0),Gfudge=self.Gfudge)
+        (self.source,self.arch,self.port,self.portx,self.noise_stdev,self.fluxprof,self.fluxprofx,self.prof,self.nbin,self.phases,self.nu0,self.bw,self.nchan,self.freqs,self.freqsx,self.nsub,self.P,self.MJD,self.weights,self.normweights,self.maskweights,self.portweights) = load_data(modelfile,dedisperse=True,tscrunch=True,pscrunch=True,quiet=False,rm_baseline=(0,0),Gfudge=self.Gfudge)
         self.model = self.port
         self.modelx = self.portx
 
 class GetTOAs:
     """
     """
-    def __init__(self,datafile,modelfile,mtype=None,outfile=None,mcmc=False,iters=20000,burn=10000,thin=100,starti=0,lsfit=True,write_TOAs=True,quiet=False,Gfudge=1.0):    #How much to thin? Burn?
+    def __init__(self,datafile,modelfile,mtype=None,DM0=None,bary_DM=True,one_DM=False,outfile=None,mcmc=False,iters=20000,burn=10000,thin=100,starti=0,lsfit=True,write_TOAs=True,quiet=False,Gfudge=1.0):    #How much to thin? Burn?
         """
         """
         self.datafile=datafile
@@ -332,11 +328,12 @@ class GetTOAs:
         self.mtype=mtype
         self.outfile=outfile
         self.Gfudge=Gfudge
-        (self.source,self.arch,self.ports,self.portxs,self.noise_stdev,self.fluxprof,self.fluxprofx,self.prof,self.nbin,self.phases,self.nu0,self.bw,self.nchan,self.chanwidth,self.lofreq,self.freqs,self.freqsx,self.nsub,self.Ps,self.epochs,self.weights,self.normweights,self.maskweights,self.portweights) = load_data(datafile,dedisperse=False,tscrunch=False,pscrunch=True,quiet=False,rm_baseline=(0,0),Gfudge=self.Gfudge)
+        (self.source,self.arch,self.ports,self.portxs,self.noise_stdev,self.fluxprof,self.fluxprofx,self.prof,self.nbin,self.phases,self.nu0,self.bw,self.nchan,self.freqs,self.freqsx,self.nsub,self.Ps,self.epochs,self.weights,self.normweights,self.maskweights,self.portweights) = load_data(datafile,dedisperse=False,tscrunch=False,pscrunch=True,quiet=False,rm_baseline=(0,0),Gfudge=self.Gfudge)
         self.MJDs = np.array([self.epochs[ii].in_days() for ii in xrange(self.nsub)],dtype=np.double)
-        self.DM0 = self.arch.get_dispersion_measure()
+        if DM0: self.DM0 = DM0
+        else: self.DM0 = self.arch.get_dispersion_measure()
         print '\n'
-        if self.mtype == "gauss": self.modelportrait=ModelPortrait_Gaussian(modelfile,self.nchan,self.nbin,self.bw,self.lofreq,portweights=None,quiet=False,Gfudge=1.0)
+        if self.mtype == "gauss": self.modelportrait=ModelPortrait_Gaussian(modelfile,self.nbin,self.freqs,portweights=None,quiet=False,Gfudge=1.0)
         elif self.mtype == "smooth": self.modelportrait=ModelPortrait_Smoothed(modelfile,quiet=False,Gfudge=self.Gfudge)
         else:
             print 'Model type must be either "gauss" or "smooth".'
@@ -425,14 +422,17 @@ class GetTOAs:
             print "Each of the %d TOAs are approximately %.2f s"%(self.nsub,self.arch.integration_length()/self.nsub)
             print "Doing Fourier-domain least-squares fit via chi_2 minimization...\n"  #FIX
             start = time.time()
-            self.phis = []
-            self.DMs = []
-            self.nfevals = []
-            self.rcs = []
+            self.phis = np.empty(self.nsub)
+            self.phi_errs = np.empty(self.nsub)
+            self.DMs = np.empty(self.nsub)
+            self.DM_errs = np.empty(self.nsub)
+            self.nfevals = np.empty(self.nsub,dtype='int')
+            self.rcs = np.empty(self.nsub,dtype='int')
+            self.scales = np.empty([self.nsub,self.nchan])
+            #These next two are lists becuase in principle, the subints could have different numbers of zapped channels, though highly unlikely.
             self.scalesx = []
-            self.scales = []
-            self.param_errs = []
-            self.red_chi2s = []
+            self.scale_errs = []
+            self.red_chi2s = np.empty(self.nsub)
             for nn in range(self.nsub):
                 dataportrait = self.portxs[nn]
                 portx_fft = np.fft.rfft(dataportrait,axis=1)
@@ -466,12 +466,22 @@ class GetTOAs:
                 #if not quiet: print "Phase guess: %.8f ; DM guess: %.5f"%(phaseguess,DMguess)
                 #NEED status bar?
                 print "Fitting for TOA %d...put more info here"%(nn+1)      #FIX
-                phi,DM,nfeval,rc,scalex,param_errs,red_chi2 = fit_portrait(self.portxs[nn],modelx,np.array([phaseguess,DMguess]),P,freqsx,nu0,scales=True)
-                self.phis.append(phi)
-                self.DMs.append(DM)
-                self.nfevals.append(nfeval)
-                self.rcs.append(rc)
+                phi,DM,nfeval,rc,scalex,param_errs,red_chi2 = fit_portrait(self.portxs[nn],modelx,np.array([phaseguess,DMguess]),P,freqsx,nu0,scales=True,test=False)
+                self.phis[nn] = phi
+                self.phi_errs[nn] = param_errs[0]
+                ####################
+                #DOPPLER CORRECTION#
+                ####################
+                if bary_DM:
+                    #NB: the 'doppler factor' retrieved below seems to be the inverse of the convention nu_source/nu_observed
+                    df = self.arch.get_Integration(nn).get_doppler_factor()
+                    DM *= df
+                self.DMs[nn] = DM
+                self.DM_errs[nn] = param_errs[1]
+                self.nfevals[nn] = nfeval
+                self.rcs[nn] = rc
                 self.scalesx.append(scalex)
+                self.scale_errs.append(param_errs[2:])
                 scale = np.zeros(self.nchan)
                 ss = 0
                 for ii in range(self.nchan):
@@ -479,29 +489,33 @@ class GetTOAs:
                         scale[ii] = scalex[ss]
                         ss += 1
                     else: pass
-                self.scales.append(scale)
-                self.param_errs.append(param_errs)
-                self.red_chi2s.append(red_chi2)
-                #duration = time.time()-start
-                #print nn,duration,phi,DM,scalesx,param_errs,red_chi2 #Also have it print red_chi_2
-                ###mark rc=1,2,4 points in different colors###
-                #self.show_fit(nn)
+                self.scales[nn] = scale
+                self.red_chi2s[nn] = red_chi2
+            self.DeltaDMs = self.DMs - self.DM0
+            self.DeltaDM_mean,self.DeltaDM_var = np.average(self.DeltaDMs,weights=self.DM_errs**-2,returned=True)   #Returns the weighted mean and the sum of the weights
+            self.DeltaDM_var = self.DeltaDM_var**-1
+            if self.nsub > 1: self.DeltaDM_var *= np.sum(((self.DeltaDMs-self.DeltaDM_mean)**2)/(self.DM_errs**2))/(len(self.DeltaDMs)-1)    #Multiplying by the chi-squared...
+            self.DeltaDM_err = self.DeltaDM_var**0.5
             if write_TOAs:
                 toas = [self.epochs[nn] + pr.MJD((self.phis[nn]*self.Ps[nn])/(3600*24.)) for nn in xrange(self.nsub)]
-                toa_errs = [np.array(self.param_errs)[nn,0]*self.Ps[nn]*1e6 for nn in xrange(self.nsub)]
+                #toas = self.epochs + pr.MJD((self.phis*self.Ps)/(3600*24.))
+                #toa_errs = [np.array(self.param_errs[nn,0])*self.Ps[nn]*1e6 for nn in xrange(self.nsub)]
+                toa_errs = self.phi_errs*self.Ps*1e6
                 if self.outfile: sys.stdout = open(self.outfile,"a")
+                #Should write which freqs? topo or bary?
+                #Have option for different kinds of TOA output
                 for nn in range(self.nsub):
-                    DeltaDM = self.DMs[nn] - self.DM0
-                    #Should write which freqs? topo or bary?
-                    write_princeton_toa(toas[nn].intday(),toas[nn].fracday(),toa_errs[nn],self.nu0,DeltaDM,obs=obs)
+                    if one_DM:
+                        write_princeton_toa(toas[nn].intday(),toas[nn].fracday(),toa_errs[nn],self.nu0,self.DeltaDM_mean,obs=obs)
+                    else:
+                        write_princeton_toa(toas[nn].intday(),toas[nn].fracday(),toa_errs[nn],self.nu0,self.DeltaDMs[nn],obs=obs)
             sys.stdout = sys.__stdout__
             duration = time.time()-start
-            #print self.red_chi2s
-            print "\nFitting took %.1f min, ~%.3f min/TOA, mean TOA error is %.3f us"%(duration/60.,duration/(60*self.nsub),np.array(self.param_errs)[:,0].mean()*self.Ps.mean()*1e6)
+            print "\nFitting took %.1f min, ~%.3f min/TOA, mean TOA error is %.3f us"%(duration/60.,duration/(60*self.nsub),self.phi_errs.mean()*self.Ps.mean()*1e6)
         show_DMerr = 0
         if show_DMerr:
             for nn in range(self.nsub):
-                print "%.2e"%np.array(self.param_errs)[nn,1]
+                print "%.2e"%self.DM_errs[nn]
 
     def show_subint(self,subint,fignum=None):
         """
@@ -563,43 +577,50 @@ class GetTOAs:
         if fignum: fig = plt.figure(fignum)
         else: fig = plt.figure()
         pf = np.polynomial.polynomial.polyfit
-        fit_results = pf(self.MJDs,self.phis*self.Ps*1e3,1,full=True,w=np.array(self.param_errs)[:,0]**-2)      #FIX not sure weighting works...
-        resids = np.array(self.phis*self.Ps*1e3)-(fit_results[0][0]+(fit_results[0][1]*self.MJDs))
-        RMS = np.sum(resids**2/len(resids))**0.5        #FIX  check this, RMS seems too high
+        fit_results = pf(self.MJDs,self.phis*self.Ps*1e3,1,full=True,w=self.phi_errs**-2)      #FIX not sure weighting works...
+        resids = (self.phis*self.Ps*1e3)-(fit_results[0][0]+(fit_results[0][1]*self.MJDs))
+        resids_mean,resids_var = np.average(resids,weights=self.phi_errs**-2,returned=True)
+        resids_var = resids_var**-1
+        if self.nsub > 1: resids_var *= np.sum(((resids-resids_mean)**2)/(self.phi_errs**2))/(len(resids)-1)
+        resids_err = resids_var**0.5
+        RMS = resids_err
+        #RMS = np.sum(resids**2/len(resids))**0.5        #FIX  check this, RMS seems too high
         ax1 = fig.add_subplot(311)
-        #ax1.errorbar(self.MJDs,self.phis,[self.param_errs[xx][0] for xx in xrange(len(self.phis))],color='k',fmt='+')
+        #ax1.errorbar(self.MJDs,self.phis,[self.phi_errs[xx] for xx in xrange(len(self.phis))],color='k',fmt='+')
         for nn in range(len(self.phis)):
-            ax1.errorbar(self.MJDs[nn],self.phis[nn]*self.Ps[nn]*1e6,self.param_errs[nn][0]*self.Ps[nn]*1e6,color='%s'%cols[self.rcs[nn]],fmt='+')
+            ax1.errorbar(self.MJDs[nn],self.phis[nn]*self.Ps[nn]*1e6,self.phi_errs[nn]*self.Ps[nn]*1e6,color='%s'%cols[self.rcs[nn]],fmt='+')
         plt.plot(self.MJDs,(fit_results[0][0]+(fit_results[0][1]*self.MJDs))*1e3,"m--")
         plt.xlabel("MJD")
         plt.ylabel(r"Offset [$\mu$s]")
         ax1.text(0.1,0.9,"%.2e ms/s"%(fit_results[0][1]/(3600*24)),ha='center',va='center',transform=ax1.transAxes)
         ax2 = fig.add_subplot(312)
         for nn in range(len(self.phis)):
-            ax2.errorbar(self.MJDs[nn],resids[nn]*1e3,self.param_errs[nn][0]*self.Ps[nn]*1e6,color='%s'%cols[self.rcs[nn]],fmt='+')
+            ax2.errorbar(self.MJDs[nn],resids[nn]*1e3,self.phi_errs[nn]*self.Ps[nn]*1e6,color='%s'%cols[self.rcs[nn]],fmt='+')
+        plt.plot(self.MJDs,np.ones(len(self.MJDs))*resids_mean*1e3,"m--")
+        xverts=np.array([self.MJDs[0],self.MJDs[0],self.MJDs[-1],self.MJDs[-1]])
+        yverts=np.array([resids_mean-resids_err,resids_mean+resids_err,resids_mean+resids_err,resids_mean-resids_err])*1e3
+        plt.fill(xverts,yverts,"m",alpha=0.25,ec='none')
         plt.xlabel("MJD")
         plt.ylabel(r"Offset [$\mu$s]")
-        ax2.text(0.1,0.9,"RMS = %d ns"%int(RMS*1e6),ha='center',va='center',transform=ax2.transAxes)
-        #FIX below; no need to fit...just get average and std
-        fit_results = pf(self.MJDs,self.DMs,0,full=True,w=np.array(self.param_errs)[:,1]**-2)      #FIX not sure weighting works...
-        #fit_results = pf(self.MJDs,self.DMs,1,full=True,w=np.array(self.param_errs)[:,1]**-2)      #FIX not sure weighting works...
-        resids = np.array(self.DMs)-fit_results[0][0]
-        #resids = np.array(self.DMs)-(fit_results[0][0]+(fit_results[0][1]*self.MJDs))
-        RMS = np.sum(resids**2/len(resids))**0.5
+        ax2.text(0.1,0.9,r"$\sim$weighted RMS = %d ns"%int(resids_err*1e6),ha='center',va='center',transform=ax2.transAxes)
         ax3 = fig.add_subplot(313)
-        #ax3.errorbar(self.MJDs,self.DMs,[self.param_errs[xx][1] for xx in xrange(len(self.DMs))],color='k',fmt='+')
+        #ax3.errorbar(self.MJDs,self.DMs,[self.DM_errs[xx] for xx in xrange(len(self.DMs))],color='k',fmt='+')
         for nn in range(len(self.phis)):
-            ax3.errorbar(self.MJDs[nn],self.DMs[nn],self.param_errs[nn][1],color='%s'%cols[self.rcs[nn]],fmt='+')
-        plt.plot(self.MJDs,np.ones(len(self.MJDs))*fit_results[0][0],"m--")
+            ax3.errorbar(self.MJDs[nn],self.DMs[nn],self.DM_errs[nn],color='%s'%cols[self.rcs[nn]],fmt='+')
+        if abs(self.DeltaDM_mean)/self.DeltaDM_err < 5: plt.plot(self.MJDs,np.ones(len(self.MJDs))*self.DM0,"r-")
+        plt.plot(self.MJDs,np.ones(len(self.MJDs))*(self.DeltaDM_mean+self.DM0),"m--")
+        xverts=[self.MJDs[0],self.MJDs[0],self.MJDs[-1],self.MJDs[-1]]
+        yverts=[self.DeltaDM_mean+self.DM0-self.DeltaDM_err,self.DeltaDM_mean+self.DM0+self.DeltaDM_err,self.DeltaDM_mean+self.DM0+self.DeltaDM_err,self.DeltaDM_mean+self.DM0-self.DeltaDM_err]
+        plt.fill(xverts,yverts,"m",alpha=0.25,ec='none')
         plt.xlabel("MJD")
         plt.ylabel(r"DM [pc cm$^{3}$]")
-        ax3.text(0.15,0.9,r"\Delta DM = %.2e ; RMS = %.2e"%(fit_results[0][0]-self.DM0,RMS),ha='center',va='center',transform=ax3.transAxes)
+        ax3.text(0.15,0.9,r"$\Delta$ DM = %.2e +/- %.2e"%(self.DeltaDM_mean,self.DeltaDM_err),ha='center',va='center',transform=ax3.transAxes)
         plt.show()
 
     def show_hists(self):
         cols = ['b','k','g','b','r']
-        bins = np.array(self.nfevals).max()
-        binmin = np.array(self.nfevals).min()
+        bins = self.nfevals.max()
+        binmin = self.nfevals.min()
         rc1=np.zeros(bins-binmin+1)
         rc2=np.zeros(bins-binmin+1)
         rc4=np.zeros(bins-binmin+1)
