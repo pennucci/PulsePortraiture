@@ -498,7 +498,7 @@ def fit_powlaws(data, freqs, nu0, weights, initial_params, errs):
     residuals = data - powlaw(freqs,nu0,fit_params[0],fit_params[1])
     return fit_params, fit_errs, chi_sq, dof, residuals
 
-def fit_portrait(data,model,initial_params,P=None,freqs=None,nu_ref=np.inf,scales=False,test=False):
+def fit_portrait(data,model,initial_params,P=None,freqs=None,nu_ref=np.inf,scales=True,test=False):
     """
     """
     #errs = get_noise(data,tau=True,chans=True,fd=True,frac=4) #tau = precision = 1/variance.  FIX Need to use better filtering instead of frac     #FIX get_noise is not right

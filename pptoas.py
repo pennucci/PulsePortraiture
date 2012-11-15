@@ -36,6 +36,9 @@ parser.add_option("--one_DM",
 parser.add_option("--errfile",
                   action="store", metavar="errfile", dest="errfile", default=None,
                   help="If specified, will write the fitted DM errors to errfile. Will append.")
+parser.add_option("--pam_cmd",
+                  action="store_true", dest="pam_cmd", default=False,
+                  help="Append pam commands to file pam_cmd.")
 parser.add_option("--showplot",
                   action="store_true", dest="showplot", default=False,
                   help="Plot fit results. Only useful if nsubint > 1.")
@@ -61,16 +64,18 @@ if options.DM0: DM0 = float(options.DM0)
 else: DM0 = None
 bary_DM = options.bary_DM
 one_DM = options.one_DM
+pam_cmd = options.pam_cmd
 outfile = options.outfile
 errfile = options.errfile
 showplot = options.showplot
 quiet = options.quiet
 
+
 if not metafile:
-    gt = GetTOAs(datafile,modelfile,mtype,DM0,bary_DM,one_DM,outfile,errfile,quiet=quiet)
+    gt = GetTOAs(datafile,modelfile,mtype,DM0,bary_DM,one_DM,pam_cmd,outfile,errfile,quiet=quiet)
     if showplot: gt.show_results()
 else:
     datafiles = open(metafile,"r").readlines()
     for datafile in datafiles:
-        gt = GetTOAs(datafile[:-1],modelfile,mtype,DM0,bary_DM,one_DM,outfile,errfile,quiet=quiet)
+        gt = GetTOAs(datafile[:-1],modelfile,mtype,DM0,bary_DM,one_DM,pam_cmd,outfile,errfile,quiet=quiet)
         if showplot: gt.show_results()
