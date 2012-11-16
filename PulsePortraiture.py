@@ -492,7 +492,7 @@ class GetTOAs:
                 self.scales[nn] = scale
                 self.red_chi2s[nn] = red_chi2
             self.DeltaDMs = self.DMs - self.DM0
-            self.DeltaDM_mean,self.DeltaDM_var = np.average(self.DeltaDMs,weights=self.DM_errs**-2,returned=True)   #Returns the weighted mean and the sum of the weights, need to do better than this in case of small-error outliers from RFI, etc.  Median...then...
+            self.DeltaDM_mean,self.DeltaDM_var = np.average(self.DeltaDMs,weights=self.DM_errs**-2,returned=True)   #Returns the weighted mean and the sum of the weights, need to do better than this in case of small-error outliers from RFI, etc.  Last TOA may mess things up...Median...then...
             self.DeltaDM_var = self.DeltaDM_var**-1
             if self.nsub > 1: self.DeltaDM_var *= np.sum(((self.DeltaDMs-self.DeltaDM_mean)**2)/(self.DM_errs**2))/(len(self.DeltaDMs)-1)    #Multiplying by the chi-squared...
             self.DeltaDM_err = self.DeltaDM_var**0.5
@@ -515,15 +515,16 @@ class GetTOAs:
             if pam_cmd:
                 pc = open("pam_cmds","a")
                 pam_ext = self.datafile[-self.datafile[::-1].find("."):]+".rot"
-                self.phi_mean,self.phi_var = np.average(self.phis,weights=self.phi_errs**-2,returned=True)   #Returns the weighted mean and the sum of the weights, need to do better than this in case of small-error outliers from RFI, etc.  Median...then...
+                self.phi_mean,self.phi_var = np.average(self.phis,weights=self.phi_errs**-2,returned=True)   #Returns the weighted mean and the sum of the weights, need to do better than this in case of small-error outliers from RFI, etc.  Last TOA may mess things up...Median...then...
                 self.phi_var = self.phi_var**-1
                 pc.write("pam -e %s -r %.7f -d %.5f %s\n"%(pam_ext,self.phi_mean,self.DeltaDM_mean+self.DM0,self.datafile))
                 pc.close()
             if errfile:
                 ef = open(errfile,"a")
                 for nn in range(self.nsub):
-                    if nn != self.nsub-1: ef.write("%.5e\n"%self.DM_errs[nn])
-                    else: ef.write("%.5e"%self.DM_errs[nn])
+                    ef.write("%.5e\n"%self.DM_errs[nn])
+                    #if nn != self.nsub-1: ef.write("%.5e\n"%self.DM_errs[nn])
+                    #else: ef.write("%.5e"%self.DM_errs[nn])
         else:
             print "Invalid."
     def show_subint(self,subint,fignum=None):
