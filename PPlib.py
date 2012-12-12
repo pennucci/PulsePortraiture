@@ -335,11 +335,12 @@ def fit_portrait_function(params, model=None, p=None, data=None, d=None, errs=No
     if P == None or freqs == None:
         Cdm = 0.0
         freqs = np.inf*np.ones(len(model))
-    else: Cdm = params[1]*Dconst/P
+    else: Cdm = Dconst*params[1]/P
     for nn in xrange(len(freqs)):
         err = errs[nn]
         freq = freqs[nn]
-        phasor = np.exp(np.arange(len(model[nn])) * 2.0j*np.pi*(phase+(Cdm*(freq**-2.0 - nu_ref**-2.0))))
+        harmind = np.arange(len(model[nn]))
+        phasor = np.exp(harmind * 2.0j*np.pi*(phase+(Cdm*(freq**-2.0 - nu_ref**-2.0))))
         mm = np.real(data[nn,:] * np.conj(model[nn,:]) * phasor).sum()
         m += (mm**2.0)*err/p[nn]
     #print d,m,d-m
@@ -351,7 +352,7 @@ def fit_portrait_function_deriv(params, model=None, p=None, data=None, d=None, e
     """
     """
     phase = params[0]
-    Cdm = params[1]*Dconst/P
+    Cdm = Dconst*params[1]/P
     d_phi,d_DM = 0.0,0.0
     for nn in xrange(len(freqs)):
         err = errs[nn]
@@ -370,7 +371,7 @@ def fit_portrait_function_2deriv(params, model=None, p=None, data=None, d=None, 
     """
     """
     phase = params[0]
-    Cdm = params[1]*Dconst/P
+    Cdm = Dconst*params[1]/P
     d2_phi,d2_DM = 0.0,0.0
     for nn in xrange(len(freqs)):
         err = errs[nn]
@@ -385,6 +386,25 @@ def fit_portrait_function_2deriv(params, model=None, p=None, data=None, d=None, 
         d2_phi += -2.0*err*(pow(gp2,2.0)+(g1*gp3))/p[nn]
         d2_DM += -2.0*err*(pow(gd2,2.0)+(g1*gd3))/p[nn]
     return np.array([d2_phi,d2_DM])
+
+def estimate_portrait(phase, DM, data, scales, P, freqs, nu_ref=np.inf): #here, all vars have additional epoch-index except nu_ref, i.e. all have to be arrays of at least len 1; errs are precision
+    """
+    """
+    #Next lines should be done just as in fit_portrait
+    dFFT = fft.rfft(data,axis=2)
+    unnorm_errs = np.real(dFFT[:,:,-len(dFFT[0,0])/4:]).std(axis=2)**-2.    #Precision FIX
+    #norm_dFFT = np.transpose((unnorm_errs**0.5)*np.transpose(dFFT))
+    #norm_errs = np.real(norm_dFFT[:,:,-len(norm_dFFT[0,0])/4:]).std(axis=2)**-2.
+    errs = unnorm_errs
+    D = Dconst*DM/P
+    freqs2 = freqs**-2.0 - nu_ref**-2.0
+    phiD = np.outer(D,freqs2)
+    phiprime = np.outer(phase,np.ones(len(freqs))) + phiD
+    weight = np.sum(pow(scales,2.0)*errs,axis=0)**-1
+    phasor = np.array([np.exp(2.0j*np.pi*kk*phiprime) for kk in xrange(len(dFFT[0,0]))]).transpose(1,2,0)
+    p = np.sum(np.transpose(np.transpose(scales*errs)*np.transpose(phasor*dFFT)),axis=0)
+    wp = np.transpose(weight*np.transpose(p))
+    return wp
 
 def wiener_filter(prof,noise):      #FIX does not work
     """
@@ -504,7 +524,7 @@ def fit_portrait(data,model,initial_params,P=None,freqs=None,nu_ref=np.inf,scale
     #errs = get_noise(data,tau=True,chans=True,fd=True,frac=4) #tau = precision = 1/variance.  FIX Need to use better filtering instead of frac     #FIX get_noise is not right
     dFFT = fft.rfft(data,axis=1)
     mFFT = fft.rfft(model,axis=1)
-    unnorm_errs = np.real(dFFT[:,-len(dFFT[0])/4:]).std(axis=1)**-2.    #Variance FIX
+    unnorm_errs = np.real(dFFT[:,-len(dFFT[0])/4:]).std(axis=1)**-2.    #Precision FIX
     norm_dFFT = np.transpose((unnorm_errs**0.5)*np.transpose(dFFT))
     norm_errs = np.real(norm_dFFT[:,-len(norm_dFFT[0])/4:]).std(axis=1)**-2.
     errs = unnorm_errs
@@ -535,7 +555,9 @@ def fit_portrait(data,model,initial_params,P=None,freqs=None,nu_ref=np.inf,scale
     red_chi2 = fit_portrait_function(np.array([phi,DM]),mFFT,p,dFFT,d,errs,P,freqs,nu_ref) / DoF
     if scales:
         scales = get_scales(data,model,phi,DM,P,freqs,nu_ref)
-        param_errs += list(pow(2*p*errs,-0.5))
+        param_errs += list(pow(2*p*errs,-0.5))  #Errors on scales, if ever needed
+        plt.imshow(fft.irfft(ep),aspect="auto",origin="lower",extent=(0.0,1.0,freqs[0],freqs[-1]))
+        plt.show()
         return phi, DM, nfeval, return_code, scales, np.array(param_errs),red_chi2
     else: return phi, DM, nfeval, return_code, np.array(param_errs),red_chi2
 
@@ -904,7 +926,7 @@ def write_princeton_toa(toa_MJDi, toa_MJDf, toaerr, freq, DM, obs='@', name=' '*
     # Splice together the fractional and integer MJDs
     toa = "%5d"%int(toa_MJDi) + ("%.13f"%toa_MJDf)[1:]
     if DM!=0.0:
-        print obs+" %13s %8.3f %s %8.3f              %9.4f" % \
+        print obs+" %13s %8.3f %s %8.3f              %9.5f" % \
               (name, freq, toa, toaerr, DM)
     else:
         print obs+" %13s %8.3f %s %8.3f" % \

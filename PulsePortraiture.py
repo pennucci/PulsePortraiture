@@ -429,7 +429,7 @@ class GetTOAs:
             self.nfevals = np.empty(self.nsub,dtype='int')
             self.rcs = np.empty(self.nsub,dtype='int')
             self.scales = np.empty([self.nsub,self.nchan])
-            #These next two are lists becuase in principle, the subints could have different numbers of zapped channels, though highly unlikely.
+            #These next two are lists becuase in principle, the subints could have different numbers of zapped channels.
             self.scalesx = []
             self.scale_errs = []
             self.red_chi2s = np.empty(self.nsub)
@@ -665,3 +665,33 @@ class GetTOAs:
             plt.xlabel("rc")
             plt.ylabel("counts")
         plt.show()
+
+#class MakeModelPortrait:
+#    """
+#    """
+#    def __init__(self,datafiles=None,metafile=None,nu_ref=np.inf):
+#        if datafiles and metafile:
+#            print "Too many file options specified."
+#            sys.exit()
+#        if metafile:
+#            datafiles = open(metafile,"r").readlines()
+#        self.nepoch = len(datafiles)
+#        freqs = []
+#        ports = []
+#        phaseguess = []
+#        DMguess = []
+#        scalesguess = []
+#        for nn in range(self.nepoch):
+#            (source,arch,port,portx,noise_stdev,fluxprof,fluxprofx,prof,nbin,phases,nu0,bw,nchan,freqs,freqsx,nsub,P,MJD,weights,normweights,maskweights,portweights) = load_data(datafiles[nn],dedisperse=False,tscrunch=True,pscrunch=True,quiet=False,rm_baseline=(0,0),Gfudge=self.Gfudge)
+#            freqs.append(freqsx)
+#            ports.append(portx)
+#            if nn == 0:
+#                port_ref = portx
+#                phaseguess.append(0.0)
+#            else:
+#                phaseguess.append(first_guess(portx,port_ref,nguess=1000))
+#            DMguess.append(arch.get_dispersion_measure())
+#            if nn == 0:
+#                scales_ref = prof.max()
+#            scalesguess.append(np.ones(len(freqsx))*prof.max()/scales_ref)
+
