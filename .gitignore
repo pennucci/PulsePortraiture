@@ -1,6 +1,6 @@
-PulsePortraiture_old.py
 *.pyc
 *.swp
 *~
 test/
+misc/
 notes

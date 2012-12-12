@@ -145,7 +145,7 @@ class DataPortrait:
         plt.colorbar()
         plt.show()
 
-    def make_Gaussian_model_portrait(self,nsubfit=8,guessA=1.0,guessalpha=0.0,niter=0,nuspacing=True,makemovie=False,writemodel=True,outfile=None,subfitplots=False,evolplots=False,PLplots=False,residplot=True,showall=False,shownone=False):
+    def make_gaussian_model_portrait(self,nsubfit=8,guessA=1.0,guessalpha=0.0,niter=0,nuspacing=True,makemovie=False,writemodel=True,outfile=None,subfitplots=False,evolplots=False,PLplots=False,residplot=True,showall=False,shownone=False):
         """
         """
         if outfile is None: outfile=self.datafile+".model"
