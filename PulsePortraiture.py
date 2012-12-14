@@ -16,6 +16,8 @@ class DataPortrait:
         self.Gfudge = Gfudge
         (self.source,self.arch,self.port,self.portx,self.noise_stdev,self.fluxprof,self.fluxprofx,self.prof,self.nbin,self.phases,self.nu0,self.bw,self.nchan,self.freqs,self.freqsx,self.nsub,self.P,self.MJD,self.weights,self.normweights,self.maskweights,self.portweights) = load_data(datafile,dedisperse=True,tscrunch=True,pscrunch=True,quiet=False,rm_baseline=(0,0),Gfudge=self.Gfudge)
         self.lofreq = self.freqs[0]-(self.bw/(2*self.nchan))
+        self.init_params = []
+
     def fit_profile(self):
         """
         """
@@ -63,70 +65,13 @@ class DataPortrait:
                 plt.show()
             return params[0],params[1]
 
-    def show_evol_plots(self):
-        """
-        """
-        try:            #FIX make smarter, or in case evol plots are needed for just modelfile
-            print "Plotting component evolution for %d fitted subbands..."%self.nsubfit
-        except(AttributeError):     #__getattr__ __getattribute__?
-            print "Model portrait has not been made yet. Use make_model_portrait()."
-            return 0
-        subfitparams = self.subfitparams
-        subfreqs = self.subfreqs
-        nsubfit = self.nsubfit
-        dcfig = plt.figure(1)
-        plt.title("DC parameter")
-        plt.plot(subfitparams[:,0],'k')
-        phasefig = plt.figure(2)
-        for gg in xrange(self.ngauss):
-            plt.errorbar(subfitparams[:,1::3][:,gg],subfreqs,fmt='%s-'%cols[gg],xerr=subfitparams[:,2::3][:,gg]/2,ecolor='%s'%cols[gg])
-            for hh in xrange(nsubfit):
-                plt.plot(subfitparams[:,1::3][:,gg][hh],subfreqs[hh],'%so'%cols[gg],ms=30*subfitparams[:,3::3][:,gg][hh]/subfitparams[:,3::3].max())
-        plt.title("Component Evolution")
-        plt.xlabel("Phase [rot]")
-        plt.ylabel("Frequency [MHz]")
-        fwhmfig = plt.figure(3)
-        for gg in xrange(self.ngauss):
-            plt.plot(subfitparams[:,2::3][:,gg],subfreqs,'%s-'%cols[gg])
-        plt.title("Component Width Evolution")
-        plt.xlabel("Width [rot]")
-        plt.ylabel("Frequency [MHz]")
-        amplfig = plt.figure(4)
-        for gg in xrange(self.ngauss):
-            plt.plot(subfitparams[:,3::3][:,gg],subfreqs,'%s-'%cols[gg])
-        plt.title("Component Height Evolution")
-        plt.xlabel("Flux Density [mJy-ish]")
-        plt.ylabel("Frequency [MHz]")
-        plt.show()
-
-    def show_PL_plots(self):
-        """
-        """
-        try:            #FIX make smarter, or in case PL plots are needed with just modelfile
-            print "Plotting component power-law evolution for %d fitted subbands..."%self.nsubfit
-        except(AttributeError):
-            print "Model portrait has not been made yet. Use make_model_portrait()."
-            return 0
-        subfitparams = self.subfitparams
-        subfreqs = self.subfreqs
-        As = self.As
-        alphas = self.alphas
-        for gg in xrange(self.ngauss):
-            plt.plot(subfreqs,subfitparams[:,3::3][:,gg],'%s+'%cols[gg])
-            plt.plot(subfreqs,powlaw(subfreqs,self.nu0,As[gg],alphas[gg]),'%s'%cols[gg])
-            plt.title("Component Height Power-Law Fits")
-            plt.xlabel("Frequency [MHz]")
-            plt.ylabel("Flux Density [mJy-ish]")
-        plt.show()
-
     def show_residual_plot(self):
         """
         """
         try:            #FIX make smarter
             junq = self.model.shape
-            print "Plotting portrait residuals..."
         except(AttributeError):
-            print "No model portrait.  Use make_model_portrait() or make_model()."
+            print "No model portrait. Use make_gaussian_model_portrait()."
             return 0
         modelfig = plt.figure()
         plt.subplot(221)
@@ -143,120 +88,51 @@ class DataPortrait:
         plt.title(r"Log$_{10}$(abs(Residuals/Data))")
         plt.imshow(np.log10(abs(self.port-self.model)/self.port),aspect="auto",origin="lower",extent=(0.0,1.0,self.freqs[0],self.freqs[-1]))
         plt.colorbar()
+        print "Residuals mean: %.3f"%(self.portx-self.modelx).mean()
+        print "Residuals std:  %.3f"%(self.portx-self.modelx).std()
+        print "Data std:       %.3f"%self.noise_stdev
         plt.show()
 
-    def make_gaussian_model_portrait(self,nsubfit=8,guessA=1.0,guessalpha=0.0,niter=0,nuspacing=True,makemovie=False,writemodel=True,outfile=None,subfitplots=False,evolplots=False,PLplots=False,residplot=True,showall=False,shownone=False):
+    def make_gaussian_model_portrait(self,locparams=0.0,fixloc=True,widparams=0.0,fixwid=False,ampparams=0.0,fixamp=False,nu_ref=None,niter=0,writemodel=True,outfile=None,residplot=True,quiet=True):
         """
         """
+        self.fix_params = np.array([fixloc,fixwid,fixamp])
+        if not len(self.init_params): self.fit_profile()
+        if type(locparams) is not np.ndarray:
+            try: locparams = np.ones(self.ngauss)*locparams
+            except ValueError:
+                print "Not enough parameters for ngauss = %d."%self.ngauss
+                return 0
+        if type(widparams) is not np.ndarray:
+            try: widparams = np.ones(self.ngauss)*widparams
+            except ValueError:
+                print "Not enough parameters for ngauss = %d."%self.ngauss
+                return 0
+        if type(ampparams) is not np.ndarray:
+            try: ampparams = np.ones(self.ngauss)*ampparams
+            except ValueError:
+                print "Not enough parameters for ngauss = %d."%self.ngauss
+                return 0
+        if nu_ref is None: self.nu_ref = self.nu0
         if outfile is None: outfile=self.datafile+".model"
+        self.init_model_params = np.empty([self.ngauss,6])
+        for nn in range(self.ngauss):
+            self.init_model_params[nn] = np.array([self.init_params[1::3][nn],locparams[nn],self.init_params[2::3][nn],widparams[nn],self.init_params[3::3][nn],ampparams[nn]])
+        self.init_model_params = np.array([self.init_params[0]]+list(np.ravel(self.init_model_params)))
         itern = niter
         if niter < 0: niter=0
         niter += 1
+        portx_noise = np.outer(get_noise(self.portx,chans=True),np.ones(self.nbin))
         while(niter):
             niter -= 1
-            print "Fitting %i components across each of %i subbands..."%(self.ngauss,nsubfit)
-            if showall:
-                subfitplots=True
-                evolplots=True
-                PLplots=True
-                residplot=True
-            if shownone:
-                subfitplots=False
-                evolplots=False
-                PLplots=False
-                residplot=False
-            if nuspacing:                   #FIX this should probably be double checked
-                subfreqs = powlawnus(self.lofreq,self.lofreq+self.bw,nsubfit,self.flux_profile(plot=False,quiet=True)[1],mid=False)
-                subfreqbins = np.zeros(len(subfreqs))
-                for ii in xrange(len(subfreqs)):
-                    subfreqbins[ii] = np.argmin(np.abs(subfreqs[ii]-self.freqs))
-                scrport = np.zeros([nsubfit,self.nbin])
-                for ii in xrange(nsubfit):
-                    norm = self.normweights[subfreqbins[ii]:subfreqbins[ii+1]].sum()
-                    scrport[ii] = np.sum(self.port[subfreqbins[ii]:subfreqbins[ii+1]],axis=0)/norm
-                subfreqs = powlawnus(self.lofreq,self.lofreq+self.bw,nsubfit,self.flux_profile(plot=False,quiet=True)[1],mid=True)
-            else:
-                subfreqs = powlawnus(self.lofreq,self.lofreq+self.bw,nsubfit,0.0,mid=False)
-                subfreqbins = np.zeros(len(subfreqs))
-                for ii in xrange(len(subfreqs)):
-                    subfreqbins[ii] = np.argmin(np.abs(subfreqs[ii]-self.freqs))
-                scrport = np.zeros([nsubfit,self.nbin])
-                for ii in xrange(nsubfit):
-                    norm = self.normweights[subfreqbins[ii]:subfreqbins[ii+1]].sum()
-                    scrport[ii] = np.sum(self.port[subfreqbins[ii]:subfreqbins[ii+1]],axis=0)/norm
-                subfreqs = powlawnus(self.lofreq,self.lofreq+self.bw,nsubfit,0.0,mid=True)
-                #subfreqs = powlawnus(self.lofreq,self.lofreq+self.bw,nsubfit,0.0,mid=True)
-                #self.arch.fscrunch_to_nchan(nsubfit)
-                #scrport = self.arch.get_data()[0][0]*self.Gfudge
-            ymax = scrport.ravel().max()*1.15
-            ymin = scrport.ravel().min()*1.15
-            subfitparams = np.zeros([nsubfit,len(self.init_params)])
-            if makemovie: moviefiles=[]
-            for ii in xrange(nsubfit):
-                #Need better noise estimate
-                (params,param_errs,chi2,dof,residuals) = fit_gaussians(scrport[ii],self.init_params,self.noise_stdev,self.datafile,quiet=1)
-                subfitparams[ii] = params
-                #To convert Scott's amplitude parameter to the amplitude at the mean...     #FIX needed? already done?
-                #subfitparams[ii][3::3] *= (2*np.pi*((subfitparams[ii][2::3]/(2*np.sqrt(2*np.log(2))))**2))**-0.5     #FIX needed? already done?
-                plt.figure(ii)
-                plt.subplot(211)
-                plt.title("%s Frequency Evolution"%self.source)
-                plt.ylabel("Flux Density-ish [mJy]")
-                plt.ylim(ymin,ymax)
-                plt.text(0.75,ymax*0.8,'%.2f Hz'%subfreqs[ii])
-                plt.plot(self.phases,scrport[ii],'k')
-                DC = params[0]
-                for gg in xrange(self.ngauss):
-                    phase, FWHM, amp = params[1+gg*3:4+gg*3]
-                    plt.plot(self.phases, DC + amp*gaussian_profile(self.nbin,phase,FWHM),'%s'%cols[gg])
-                fitprof = gen_gaussians(params,self.nbin)
-                plt.plot(self.phases,fitprof,'r--',lw=1)
-                plt.subplot(212)
-                plt.plot(self.phases,residuals,'k')
-                plt.xlabel("Phase [rot]")
-                plt.ylabel("Data-Fit Residuals")
-                print "Subband %d fit done..."%(ii+1)
-                if makemovie:
-                    fname = '_tmp%03d.png'%(ii+1)
-                    plt.savefig(fname)
-                    moviefiles.append(fname)
-            if makemovie:
-                import os
-                os.system("mencoder -really-quiet 'mf://_tmp*.png' -mf type=png:fps=1 -o %s_evol.avi -ovc lavc -lavcopts vcodec=mpeg4"%self.source)
-                for fname in moviefiles:
-                    os.remove(fname)
-            if subfitplots: plt.show()
-            else: plt.close('all')
-            self.nsubfit = nsubfit
-            self.subfreqs = subfreqs
-            self.subfreqbins = subfreqbins
-            self.scrport = scrport
-            self.subfitparams = subfitparams
-            if evolplots: self.show_evol_plots()
-            As = []
-            alphas = []
-            for gg in xrange(self.ngauss):
-                (params,param_errs,chi2,dof,residuals) = fit_powlaws(subfitparams[:,3::3][:,gg],subfreqs,self.nu0,np.ones(nsubfit),[guessA,guessalpha],self.noise_stdev)
-                A,alpha = params[0],params[1]
-                As.append(A)
-                alphas.append(alpha)
-            self.As = As
-            self.alphas = alphas
-            if PLplots: self.show_PL_plots()
-            modelparams = np.empty(self.ngauss*3+1)
-            modelparams[0] = np.median(subfitparams[:,0])      #FIX make smarter...way smarter...
-            for gg in xrange(self.ngauss):
-                modelparams[1::3][gg] = np.median(subfitparams[:,1::3][:,gg])
-                modelparams[2::3][gg] = np.median(subfitparams[:,2::3][:,gg])
-                modelparams[3::3][gg] = np.median(subfitparams[:,3::3][:,gg])
-            model = make_model(self.phases,self.freqs,None,modelparams,As,alphas,self.nu0)
-            modelmasked,modelx = screen_portrait(model,self.portweights)
-            self.modelparams = modelparams
-            self.model = model
-            self.modelmasked = modelmasked
-            self.modelx = modelx
+            start = time.time()
+            if niter == itern: self.fit_params, self.fit_errs, self.chi_sq, self.dof = fit_gaussian_portrait(self.portx, portx_noise, self.init_model_params, self.fix_params, self.phases, self.freqsx, self.nu_ref, quiet=quiet)
+            else:  self.fit_params, self.fit_errs, self.chi_sq, self.dof = fit_gaussian_portrait(self.portx, portx_noise, self.model_params, self.fix_params, self.phases, self.freqsx, self.nu_ref, quiet=quiet)
+            print "Fit took %.2f min"%((time.time()-start)/60.)
+            self.model_params = self.fit_params
+            self.model = gaussian_portrait(self.model_params,self.phases,self.freqs,self.nu_ref)
+            self.modelmasked,self.modelx = screen_portrait(self.model,self.portweights)
             if residplot: self.show_residual_plot()      #FIX    Have it also show statistics of residuals
-            if writemodel: write_model(outfile,self.source,modelparams,As,alphas,self.nu0)    #FIX do not overwrite model file if exists...
             dofit = 1
             if dofit == 1:
                 phaseguess = first_guess(self.portx,self.modelx,nguess=5000)
@@ -272,9 +148,10 @@ class DataPortrait:
                         DM = 0.0
                         niter = 0
                 if niter:
-                    print "Rotating portrait by above values for iteration %d."%(itern-niter+1)
+                    print "Rotating data portrait by above values for iteration %d."%(itern-niter+1)
                     self.port = rotate_portrait(self.port,phi,DM,self.P,self.freqs,self.nu0)
                     self.portx = rotate_portrait(self.portx,phi,DM,self.P,self.freqsx,self.nu0)
+        if writemodel: write_model(outfile,self.source,self.model_params,self.nu_ref)    #FIX do not overwrite model file if exists...
 
 class ModelPortrait_Gaussian:
     """

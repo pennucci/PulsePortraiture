@@ -1516,7 +1516,9 @@ Keywords:
 
       ## Reverse the sign of the step if we are up against the parameter
       ## limit, or if the user requested it.
-      mask = dside == -1
+      dsidei = Numeric.take(dside, ifree)
+      mask = dsidei == -1
+      #mask = dside == -1
       if len(ulimited) > 0 and len(ulimit) > 0:
          mask = Numeric.logical_or(mask, Numeric.logical_and(ulimited, x > ulimit-h))
          wh = Numeric.nonzero(mask)

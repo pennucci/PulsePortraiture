@@ -261,6 +261,26 @@ def gen_gaussians(params, N):
         model += amp * gaussian_profile(N, phase, FWHM)
     return model
 
+def gaussian_portrait(params, phases, freqs, nu_ref):
+    """
+    """
+    refparams = np.array([params[0]]+list(params[1::2]))
+    locparams = params[2::6]
+    widparams = params[4::6]
+    ampparams = params[6::6]
+    ngauss = len(refparams[1::3])
+    nbin = len(phases)
+    nchan = len(freqs)
+    gport = np.empty([nchan,nbin])
+    gparams = np.empty([nchan,len(refparams)])
+    gparams[:,0] = refparams[0]    #DC term
+    gparams[:,1::3] = np.outer(freqs-nu_ref,locparams)+np.outer(np.ones(nchan),refparams[1::3])    #Locs
+    gparams[:,2::3] = np.outer(freqs-nu_ref,widparams)+np.outer(np.ones(nchan),refparams[2::3])    #Wids
+    gparams[:,0::3][:,1:] = np.exp(np.outer(np.log(freqs)-np.log(nu_ref),ampparams)+np.outer(np.ones(nchan),np.log(refparams[0::3][1:])))    #Amps
+    for nn in range(nchan):
+        gport[nn] = gen_gaussians(gparams[nn],nbin) #Maybe need to contrain so values don't go negative?
+    return gport
+
 def powlaw(nu,nu0,A,alpha):
     """
     Power-law spectrum given by:
@@ -310,6 +330,12 @@ def fit_gauss_function(params, fjac=None, data=None, errs=None):
     """
     """
     return [0, (data - gen_gaussians(params, len(data))) / errs]
+
+def fit_gaussian_portrait_function(params, phases, freqs, nu_ref, fjac=None, data=None, errs=None):
+    """
+    """
+    deviates = np.ravel((data - gaussian_portrait(params, phases, freqs, nu_ref)) / errs)
+    return [0, deviates]
 
 def fit_pl_function(params, freqs, nu0, weights=None, fjac=None, data=None, errs=None):     #NO NEED FOR WEIGHTS HERE?
     """
@@ -433,7 +459,7 @@ def find_kc(prof,noise):
         X2[ii] = np.sum((wf-brickwall_filter(N,ii))**2)
     return X2.argmin()
 
-def fit_gaussians(data, initial_params, errs, profnm, quiet=0):
+def fit_gaussians(data, initial_params, errs, profnm, quiet=True):
     """
     """
     numparams = len(initial_params)
@@ -476,23 +502,80 @@ def fit_gaussians(data, initial_params, errs, profnm, quiet=0):
     #outfile.close()
     if not quiet:
         print "------------------------------------------------------------------"
-        print "Multi-Gaussian Fit of '%s'"%profnm
+        print "Multi-Gaussian Fit Results"
         print "------------------------------------------------------------------"
         print "mpfit status:", mpfit_out.status
-        print "gaussians:", numgaussians
+        print "gaussians:", ngauss
         print "DOF:", dof
         print "chi-sq: %.2f" % chi_sq
         print "reduced chi-sq: %.2f" % (chi_sq/dof)
         print "residuals mean: %.3g" % np.mean(residuals)
         print "residuals stdev: %.3g" % np.std(residuals)
         print "--------------------------------------"
-        print " const = %.5f +/- %.5f" % (fit_params[0], fit_errs[0])
-        for ii in xrange(numgaussians):
-            print " phas%d = %.5f +/- %.5f" % (ii+1, fit_params[1+ii*3], fit_errs[1+ii*3])
-            print " fwhm%d = %.5f +/- %.5f" % (ii+1, fit_params[2+ii*3], fit_errs[2+ii*3])
-            print " ampl%d = %.5f +/- %.5f" % (ii+1, fit_params[3+ii*3], fit_errs[3+ii*3])
-        print "--------------------------------------"
     return fit_params, fit_errs, chi_sq, dof, residuals
+
+def fit_gaussian_portrait(data, errs, init_params, fixparams, phases, freqs, nu_ref, quiet=True):
+    """
+    """
+    nparams = len(init_params)
+    ngauss = (len(init_params)-1)/6
+    fixloc,fixwid,fixamp = tuple(fixparams)
+    # Generate the parameter structure
+    params0 = []
+    parinfo = []
+    for ii in xrange(nparams):
+        params0.append(init_params[ii])
+        if ii == 0:     #DC, limited by 0
+            parinfo.append({'value':init_params[ii], 'fixed':0,
+                            'limited':[1,0], 'limits':[0.,0.]})
+        elif ii%6 == 1:     #loc limits, could try limited b/w 0,1, but the gaussian code is periodic
+            parinfo.append({'value':init_params[ii], 'fixed':0,
+                            'limited':[0,0], 'limits':[0.,0.]})
+        elif ii%6 == 2:     #loc slope limits
+            parinfo.append({'value':init_params[ii], 'fixed':fixloc,
+                            'limited':[0,0], 'limits':[0.,0.]})
+        elif ii%6 == 3:     #wid limits, limited by 0
+            parinfo.append({'value':init_params[ii], 'fixed':0,
+                            'limited':[1,0], 'limits':[0.,0.]})
+        elif ii%6 == 4:     #wid slope limits
+            parinfo.append({'value':init_params[ii], 'fixed':fixwid,
+                            'limited':[0,0], 'limits':[0.,0.]})
+        elif ii%6 == 5:     #amp limits, limited by 0
+            parinfo.append({'value':init_params[ii], 'fixed':0,
+                            'limited':[1,0], 'limits':[0.,0.]})
+        elif ii%6 == 0:     #amp index limits
+            parinfo.append({'value':init_params[ii], 'fixed':fixamp,
+                            'limited':[0,0], 'limits':[0.,0.]})
+        else:
+            print "Unfortunate index."
+            sys.exit()
+    other_args = {'data':data, 'errs':errs, 'phases':phases, 'freqs':freqs, 'nu_ref':nu_ref}
+    # Now fit it
+    mpfit_out = mp.mpfit(fit_gaussian_portrait_function, params0, functkw=other_args,
+                            parinfo=parinfo, quiet=1)
+    print mpfit_out.errmsg
+    print mpfit_out.errmsg
+    fit_params = mpfit_out.params
+    fit_errs = mpfit_out.perror
+    # degrees of freedom
+    dof = len(np.ravel(data)) - len(fit_params)
+    # chi-squared for the model fit
+    chi_sq = mpfit_out.fnorm
+    model = gaussian_portrait(fit_params,phases,freqs,nu_ref)
+    residuals = data - model
+    if not quiet:
+        print "------------------------------------------------------------------"
+        print "2D-Gaussian Fit"
+        print "------------------------------------------------------------------"
+        print "mpfit status:", mpfit_out.status
+        print "gaussians:", ngauss
+        print "DOF:", dof
+        print "chi-sq: %.2f" % chi_sq
+        print "reduced chi-sq: %.2f" % (chi_sq/dof)
+        print "residuals mean: %.3g" % np.mean(residuals)
+        print "residuals stdev: %.3g" % np.std(residuals)
+        print "--------------------------------------"
+    return fit_params, fit_errs, chi_sq, dof
 
 def fit_powlaws(data, freqs, nu0, weights, initial_params, errs):
     """
@@ -556,8 +639,6 @@ def fit_portrait(data,model,initial_params,P=None,freqs=None,nu_ref=np.inf,scale
     if scales:
         scales = get_scales(data,model,phi,DM,P,freqs,nu_ref)
         param_errs += list(pow(2*p*errs,-0.5))  #Errors on scales, if ever needed
-        plt.imshow(fft.irfft(ep),aspect="auto",origin="lower",extent=(0.0,1.0,freqs[0],freqs[-1]))
-        plt.show()
         return phi, DM, nfeval, return_code, scales, np.array(param_errs),red_chi2
     else: return phi, DM, nfeval, return_code, np.array(param_errs),red_chi2
 
@@ -714,24 +795,19 @@ def plot_PL_results(M,withprof=1,witherrors=1, negative=0):
     plt.ylim(alphamu.min()-5,plt.ylim()[1])
     plt.show()
 
-#def plot_amps(M)
-
-#def plot_PL_bin(M,bin)
-
-def write_model(filenm,source,refparams,As,alphas,nu0):
+def write_model(filenm,source,model_params,nu_ref):
     """
     """
-    outfile = open(filenm,"w")
+    outfile = open(filenm,"a")
     outfile.write("%s\n"%source)
-    outfile.write("%.8f\n"%nu0)
-    outfile.write("%.8f\n"%refparams[0])
-    ngauss = len(refparams[1:])/3
+    outfile.write("%.8f\n"%nu_ref)
+    outfile.write("%.8f\n"%model_params[0])
+    ngauss = (len(model_params)-1)/6
     for nn in xrange(ngauss):
-        comp = refparams[1+nn*3:4+nn*3]
-        outfile.write("%.8f\t %.8f\t %.8f\t %.8f\t %.8f\n"%(comp[0],comp[1],comp[2],As[nn],alphas[nn]))
+        comp = model_params[1+nn*6:7+nn*6]
+        outfile.write("%.8f\t %.8f\t %.8f\t %.8f\t %.8f\t %.8f\n"%(comp[0],comp[1],comp[2],comp[3],comp[4],comp[5]))
     outfile.close()
     print "%s written."%filenm
-    return 0
 
 def load_data(filenm,dedisperse=False,tscrunch=False,pscrunch=False,quiet=False,rm_baseline=(0,0),Gfudge=1.0):
     """
