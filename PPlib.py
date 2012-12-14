@@ -663,42 +663,23 @@ def first_guess(data,model,nguess=1000):       #is phaseguess/fit for phase the 
     #ampguess = guessparams[np.argmin(np.array(guesschi2s))][2]
     return phaseguess
 
-def make_model(phases,freqs,modelfile=None,refparams=None,As=None,alphas=None,nu0=None,quiet=False):
+def make_model(phases,freqs,modelfile=None,quiet=False):
     """
     """
     nbin = len(phases)
     nchan = len(freqs)
-    if modelfile:
-        modeldata = open(modelfile,"r").readlines()
-        ngauss = len(modeldata)-3
-        refparams = np.zeros(ngauss*3+1)
-        As = np.zeros(ngauss)
-        alphas = np.zeros(ngauss)
-        source = str(modeldata.pop(0)[:-1])
-        nu0 = float(modeldata.pop(0))   #Extraneous here?
-        refparams[0] = float(modeldata.pop(0))
-        for gg in xrange(ngauss):
-            comp = map(float,modeldata[gg].split())
-            refparams[1+gg*3:1+(gg*3)+3] = comp[:3]
-            As[gg] = comp[3]
-            alphas[gg] = comp[4]
-    model=np.zeros([nchan,nbin]) + refparams[0]
-    for ff in xrange(nchan):
-        freq = freqs[ff]
-        for nn in xrange(len(refparams-1)/3):
-            G = refparams[(nn*3)+1:(nn*3)+4]
-            mu = G[0]
-            fwhm = G[1]
-            A = As[nn]
-            alpha = alphas[nn]
-            amp = powlaw(freq,nu0,A,alpha)
-            model[ff] += amp*gaussian_profile(nbin,mu,fwhm)
-    if modelfile:
-        if not quiet: print "Made %d component model for %s with %d frequency channels, %d profile bins, %.0f MHz bandwidth centered on %.2f MHz"%(ngauss,source,nchan,nbin,(freqs[-1]-freqs[0])+((freqs[-1]-freqs[-2])),nu0)
-        return source,ngauss,refparams,As,alphas,nu0,model
-    else:
-        if not quiet: print "Made %d component model with %d frequency channels, %d profile bins, %.0f MHz bandwidth centered on %.2f MHz"%((len(refparams)-1)/3, nchan,nbin,(freqs[-1]-freqs[0])+((freqs[-1]-freqs[-2])),nu0)
-        return model
+    modeldata = open(modelfile,"r").readlines()
+    ngauss = len(modeldata)-3
+    params = np.zeros(ngauss*6+1)
+    source = modeldata.pop(0)[:-1]
+    nu_ref = float(modeldata.pop(0))
+    params[0] = float(modeldata.pop(0))
+    for gg in xrange(ngauss):
+        comp = map(float,modeldata[gg].split())
+        params[1+gg*6:7+(gg*6)] = comp
+    model = gaussian_portrait(params,phases,freqs,nu_ref)
+    if not quiet: print "Made %d component model for %s with %d frequency channels, %d profile bins, %.0f MHz bandwidth centered near %.2f MHz"%(ngauss,source,nchan,nbin,(freqs[-1]-freqs[0])+((freqs[-1]-freqs[-2])),freqs.mean())
+    return source,ngauss,model
 
 def get_noise(data,frac=4,tau=False,chans=False,fd=False):     #FIX: Make sure to use on portraits w/o zapped freq. channels, i.e. portxs     FIX: MAKE SIMPLER!!!    FIX: Implement k_max from wiener/brick-wall filter fit        #FIX This is not right 
     """

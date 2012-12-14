@@ -159,8 +159,8 @@ class DataPortrait:
                     print "Rotating data portrait by above values for iteration %d."%(itern-niter+1)
                     self.port = rotate_portrait(self.port,phi,DM,self.P,self.freqs,self.nu0)
                     self.portx = rotate_portrait(self.portx,phi,DM,self.P,self.freqsx,self.nu0)
+                    self.set_model_run()
         if writemodel: write_model(outfile,self.source,self.model_params,self.nu_ref)    #FIX do not overwrite model file if exists...
-        self.set_model_run()
 
 class ModelPortrait_Gaussian:
     """
@@ -174,7 +174,7 @@ class ModelPortrait_Gaussian:
         self.portweights = portweights
         self.Gfudge = Gfudge
         self.phases = np.arange(nbin, dtype='d')/nbin
-        self.source,self.ngauss,self.refparams,self.As,self.alphas,self.nu0,self.model = make_model(self.phases,self.freqs,modelfile,quiet=quiet)
+        self.source,self.ngauss,self.model = make_model(self.phases,self.freqs,modelfile,quiet=quiet)
         if portweights is not None: self.modelmasked,self.modelx = screen_portrait(self.model,portweights)
         else: self.modelmasked,self.modelx = self.model,self.model
 
