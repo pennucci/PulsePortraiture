@@ -174,7 +174,7 @@ class ModelPortrait_Gaussian:
         self.portweights = portweights
         self.Gfudge = Gfudge
         self.phases = np.arange(nbin, dtype='d')/nbin
-        self.source,self.ngauss,self.model = make_model(self.phases,self.freqs,modelfile,quiet=quiet)
+        self.source,self.ngauss,self.model = make_model(modelfile,self.phases,self.freqs,quiet=quiet)
         if portweights is not None: self.modelmasked,self.modelx = screen_portrait(self.model,portweights)
         else: self.modelmasked,self.modelx = self.model,self.model
 

@@ -663,7 +663,7 @@ def first_guess(data,model,nguess=1000):       #is phaseguess/fit for phase the 
     #ampguess = guessparams[np.argmin(np.array(guesschi2s))][2]
     return phaseguess
 
-def make_model(phases,freqs,modelfile=None,quiet=False):
+def make_model(modelfile,phases,freqs,quiet=False):
     """
     """
     nbin = len(phases)
