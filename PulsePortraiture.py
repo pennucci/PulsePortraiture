@@ -14,6 +14,7 @@ class DataPortrait:
         #Reading the data
         self.datafile = datafile
         self.Gfudge = Gfudge
+        self.initial_model_run = False
         (self.source,self.arch,self.port,self.portx,self.noise_stdev,self.fluxprof,self.fluxprofx,self.prof,self.nbin,self.phases,self.nu0,self.bw,self.nchan,self.freqs,self.freqsx,self.nsub,self.P,self.MJD,self.weights,self.normweights,self.maskweights,self.portweights) = load_data(datafile,dedisperse=True,tscrunch=True,pscrunch=True,quiet=False,rm_baseline=(0,0),Gfudge=self.Gfudge)
         self.lofreq = self.freqs[0]-(self.bw/(2*self.nchan))
         self.init_params = []
@@ -93,6 +94,9 @@ class DataPortrait:
         print "Data std:       %.3f"%self.noise_stdev
         plt.show()
 
+    def set_model_run(self):
+        self.initial_model_run = True
+
     def make_gaussian_model_portrait(self,locparams=0.0,fixloc=True,widparams=0.0,fixwid=False,ampparams=0.0,fixamp=False,nu_ref=None,niter=0,writemodel=True,outfile=None,residplot=True,quiet=True):
         """
         """
@@ -120,19 +124,23 @@ class DataPortrait:
             self.init_model_params[nn] = np.array([self.init_params[1::3][nn],locparams[nn],self.init_params[2::3][nn],widparams[nn],self.init_params[3::3][nn],ampparams[nn]])
         self.init_model_params = np.array([self.init_params[0]]+list(np.ravel(self.init_model_params)))
         itern = niter
-        if niter < 0: niter=0
-        niter += 1
+        if niter < 0: niter = 0
         portx_noise = np.outer(get_noise(self.portx,chans=True),np.ones(self.nbin))
-        while(niter):
-            niter -= 1
+        if not self.initial_model_run:
             start = time.time()
-            if niter == itern: self.fit_params, self.fit_errs, self.chi_sq, self.dof = fit_gaussian_portrait(self.portx, portx_noise, self.init_model_params, self.fix_params, self.phases, self.freqsx, self.nu_ref, quiet=quiet)
-            else:  self.fit_params, self.fit_errs, self.chi_sq, self.dof = fit_gaussian_portrait(self.portx, portx_noise, self.model_params, self.fix_params, self.phases, self.freqsx, self.nu_ref, quiet=quiet)
+            self.fit_params, self.fit_errs, self.chi_sq, self.dof = fit_gaussian_portrait(self.portx, portx_noise, self.init_model_params, self.fix_params, self.phases, self.freqsx, self.nu_ref, quiet=quiet)
             print "Fit took %.2f min"%((time.time()-start)/60.)
+            niter += 1
+        while(niter):
+            if niter and self.initial_model_run:
+                start = time.time()
+                self.fit_params, self.fit_errs, self.chi_sq, self.dof = fit_gaussian_portrait(self.portx, portx_noise, self.model_params, self.fix_params, self.phases, self.freqsx, self.nu_ref, quiet=quiet)
+                print "Fit took %.2f min"%((time.time()-start)/60.)
             self.model_params = self.fit_params
             self.model = gaussian_portrait(self.model_params,self.phases,self.freqs,self.nu_ref)
             self.modelmasked,self.modelx = screen_portrait(self.model,self.portweights)
             if residplot: self.show_residual_plot()      #FIX    Have it also show statistics of residuals
+            niter -= 1
             dofit = 1
             if dofit == 1:
                 phaseguess = first_guess(self.portx,self.modelx,nguess=5000)
@@ -152,6 +160,7 @@ class DataPortrait:
                     self.port = rotate_portrait(self.port,phi,DM,self.P,self.freqs,self.nu0)
                     self.portx = rotate_portrait(self.portx,phi,DM,self.P,self.freqsx,self.nu0)
         if writemodel: write_model(outfile,self.source,self.model_params,self.nu_ref)    #FIX do not overwrite model file if exists...
+        self.set_model_run()
 
 class ModelPortrait_Gaussian:
     """
