@@ -15,18 +15,24 @@ parser.add_option("-d", "--datafile",
 parser.add_option("-o", "--outfile",
                   action="store", metavar="outfile", dest="outfile",
                   help="Name of output model file name. [default=archive.model]")
-parser.add_option("--nsubfit",
-                  action="store", metavar="int", dest="nsubfit", default=8,
-                  help="Number of subfits across the band. [default=8]")
+parser.add_option("--fixloc",
+                  action="store_true", dest="fixloc", default=False,
+                  help="Fix locations of gaussians across frequency. [default=True]")
+parser.add_option("--fixwid",
+                  action="store_true", dest="fixwid", default=False,
+                  help="Fix widths of gaussians across frequency. [default=True]")
+parser.add_option("--fixamp",
+                  action="store", dest="fixamp", default=False,
+                  help="Fix amplitudes of gaussians across frequency. [default=False]")
 parser.add_option("--niter",
                   action="store", metavar="int", dest="niter", default=0,
                   help="Number of iterations to loop over generating better model. [default=0]")
 parser.add_option("--showplots",
                   action="store_true", dest="showplots", default=False,
                   help="Show residual plot after each iteration. [default=False]")
-#parser.add_option("--quiet",
-#                  action="store_false", dest="quiet", default=False,
-#                  help="Nothing to stdout.")
+parser.add_option("--verbose",
+                  action="store_true", dest="verbose", default=False,
+                  help="More to stdout.")
 
 (options, args) = parser.parse_args()
 
@@ -39,13 +45,12 @@ from PulsePortraiture import DataPortrait,ModelPortrait_Gaussian
 
 datafile = options.datafile
 outfile = options.outfile
-nsubfit = int(options.nsubfit)
+fixloc = options.fixloc
+fixwid = options.fixwid
+fixamp = options.fixamp
 niter = int(options.niter)
 showplots = options.showplots
-if showplots: shownone = False
-else: shownone = True
-#quiet = options.quiet
+quiet = not options.verbose
 
 dp = DataPortrait(datafile)
-dp.fit_profile()
-dp.make_Gaussian_model_portrait(nsubfit=nsubfit,niter=niter,outfile=outfile,shownone=shownone)
+dp.make_gaussian_model_portrait(locparams=0.0,fixloc=fixloc,widparams=0.0,fixwid=fixwid,ampparams=0.0,fixamp=fixamp,nu_ref=None,niter=niter,outfile=outfile,residplot=showplots,quiet=quiet)
