@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 from PulsePortraiture import *
 
 archs = open(sys.argv[-2],"r").readlines()
