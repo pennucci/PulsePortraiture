@@ -97,7 +97,7 @@ class DataPortrait:
     def set_model_run(self):
         self.initial_model_run = True
 
-    def make_gaussian_model_portrait(self,locparams=0.0,fixloc=True,widparams=0.0,fixwid=False,ampparams=0.0,fixamp=False,nu_ref=None,niter=0,writemodel=True,outfile=None,residplot=True,quiet=True):
+    def make_gaussian_model_portrait(self,locparams=0.0,fixloc=False,widparams=0.0,fixwid=False,ampparams=0.0,fixamp=False,nu_ref=None,niter=0,writemodel=True,outfile=None,residplot=True,quiet=True):
         """
         """
         self.fix_params = np.array([fixloc,fixwid,fixamp])

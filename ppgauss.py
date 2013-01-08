@@ -17,12 +17,12 @@ parser.add_option("-o", "--outfile",
                   help="Name of output model file name. [default=archive.model]")
 parser.add_option("--fixloc",
                   action="store_true", dest="fixloc", default=False,
-                  help="Fix locations of gaussians across frequency. [default=True]")
+                  help="Fix locations of gaussians across frequency. [default=False]")
 parser.add_option("--fixwid",
                   action="store_true", dest="fixwid", default=False,
-                  help="Fix widths of gaussians across frequency. [default=True]")
+                  help="Fix widths of gaussians across frequency. [default=False]")
 parser.add_option("--fixamp",
-                  action="store", dest="fixamp", default=False,
+                  action="store_true", dest="fixamp", default=False,
                   help="Fix amplitudes of gaussians across frequency. [default=False]")
 parser.add_option("--niter",
                   action="store", metavar="int", dest="niter", default=0,
