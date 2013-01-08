@@ -13,6 +13,7 @@ for aa in range(len(archs)):
     maxbin = prof.argmax()
     rotport = rotate(port.transpose(),maxbin-(nbin/2)).transpose()
     totport += rotport
+    print "Added %s"%datafile
 
 totport /= len(archs)
 
@@ -27,3 +28,4 @@ for nn in range(nchan):
 arch.set_dispersion_measure(0.0)
 #arch.set_dedispersed(True)
 arch.unload()
+print "\nUnloaded %s\n"%totarch
