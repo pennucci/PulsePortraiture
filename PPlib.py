@@ -800,7 +800,7 @@ def load_data(filenm,dedisperse=False,tscrunch=False,pscrunch=False,quiet=False,
     if not quiet: print "Reading data from %s on source %s..."%(filenm,source)
     #Get some metadata
     nu0 = arch.get_centre_frequency()   #Center of the band
-    bw = arch.get_bandwidth()
+    bw = abs(arch.get_bandwidth())      #For the -200 MHz cases.  Good fix?
     nchan = arch.get_nchan()
     #By-hand frequency calculation, equivalent to below from psrchive
     #chanwidth = bw/nchan
