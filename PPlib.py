@@ -807,7 +807,7 @@ def load_data(filenm,dedisperse=False,tscrunch=False,pscrunch=False,quiet=False,
     #lofreq = nu0-(bw/2)
     #freqs = np.linspace(lofreq+(chanwidth/2.0),lofreq+bw-(chanwidth/2.0),nchan)     #Centers of frequency channels
     freqs = np.array([arch.get_Integration(0).get_centre_frequency(ii) for ii in range(nchan)])
-    freqs = freqs.sort()                #Again, for the negative BW cases.  Good fix?
+    freqs.sort()                #Again, for the negative BW cases.  Good fix?
     nbin = arch.get_nbin()
     phases = np.arange(nbin, dtype='d')/nbin
     #Dedisperse?
