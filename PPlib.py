@@ -800,14 +800,15 @@ def load_data(filenm,dedisperse=False,tscrunch=False,pscrunch=False,quiet=False,
     if not quiet: print "Reading data from %s on source %s..."%(filenm,source)
     #Get some metadata
     nu0 = arch.get_centre_frequency()   #Center of the band
-    bw = abs(arch.get_bandwidth())      #For the -200 MHz cases.  Good fix?
+    #bw = abs(arch.get_bandwidth())      #For the -200 MHz cases.  Good fix?
+    bw = arch.get_bandwidth()      #For the -200 MHz cases.  Good fix?
     nchan = arch.get_nchan()
     #By-hand frequency calculation, equivalent to below from psrchive
     #chanwidth = bw/nchan
     #lofreq = nu0-(bw/2)
     #freqs = np.linspace(lofreq+(chanwidth/2.0),lofreq+bw-(chanwidth/2.0),nchan)     #Centers of frequency channels
     freqs = np.array([arch.get_Integration(0).get_centre_frequency(ii) for ii in range(nchan)])
-    freqs.sort()                #Again, for the negative BW cases.  Good fix?
+    #freqs.sort()                #Again, for the negative BW cases.  Good fix?
     nbin = arch.get_nbin()
     phases = np.arange(nbin, dtype='d')/nbin
     #Dedisperse?
