@@ -126,6 +126,7 @@ class DataPortrait:
         itern = niter
         if niter < 0: niter = 0
         portx_noise = np.outer(get_noise(self.portx,chans=True),np.ones(self.nbin))
+        print "Starting to fit gaussian model portrait..."
         if not self.initial_model_run:
             start = time.time()
             self.fit_params, self.fit_errs, self.chi_sq, self.dof = fit_gaussian_portrait(self.portx, portx_noise, self.init_model_params, self.fix_params, self.phases, self.freqsx, self.nu_ref, quiet=quiet)
