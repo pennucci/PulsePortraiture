@@ -414,6 +414,7 @@ class GetTOAs:
                     #else: ef.write("%.5e"%self.DM_errs[nn])
         else:
             print "Invalid."
+
     def show_subint(self,subint,fignum=None):
         """
         subint 0 = python index 0
@@ -448,9 +449,12 @@ class GetTOAs:
         portx = self.portxs[ii]
         model,modelx = screen_portrait(self.modelportrait.model,self.portweights[ii])
         #modelmasked = 
-        fitmodel = np.transpose(self.scales[ii]*np.transpose(rotate_portrait(model,-phi,-DM,P,freqs,nu0)))
-        fitmodelx = np.transpose(self.scalesx[ii]*np.transpose(rotate_portrait(modelx,-phi,-DM,P,freqsx,nu0)))
+        #fitmodel = np.transpose(self.scales[ii]*np.transpose(rotate_portrait(model,-phi,-DM,P,freqs,nu0)))
+        fitmodel = np.transpose(self.scales[ii]*np.transpose(rotate_portrait(model,-phi,0.0,P,freqs,nu0)))
+        #fitmodelx = np.transpose(self.scalesx[ii]*np.transpose(rotate_portrait(modelx,-phi,-DM,P,freqsx,nu0)))
+        fitmodelx = np.transpose(self.scalesx[ii]*np.transpose(rotate_portrait(modelx,-phi,0.0,P,freqsx,nu0)))
         #fitmodelmasked = rotate_portrait(modelmasked,-np.mean((M.phi.trace()[starti:])),-10**np.mean((M.DM.trace()[starti:])),freqs,nu0)
+        port = rotate_portrait(port,phi,DM,P,freqs,nu0)
         plt.subplot(221)
         plt.title("Data Portrait")
         plt.imshow(port,aspect="auto",origin="lower",extent=(0.0,1.0,self.freqs[0],self.freqs[-1])) #WRONG EXTENT
