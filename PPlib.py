@@ -17,7 +17,6 @@ import psrchive as pr
 import numpy.fft as fft
 import numpy.ma as ma
 import scipy.optimize as opt
-import mpfit as mp  #Need to move over from this...
 import lmfit as lm
 
 cols = ['b','g','r','c','m','y','b','g','r','c','m','y','b','g','r','c','m','y','b','g','r','c','m','y','b','g','r','c','m','y']
