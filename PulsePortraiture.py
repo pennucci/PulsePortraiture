@@ -24,7 +24,7 @@ class DataPortrait:
         """
         fig = plt.figure()
         profplot = fig.add_subplot(211)
-        interactor = GaussianSelector(profplot,self.prof,self.noise_stdev,self.datafile,minspanx=None,minspany=None,useblit=True)   #FIX self.noise_stdev is not the number you want
+        interactor = GaussianSelector(profplot,self.prof,self.noise_stdev,minspanx=None,minspany=None,useblit=True)   #FIX self.noise_stdev is not the number you want
         plt.show()
         self.init_params = interactor.fit_params
         self.ngauss = (len(self.init_params) - 1)/3
@@ -64,7 +64,7 @@ class DataPortrait:
                     plt.title("Residuals")
                     plt.plot(self.freqsx,residuals,'r+')
                 plt.show()
-            return params[0],params[1]
+            self.spect_index = params[1]
 
     def show_residual_plot(self):
         """
@@ -129,13 +129,13 @@ class DataPortrait:
         print "Starting to fit gaussian model portrait..."
         if not self.initial_model_run:
             start = time.time()
-            self.fit_params, self.fit_errs, self.chi_sq, self.dof = fit_gaussian_portrait(self.portx, portx_noise, self.init_model_params, self.fix_params, self.phases, self.freqsx, self.nu_ref, quiet=quiet)
+            self.fit_params, self.chi_sq, self.dof = fit_gaussian_portrait(self.portx, portx_noise, self.init_model_params, self.fix_params, self.phases, self.freqsx, self.nu_ref, quiet=quiet)
             print "Fit took %.2f min"%((time.time()-start)/60.)
             niter += 1
         while(niter):
             if niter and self.initial_model_run:
                 start = time.time()
-                self.fit_params, self.fit_errs, self.chi_sq, self.dof = fit_gaussian_portrait(self.portx, portx_noise, self.model_params, self.fix_params, self.phases, self.freqsx, self.nu_ref, quiet=quiet)
+                self.fit_params, self.chi_sq, self.dof = fit_gaussian_portrait(self.portx, portx_noise, self.model_params, self.fix_params, self.phases, self.freqsx, self.nu_ref, quiet=quiet)
                 print "Fit took %.2f min"%((time.time()-start)/60.)
             self.model_params = self.fit_params
             self.model = gaussian_portrait(self.model_params,self.phases,self.freqs,self.nu_ref)
@@ -144,9 +144,9 @@ class DataPortrait:
             niter -= 1
             dofit = 1
             if dofit == 1:
-                phaseguess = first_guess(self.portx,self.modelx,nguess=5000)
+                phaseguess = first_guess(self.portx,self.modelx,nguess=1000)
                 DMguess = 0.0
-                phi,DM,nfeval,rc,scalesx,param_errs,red_chi2 = fit_portrait(self.portx,self.modelx,np.array([phaseguess,DMguess]),self.P,self.freqsx,self.nu0,scales=True,test=False)
+                phi,DM,nfeval,rc,scalesx,param_errs,red_chi2 = fit_portrait(self.portx,self.modelx,np.array([phaseguess,DMguess]),self.P,self.freqsx,self.nu0,scales=True)
                 phierr = param_errs[0]
                 DMerr = param_errs[1]
                 print "Fit has phase offset of %.2e +/- %.2e [rot], DM of %.2e +/- %.2e [pc cm**-3], and red. chi**2 of %.2f."%(phi,phierr,DM,DMerr,red_chi2)
@@ -253,7 +253,7 @@ class GetTOAs:
                 model_fft = np.fft.rfft(modelx,axis=1)
                 freqsx = ma.masked_array(self.freqs,mask=self.maskweights[nn]).compressed()
                 if nn == 0:
-                    phaseguess = first_guess(dataportrait,modelx,nguess=5000)    #FIX how does it tell the diff between say, +0.85 and -0.15
+                    phaseguess = first_guess(dataportrait,modelx,nguess=1000)    #FIX how does it tell the diff between say, +0.85 and -0.15
                     #if phaseguess > 0.5: phaseguess = 1-phaseguess  #FIX good fix?
                     print "Phase guess: %.8f"%phaseguess
                 P = self.Ps[nn]
@@ -342,8 +342,8 @@ class GetTOAs:
                     rot_dataportrait = rotate_portrait(self.portxs.mean(axis=0),0.0,self.DM0,P,freqsx,nu0)
                     #PSRCHIVE Dedisperses w.r.t. center of band...??
                     #if phaseguess > 0.5: phaseguess = phaseguess - 1    #FIX good fix?
-                    phaseguess = first_guess(rot_dataportrait,modelx,nguess=5000)
-                    #phaseguess = first_guess(dataportrait,modelx,nguess=5000)
+                    phaseguess = first_guess(rot_dataportrait,modelx,nguess=1000)
+                    #phaseguess = first_guess(dataportrait,modelx,nguess=1000)
                     #self.DM0 = 0.0
                     DMguess = self.DM0
                     if not quiet: print "Phase guess: %.8f ; DM guess: %.5f"%(phaseguess,DMguess)
@@ -353,7 +353,7 @@ class GetTOAs:
                 #if not quiet: print "Phase guess: %.8f ; DM guess: %.5f"%(phaseguess,DMguess)
                 #NEED status bar?
                 print "Fitting for TOA %d...put more info here"%(nn+1)      #FIX
-                phi,DM,nfeval,rc,scalex,param_errs,red_chi2 = fit_portrait(self.portxs[nn],modelx,np.array([phaseguess,DMguess]),P,freqsx,nu0,scales=True,test=False)
+                phi,DM,nfeval,rc,scalex,param_errs,red_chi2 = fit_portrait(self.portxs[nn],modelx,np.array([phaseguess,DMguess]),P,freqsx,nu0,scales=True)
                 self.phis[nn] = phi
                 self.phi_errs[nn] = param_errs[0]
                 ####################
