@@ -19,42 +19,15 @@ import numpy.ma as ma
 import scipy.optimize as opt
 import lmfit as lm
 
+#plt.copper()
+#plt.gray()
+#plt.bone()
+plt.pink()
+plt.close('all')
 cols = ['b','g','r','c','m','y','b','g','r','c','m','y','b','g','r','c','m','y','b','g','r','c','m','y','b','g','r','c','m','y']
 
 #Dconst = 4.148808e3     #Dispersion constant (e**2/(2*pi*m_e*c)) [MHz**2 pc**-1 cm**3 s], used by PRESTO
 Dconst = 0.000241**-1   #"Traditional" dispersion constant, used by psrchive
-
-def gaussian_profile(N, loc, fwhm, norm=0):
-    """
-    gaussian_profile(N, loc, fwhm):
-        Return a gaussian pulse profile with 'N' bins and
-        an integrated 'flux' of 1 unit (if norm=1; default norm=0 and peak ampltiude = 1).
-            'N' = the number of points in the profile
-            'loc' = the pulse phase (0-1)
-            'fwhm' = the gaussian pulses full width at half-max
-        Note:  The FWHM of a gaussian is approx 2.35482 sigma (exactly 2*sqrt(2*ln(2)))
-    """
-    sigma = fwhm / (2*np.sqrt(2*np.log(2)))
-    mean = loc % 1.0
-    locval = np.arange(N, dtype='d') / float(N)
-    if (mean < 0.5):
-        locval = np.where(np.greater(locval, mean+0.5),
-                           locval-1.0, locval)
-    else:
-        locval = np.where(np.less(locval, mean-0.5),
-                           locval+1.0, locval)
-    try:
-        zs = (locval-mean)/sigma
-        okzinds = np.compress(np.fabs(zs)<20.0, np.arange(N))
-        okzs = np.take(zs, okzinds)
-        retval = np.zeros(N, 'd')
-        np.put(retval, okzinds, np.exp(-0.5*(okzs)**2.0)/(sigma*np.sqrt(2*np.pi)))
-        if norm: return retval
-        else: return retval/np.max(retval)
-    except OverflowError:
-        print "Problem in gaussian prof:  mean = %f  sigma = %f" % \
-              (mean, sigma)
-        return np.zeros(N, 'd')
 
 class GaussianSelector:
     def __init__(self, ax, profile, errs, minspanx=None,
@@ -186,8 +159,8 @@ class GaussianSelector:
         DC = params[0]
         # Plot the individual gaussians
         for ii in xrange(self.ngauss):
-            loc, FWHM, amp = params[1+ii*3:4+ii*3]
-            plt.plot(self.phases, DC + amp*gaussian_profile(self.proflen, loc, FWHM),'%s'%cols[ii])
+            loc, wid, amp = params[1+ii*3:4+ii*3]
+            plt.plot(self.phases, DC + amp*gaussian_profile(self.proflen, loc, wid),'%s'%cols[ii])
 
     def onselect(self):
         event1 = self.eventpress
@@ -197,10 +170,10 @@ class GaussianSelector:
             x1, y1 = event1.xdata, event1.ydata
             x2, y2 = event2.xdata, event2.ydata
             loc = 0.5*(x1+x2)
-            FWHM = np.fabs(x2-x1)
+            wid = np.fabs(x2-x1)
             #amp = np.fabs(1.05*(y2-self.init_params[0])*(x2-x1))
             amp = np.fabs(1.05*(y2-self.init_params[0]))
-            self.init_params += [loc, FWHM, amp]
+            self.init_params += [loc, wid, amp]
             self.ngauss += 1
             self.plot_gaussians(self.init_params)
             plt.draw()
@@ -215,7 +188,7 @@ class GaussianSelector:
 
             # Plot the best-fit profile
             self.plot_gaussians(fit_params)
-            fitprof = gen_gaussians(fit_params, self.proflen)
+            fitprof = gen_gaussian_profile(fit_params, self.proflen)
             plt.plot(self.phases, fitprof, c='black', lw=1)
             plt.draw()
 
@@ -244,24 +217,66 @@ class GaussianSelector:
         plt.close(1)
         plt.close(2)
 
-def gen_gaussians(params, N):
+def gaussian_profile(N, loc, wid, norm=False, abs_wid=False, zeroout=True):
     """
-    gen_gaussians(params, N):
+    gaussian_profile(N, loc, wid):
+        Return a gaussian pulse profile with 'N' bins and
+        an integrated 'flux' of 1 unit (if norm=True; default norm=False and peak ampltiude = 1).
+            'N' = the number of points in the profile
+            'loc' = the pulse phase (0-1)
+            'wid' = the gaussian pulses full width at half-max
+        Note:  The FWHM of a gaussian is approx 2.35482 sigma (exactly 2*sqrt(2*ln(2)))
+    """
+    #Maybe should move these checks to gen_gaussian_portrait?
+    if abs_wid: wid = abs(wid)
+    if wid > 0.0: pass
+    elif wid == 0.0: return np.zeros(N, 'd')
+    elif wid < 0.0 and zeroout: return np.zeros(N, 'd')
+    elif wid < 0.0 and not zeroout: pass
+    else: return 0
+    sigma = wid / (2*np.sqrt(2*np.log(2)))
+    mean = loc % 1.0
+    locval = np.arange(N, dtype='d') / float(N)
+    if (mean < 0.5):
+        locval = np.where(np.greater(locval, mean+0.5),
+                           locval-1.0, locval)
+    else:
+        locval = np.where(np.less(locval, mean-0.5),
+                           locval+1.0, locval)
+    try:
+        zs = (locval-mean)/sigma
+        okzinds = np.compress(np.fabs(zs)<20.0, np.arange(N))   #Why 20?
+        okzs = np.take(zs, okzinds)
+        retval = np.zeros(N, 'd')
+        np.put(retval, okzinds, np.exp(-0.5*(okzs)**2.0)/(sigma*np.sqrt(2*np.pi)))
+        if norm: return retval
+        #else: return retval/np.max(retval)
+        else:
+            if np.max(abs(retval)) == 0.0: return retval   #TP hack
+            else: return retval/np.max(abs(retval))  #TP hack
+    except OverflowError:
+        print "Problem in gaussian prof:  mean = %f  sigma = %f" % \
+              (mean, sigma)
+        return np.zeros(N, 'd')
+
+def gen_gaussian_profile(params, N):
+    """
+    gen_gaussian_profile(params, N):
         Return a model of a DC-component + M gaussians
             params is a sequence of 1+M*3 values
                 the first value is the DC component.  Each remaining
                 group of three represents the gaussians loc (0-1),
-                FWHM (0-1), and amplitude (>0.0).
+                wid (FWHM) (0-1), and amplitude (>0.0).
             N is the number of points in the model.
     """
     ngauss = (len(params)-1)/3
     model = np.zeros(N, dtype='d') + params[0]
     for ii in xrange(ngauss):
-        loc, FWHM, amp = params[1+ii*3:4+ii*3]
-        model += amp * gaussian_profile(N, loc, FWHM)
+        loc, wid, amp = params[1+ii*3:4+ii*3]
+        model += amp * gaussian_profile(N, loc, wid)
     return model
 
-def gaussian_portrait(params, phases, freqs, nu_ref):
+def gen_gaussian_portrait(params, phases, freqs, nu_ref):
     """
     """
     refparams = np.array([params[0]]+list(params[1::2]))
@@ -278,7 +293,7 @@ def gaussian_portrait(params, phases, freqs, nu_ref):
     gparams[:,2::3] = np.outer(freqs-nu_ref,widparams)+np.outer(np.ones(nchan),refparams[2::3])    #Wids
     gparams[:,0::3][:,1:] = np.exp(np.outer(np.log(freqs)-np.log(nu_ref),ampparams)+np.outer(np.ones(nchan),np.log(refparams[0::3][1:])))    #Amps
     for nn in range(nchan):
-        gport[nn] = gen_gaussians(gparams[nn],nbin) #Maybe need to contrain so values don't go negative?
+        gport[nn] = gen_gaussian_profile(gparams[nn],nbin) #Maybe need to contrain so values don't go negative?
     return gport
 
 def powlaw(nu,nu0,A,alpha):
@@ -330,13 +345,13 @@ def fit_gauss_function(params, data=None, errs=None):
     """
     """
     prms = np.array([param.value for param in params.itervalues()])
-    return (data - gen_gaussians(prms, len(data))) / errs
+    return (data - gen_gaussian_profile(prms, len(data))) / errs
 
 def fit_gaussian_portrait_function(params, phases, freqs, nu_ref, fjac=None, data=None, errs=None):
     """
     """
     prms = np.array([param.value for param in params.itervalues()])
-    deviates = np.ravel((data - gaussian_portrait(prms, phases, freqs, nu_ref)) / errs)
+    deviates = np.ravel((data - gen_gaussian_portrait(prms, phases, freqs, nu_ref)) / errs)
     return deviates
 
 def fit_powlaws_function(params, freqs, nu0, weights=None, fjac=None, data=None, errs=None):
@@ -522,7 +537,7 @@ def fit_gaussian_portrait(data, errs, init_params, fix_params, phases, freqs, nu
     """
     nparam = len(init_params)
     ngauss = (len(init_params)-1)/6
-    fixloc,fixwid,fixamp = tuple(fix_params)
+    fixloc,fixwid,fixamp = fix_params
     # Generate the parameter structure
     params = lm.Parameters()
     for ii in xrange(nparam):
@@ -537,7 +552,7 @@ def fit_gaussian_portrait(data, errs, init_params, fix_params, phases, freqs, nu
         elif ii%6 == 4:     #wid slope limits
             params.add('m_wid%s'%str((ii-1)/6+1), init_params[ii], vary=not(fixwid), min=None, max=None, expr=None)
         elif ii%6 == 5:     #amp limits, limited by 0
-            params.add('amp%s'%str((ii-1)/6+1), init_params[ii], vary=True, min=None, max=None, expr=None)
+            params.add('amp%s'%str((ii-1)/6+1), init_params[ii], vary=True, min=0.0, max=None, expr=None)
         elif ii%6 == 0:     #amp index limits
             params.add('alpha%s'%str((ii-1)/6+1), init_params[ii], vary=not(fixamp), min=None, max=None, expr=None)
         else:
@@ -551,7 +566,7 @@ def fit_gaussian_portrait(data, errs, init_params, fix_params, phases, freqs, nu
     chi_sq = results.chisqr
     redchi_sq = results.redchi
     residuals = results.residual
-    model = gaussian_portrait(fit_params,phases,freqs,nu_ref)
+    model = gen_gaussian_portrait(fit_params,phases,freqs,nu_ref)
     if not quiet:
         print "------------------------------------------------------------------"
         print "Gaussian Portrait Fit"
@@ -627,7 +642,7 @@ def make_model(modelfile,phases,freqs,quiet=False):
     for gg in xrange(ngauss):
         comp = map(float,modeldata[gg].split())
         params[1+gg*6:7+(gg*6)] = comp
-    model = gaussian_portrait(params,phases,freqs,nu_ref)
+    model = gen_gaussian_portrait(params,phases,freqs,nu_ref)
     if not quiet: print "Made %d component model for %s with %d frequency channels, %d profile bins, %.0f MHz bandwidth centered near %.2f MHz"%(ngauss,source,nchan,nbin,(freqs[-1]-freqs[0])+((freqs[-1]-freqs[-2])),freqs.mean())
     return source,ngauss,model
 

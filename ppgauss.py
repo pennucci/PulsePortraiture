@@ -15,6 +15,12 @@ parser.add_option("-d", "--datafile",
 parser.add_option("-o", "--outfile",
                   action="store", metavar="outfile", dest="outfile",
                   help="Name of output model file name. [default=archive.model]")
+parser.add_option("--freq",
+                  action="store", metavar="freq", dest="nu_ref", default=None,
+                  help="Reference frequency [MHz] for the gaussian model; the initial profile to fit will be centered on this freq. [default=PSRCHIVE weighted center frequency]")
+parser.add_option("--bw",
+                  action="store", metavar="bw", dest="bw_ref", default=None,
+                  help="Used with --freq; amount of bandwidth [MHz] centered on nu_ref to average for the initial profile fit. [default=Full bandwidth]")
 parser.add_option("--fixloc",
                   action="store_true", dest="fixloc", default=False,
                   help="Fix locations of gaussians across frequency. [default=False]")
@@ -45,6 +51,8 @@ from PulsePortraiture import DataPortrait,ModelPortrait_Gaussian
 
 datafile = options.datafile
 outfile = options.outfile
+nu_ref = float(options.nu_ref)
+bw_ref = float(options.bw_ref)
 fixloc = options.fixloc
 fixwid = options.fixwid
 fixamp = options.fixamp
@@ -53,4 +61,4 @@ showplots = options.showplots
 quiet = not options.verbose
 
 dp = DataPortrait(datafile)
-dp.make_gaussian_model_portrait(locparams=0.0,fixloc=fixloc,widparams=0.0,fixwid=fixwid,ampparams=0.0,fixamp=fixamp,nu_ref=None,niter=niter,outfile=outfile,residplot=showplots,quiet=quiet)
+dp.make_gaussian_model_portrait(ref_prof=(nu_ref,bw_ref),locparams=0.0,fixloc=fixloc,widparams=0.0,fixwid=fixwid,ampparams=0.0,fixamp=fixamp,niter=niter,outfile=outfile,residplot=showplots,quiet=quiet)

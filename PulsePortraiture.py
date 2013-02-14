@@ -19,12 +19,12 @@ class DataPortrait:
         self.lofreq = self.freqs[0]-(self.bw/(2*self.nchan))
         self.init_params = []
 
-    def fit_profile(self):
+    def fit_profile(self,profile):
         """
         """
         fig = plt.figure()
         profplot = fig.add_subplot(211)
-        interactor = GaussianSelector(profplot,self.prof,self.noise_stdev,minspanx=None,minspany=None,useblit=True)   #FIX self.noise_stdev is not the number you want
+        interactor = GaussianSelector(profplot,profile,self.noise_stdev,minspanx=None,minspany=None,useblit=True)   #FIX self.noise_stdev is not the number you want
         plt.show()
         self.init_params = interactor.fit_params
         self.ngauss = (len(self.init_params) - 1)/3
@@ -97,11 +97,17 @@ class DataPortrait:
     def set_model_run(self):
         self.initial_model_run = True
 
-    def make_gaussian_model_portrait(self,locparams=0.0,fixloc=False,widparams=0.0,fixwid=False,ampparams=0.0,fixamp=False,nu_ref=None,niter=0,writemodel=True,outfile=None,residplot=True,quiet=True):
+    def make_gaussian_model_portrait(self,ref_prof=None,locparams=0.0,fixloc=False,widparams=0.0,fixwid=False,ampparams=0.0,fixamp=False,niter=0,writemodel=True,outfile=None,residplot=True,quiet=True):
         """
         """
-        self.fix_params = np.array([fixloc,fixwid,fixamp])
-        if not len(self.init_params): self.fit_profile()
+        self.nu_ref = ref_prof[0]
+        self.bw_ref = ref_prof[1]
+        if self.nu_ref is None: self.nu_ref = self.nu0
+        if self.bw_ref is None: self.bw_ref = self.bw
+        okinds = np.compress(np.less(self.nu_ref-(self.bw_ref/2),self.freqs)*np.greater(self.nu_ref+(self.bw_ref/2),self.freqs)*self.normweights,np.arange(self.nchan))
+        profile = np.take(self.port,okinds,axis=0).mean(axis=0) #This gives a slightly different average profile than self.profile if given the full band and center frequency
+        self.fix_params = (fixloc,fixwid,fixamp)
+        if not len(self.init_params): self.fit_profile(profile)
         if type(locparams) is not np.ndarray:
             try: locparams = np.ones(self.ngauss)*locparams
             except ValueError:
@@ -117,7 +123,6 @@ class DataPortrait:
             except ValueError:
                 print "Not enough parameters for ngauss = %d."%self.ngauss
                 return 0
-        if nu_ref is None: self.nu_ref = self.nu0
         if outfile is None: outfile=self.datafile+".model"
         self.init_model_params = np.empty([self.ngauss,6])
         for nn in range(self.ngauss):
@@ -138,7 +143,7 @@ class DataPortrait:
                 self.fit_params, self.chi_sq, self.dof = fit_gaussian_portrait(self.portx, portx_noise, self.model_params, self.fix_params, self.phases, self.freqsx, self.nu_ref, quiet=quiet)
                 print "Fit took %.2f min"%((time.time()-start)/60.)
             self.model_params = self.fit_params
-            self.model = gaussian_portrait(self.model_params,self.phases,self.freqs,self.nu_ref)
+            self.model = gen_gaussian_portrait(self.model_params,self.phases,self.freqs,self.nu_ref)
             self.modelmasked,self.modelx = screen_portrait(self.model,self.portweights)
             if residplot: self.show_residual_plot()      #FIX    Have it also show statistics of residuals
             niter -= 1
