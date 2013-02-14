@@ -103,7 +103,7 @@ class DataPortrait:
         self.nu_ref = ref_prof[0]
         self.bw_ref = ref_prof[1]
         if self.nu_ref is None: self.nu_ref = self.nu0
-        if self.bw_ref is None: self.bw_ref = self.bw
+        if self.bw_ref is None: self.bw_ref = abs(self.bw)
         okinds = np.compress(np.less(self.nu_ref-(self.bw_ref/2),self.freqs)*np.greater(self.nu_ref+(self.bw_ref/2),self.freqs)*self.normweights,np.arange(self.nchan))
         profile = np.take(self.port,okinds,axis=0).mean(axis=0) #This gives a slightly different average profile than self.profile if given the full band and center frequency
         self.fix_params = (fixloc,fixwid,fixamp)

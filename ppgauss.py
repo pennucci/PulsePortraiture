@@ -51,8 +51,10 @@ from PulsePortraiture import DataPortrait,ModelPortrait_Gaussian
 
 datafile = options.datafile
 outfile = options.outfile
-nu_ref = float(options.nu_ref)
-bw_ref = float(options.bw_ref)
+if options.nu_ref: nu_ref = float(options.nu_ref)
+else: nu_ref = options.nu_ref
+if options.nu_ref: bw_ref = float(options.bw_ref)
+else: bw_ref = options.bw_ref
 fixloc = options.fixloc
 fixwid = options.fixwid
 fixamp = options.fixamp
