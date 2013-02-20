@@ -33,9 +33,9 @@ parser.add_option("--fixamp",
 parser.add_option("--niter",
                   action="store", metavar="int", dest="niter", default=0,
                   help="Number of iterations to loop over generating better model. [default=0]")
-parser.add_option("--showplots",
-                  action="store_true", dest="showplots", default=False,
-                  help="Show residual plot after each iteration. [default=False]")
+parser.add_option("--figure", metavar="figurename",
+                  action="store", dest="figure", default=None,
+                  help="Save PNG figure of final fit to figurename. [default=Not saved]")
 parser.add_option("--verbose",
                   action="store_true", dest="verbose", default=False,
                   help="More to stdout.")
@@ -47,20 +47,20 @@ if options.datafile is None:
     parser.print_help()
     parser.exit()
 
-from PulsePortraiture import DataPortrait,ModelPortrait_Gaussian
+from PulsePortraiture import DataPortrait
 
 datafile = options.datafile
 outfile = options.outfile
 if options.nu_ref: nu_ref = float(options.nu_ref)
 else: nu_ref = options.nu_ref
-if options.nu_ref: bw_ref = float(options.bw_ref)
+if options.bw_ref: bw_ref = float(options.bw_ref)
 else: bw_ref = options.bw_ref
 fixloc = options.fixloc
 fixwid = options.fixwid
 fixamp = options.fixamp
 niter = int(options.niter)
-showplots = options.showplots
+figure = options.figure
 quiet = not options.verbose
 
 dp = DataPortrait(datafile)
-dp.make_gaussian_model_portrait(ref_prof=(nu_ref,bw_ref),locparams=0.0,fixloc=fixloc,widparams=0.0,fixwid=fixwid,ampparams=0.0,fixamp=fixamp,niter=niter,outfile=outfile,residplot=showplots,quiet=quiet)
+dp.make_gaussian_model_portrait(ref_prof=(nu_ref,bw_ref),locparams=0.0,fixloc=fixloc,widparams=0.0,fixwid=fixwid,ampparams=0.0,fixamp=fixamp,niter=niter,outfile=outfile,residplot=figure,quiet=quiet)

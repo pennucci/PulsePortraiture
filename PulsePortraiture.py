@@ -2,7 +2,6 @@
 ### This software lays on the bed of Procrustes all too comfortably.
 ###
 
-import sys,time
 from PPlib import *
 
 class DataPortrait:
@@ -66,7 +65,7 @@ class DataPortrait:
                 plt.show()
             self.spect_index = params[1]
 
-    def show_residual_plot(self):
+    def show_residual_plot(self,savefig=None):
         """
         """
         try:            #FIX make smarter
@@ -92,12 +91,14 @@ class DataPortrait:
         print "Residuals mean: %.3f"%(self.portx-self.modelx).mean()
         print "Residuals std:  %.3f"%(self.portx-self.modelx).std()
         print "Data std:       %.3f"%self.noise_stdev
-        plt.show()
+        if savefig:
+            plt.savefig(savefig,format='png')
+        else: plt.show()
 
     def set_model_run(self):
         self.initial_model_run = True
 
-    def make_gaussian_model_portrait(self,ref_prof=None,locparams=0.0,fixloc=False,widparams=0.0,fixwid=False,ampparams=0.0,fixamp=False,niter=0,writemodel=True,outfile=None,residplot=True,quiet=True):
+    def make_gaussian_model_portrait(self,ref_prof=None,locparams=0.0,fixloc=False,widparams=0.0,fixwid=False,ampparams=0.0,fixamp=False,niter=0,writemodel=True,outfile=None,residplot=None,quiet=True):
         """
         """
         self.nu_ref = ref_prof[0]
@@ -131,44 +132,44 @@ class DataPortrait:
         itern = niter
         if niter < 0: niter = 0
         portx_noise = np.outer(get_noise(self.portx,chans=True),np.ones(self.nbin))
-        print "Starting to fit gaussian model portrait..."
+        print "Fitting gaussian model portrait..."
         if not self.initial_model_run:
             start = time.time()
             self.fit_params, self.chi_sq, self.dof = fit_gaussian_portrait(self.portx, portx_noise, self.init_model_params, self.fix_params, self.phases, self.freqsx, self.nu_ref, quiet=quiet)
             print "Fit took %.2f min"%((time.time()-start)/60.)
             niter += 1
         while(niter):
-            if niter and self.initial_model_run:
-                start = time.time()
-                self.fit_params, self.chi_sq, self.dof = fit_gaussian_portrait(self.portx, portx_noise, self.model_params, self.fix_params, self.phases, self.freqsx, self.nu_ref, quiet=quiet)
-                print "Fit took %.2f min"%((time.time()-start)/60.)
-            self.model_params = self.fit_params
-            self.model = gen_gaussian_portrait(self.model_params,self.phases,self.freqs,self.nu_ref)
-            self.modelmasked,self.modelx = screen_portrait(self.model,self.portweights)
-            if residplot: self.show_residual_plot()      #FIX    Have it also show statistics of residuals
-            niter -= 1
-            dofit = 1
-            if dofit == 1:
-                phaseguess = first_guess(self.portx,self.modelx,nguess=1000)
-                DMguess = 0.0
-                phi,DM,nfeval,rc,scalesx,param_errs,red_chi2 = fit_portrait(self.portx,self.modelx,np.array([phaseguess,DMguess]),self.P,self.freqsx,self.nu0,scales=True)
-                phierr = param_errs[0]
-                DMerr = param_errs[1]
-                print "Fit has phase offset of %.2e +/- %.2e [rot], DM of %.2e +/- %.2e [pc cm**-3], and red. chi**2 of %.2f."%(phi,phierr,DM,DMerr,red_chi2)
-                if min(abs(phi),abs(1-phi)) < abs(phierr):
-                    if abs(DM) < abs(DMerr):
-                        print "Iteration converged."
-                        phi = 0.0
-                        DM = 0.0
-                        niter = 0
-                if niter:
-                    print "Rotating data portrait by above values for iteration %d."%(itern-niter+1)
-                    self.port = rotate_portrait(self.port,phi,DM,self.P,self.freqs,self.nu0)
-                    self.portx = rotate_portrait(self.portx,phi,DM,self.P,self.freqsx,self.nu0)
-                    self.set_model_run()
+           if niter and self.initial_model_run:
+               start = time.time()
+               self.fit_params, self.chi_sq, self.dof = fit_gaussian_portrait(self.portx, portx_noise, self.model_params, self.fix_params, self.phases, self.freqsx, self.nu_ref, quiet=quiet)
+               print "Fit took %.2f min"%((time.time()-start)/60.)
+           self.model_params = self.fit_params
+           self.model = gen_gaussian_portrait(self.model_params,self.phases,self.freqs,self.nu_ref)
+           self.modelmasked,self.modelx = screen_portrait(self.model,self.portweights)
+           niter -= 1
+           dofit = 1
+           if dofit == 1:
+               phaseguess = first_guess(self.portx,self.modelx,nguess=1000)
+               DMguess = 0.0
+               phi,DM,nfeval,rc,scalesx,param_errs,red_chi2,duration = fit_portrait(self.portx,self.modelx,np.array([phaseguess,DMguess]),self.P,self.freqsx,self.nu0,scales=True)
+               phierr = param_errs[0]
+               DMerr = param_errs[1]
+               print "Fit has phase offset of %.2e +/- %.2e [rot], DM of %.2e +/- %.2e [pc cm**-3], and red. chi**2 of %.2f."%(phi,phierr,DM,DMerr,red_chi2)
+               if min(abs(phi),abs(1-phi)) < abs(phierr):
+                   if abs(DM) < abs(DMerr):
+                       print "Iteration converged."
+                       phi = 0.0
+                       DM = 0.0
+                       niter = 0
+               if niter:
+                   print "Rotating data portrait by above values for iteration %d."%(itern-niter+1)
+                   self.port = rotate_portrait(self.port,phi,DM,self.P,self.freqs,self.nu0)
+                   self.portx = rotate_portrait(self.portx,phi,DM,self.P,self.freqsx,self.nu0)
+                   self.set_model_run()
         if writemodel: write_model(outfile,self.source,self.model_params,self.nu_ref)    #FIX do not overwrite model file if exists...
+        if residplot: self.show_residual_plot(residplot)      #FIX    Have it also show statistics of residuals
 
-class ModelPortrait_Gaussian:
+class GaussianModelPortrait:
     """
     """
     def __init__(self,modelfile,nbin,freqs,portweights=None,quiet=False,Gfudge=1.0):  #FIX make smarter to query DataPortrait...?
@@ -197,7 +198,7 @@ class ModelPortrait_Gaussian:
         #Need to make pretty, axes and what not
         plt.show()
 
-class ModelPortrait_Smoothed:
+class SmoothedModelPortrait:
     """
     """
     def __init__(self,modelfile,quiet=False,Gfudge=1.0):    #FIX need to interpolate, or somehow account for missing channels in model...
@@ -225,8 +226,8 @@ class GetTOAs:
         if DM0: self.DM0 = DM0
         else: self.DM0 = self.arch.get_dispersion_measure()
         print '\n'
-        if self.mtype == "gauss": self.modelportrait=ModelPortrait_Gaussian(modelfile,self.nbin,self.freqs,portweights=None,quiet=False,Gfudge=1.0)
-        elif self.mtype == "smooth": self.modelportrait=ModelPortrait_Smoothed(modelfile,quiet=False,Gfudge=self.Gfudge)
+        if self.mtype == "gauss": self.modelportrait=GaussianModelPortrait(modelfile,self.nbin,self.freqs,portweights=None,quiet=False,Gfudge=1.0)
+        elif self.mtype == "smooth": self.modelportrait=SmoothedModelPortrait(modelfile,quiet=False,Gfudge=self.Gfudge)
         else:
             print 'Model type must be either "gauss" or "smooth".'
             sys.exit()
@@ -325,6 +326,7 @@ class GetTOAs:
             self.scalesx = []
             self.scale_errs = []
             self.red_chi2s = np.empty(self.nsub)
+            self.fit_duration = 0.0
             for nn in range(self.nsub):
                 dataportrait = self.portxs[nn]
                 portx_fft = np.fft.rfft(dataportrait,axis=1)
@@ -358,7 +360,8 @@ class GetTOAs:
                 #if not quiet: print "Phase guess: %.8f ; DM guess: %.5f"%(phaseguess,DMguess)
                 #NEED status bar?
                 print "Fitting for TOA %d...put more info here"%(nn+1)      #FIX
-                phi,DM,nfeval,rc,scalex,param_errs,red_chi2 = fit_portrait(self.portxs[nn],modelx,np.array([phaseguess,DMguess]),P,freqsx,nu0,scales=True)
+                phi,DM,nfeval,rc,scalex,param_errs,red_chi2,duration = fit_portrait(self.portxs[nn],modelx,np.array([phaseguess,DMguess]),P,freqsx,nu0,scales=True)
+                self.fit_duration += duration
                 self.phis[nn] = phi
                 self.phi_errs[nn] = param_errs[0]
                 ####################
@@ -402,8 +405,8 @@ class GetTOAs:
                     else:
                         write_princeton_toa(toas[nn].intday(),toas[nn].fracday(),toa_errs[nn],self.nu0,self.DeltaDMs[nn],obs=obs)
             sys.stdout = sys.__stdout__
-            duration = time.time()-start
-            print "\nFitting took %.1f min, ~%.3f min/TOA, mean TOA error is %.3f us"%(duration/60.,duration/(60*self.nsub),self.phi_errs.mean()*self.Ps.mean()*1e6)
+            self.tot_duration = time.time()-start
+            print "\nMinimization took ~%.2f min/TOA, total ~%.2f min/TOA, mean TOA error is %.3f us"%(self.fit_duration/(60.*self.nsub),self.tot_duration/(60*self.nsub),self.phi_errs.mean()*self.Ps.mean()*1e6)
             if pam_cmd:
                 pc = open("pam_cmds","a")
                 pam_ext = self.datafile[-self.datafile[::-1].find("."):]+".rot"

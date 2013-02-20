@@ -18,6 +18,7 @@ import numpy.fft as fft
 import numpy.ma as ma
 import scipy.optimize as opt
 import lmfit as lm
+import sys,time
 
 #plt.copper()
 #plt.gray()
@@ -291,7 +292,8 @@ def gen_gaussian_portrait(params, phases, freqs, nu_ref):
     gparams[:,0] = refparams[0]    #DC term
     gparams[:,1::3] = np.outer(freqs-nu_ref,locparams)+np.outer(np.ones(nchan),refparams[1::3])    #Locs
     gparams[:,2::3] = np.outer(freqs-nu_ref,widparams)+np.outer(np.ones(nchan),refparams[2::3])    #Wids
-    gparams[:,0::3][:,1:] = np.exp(np.outer(np.log(freqs)-np.log(nu_ref),ampparams)+np.outer(np.ones(nchan),np.log(refparams[0::3][1:])))    #Amps
+    #gparams[:,0::3][:,1:] = np.exp(np.outer(np.log(freqs)-np.log(nu_ref),ampparams)+np.outer(np.ones(nchan),np.log(refparams[0::3][1:])))    #Amps; I am unsure why I needed this fix at some point
+    gparams[:,3::3] = np.exp(np.outer(np.log(freqs)-np.log(nu_ref),ampparams)+np.outer(np.ones(nchan),np.log(refparams[3::3])))    #Amps
     for nn in range(nchan):
         gport[nn] = gen_gaussian_profile(gparams[nn],nbin) #Maybe need to contrain so values don't go negative?
     return gport
@@ -321,8 +323,8 @@ def powlawnus(lo,hi,N,alpha,mid=False):
     Returns frequencies such that a bandwidth from lo to hi frequencies
     split into N chunks contains the same amount of power in each chunk
     given a power-law across the band with spectral index alpha.  Default
-    behavior return N+1 frequencies (includes both lo and hi freqs); if
-    mid=True, it returns N frequencies, corresponding to the middle frequency
+    behavior returns N+1 frequencies (includes both lo and hi freqs); if
+    mid=True, will return N frequencies, corresponding to the middle frequency
     in each chunk.
     """
     alpha = np.float(alpha)
@@ -597,7 +599,9 @@ def fit_portrait(data,model,init_params,P=None,freqs=None,nu_ref=np.inf,scales=T
     minimize = opt.minimize
     method = 'TNC'  #Seems to work best, fastest
     bounds = [(None,None),(None,None)]    #Bounds on phase and DM
+    start = time.time()
     results = minimize(fit_portrait_function,init_params,args=other_args,method=method,jac=fit_portrait_function_deriv,bounds=bounds,options={'disp':False})
+    duration = time.time()-start
     phi = results.x[0]
     DM = results.x[1]
     nfeval = results.nfev
@@ -610,8 +614,8 @@ def fit_portrait(data,model,init_params,P=None,freqs=None,nu_ref=np.inf,scales=T
     if scales:
         scales = get_scales(data,model,phi,DM,P,freqs,nu_ref)
         param_errs += list(pow(2*p*errs,-0.5))  #Errors on scales, if ever needed
-        return phi, DM, nfeval, return_code, scales, np.array(param_errs), red_chi2
-    else: return phi, DM, nfeval, return_code, np.array(param_errs), red_chi2
+        return phi, DM, nfeval, return_code, scales, np.array(param_errs), red_chi2, duration
+    else: return phi, DM, nfeval, return_code, np.array(param_errs), red_chi2, duration
 
 def first_guess(data,model,nguess=1000):
     """
