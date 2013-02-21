@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-from PulsePortraiture import *
+from pplib import *
 
 archs = open(sys.argv[-2],"r").readlines()
 totarch = sys.argv[-1]
