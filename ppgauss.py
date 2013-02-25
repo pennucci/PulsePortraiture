@@ -271,19 +271,21 @@ class DataPortrait:
             return 0
         modelfig = plt.figure()
         aspect = "auto"
+        interpolations = "none"
         origin = "lower"
         extent = (0.0, 1.0, self.freqs[0], self.freqs[-1])
         plt.subplot(221)
         plt.title("Data Portrait")
-        plt.imshow(self.port, aspect=aspect, origin=origin,
-                extent=extent)
+        plt.imshow(self.port, aspect=aspect, interpolation=interpolation,
+                origin=origin, extent=extent)
         plt.subplot(222)
         plt.title("Model Portrait")
-        plt.imshow(self.model,aspect=aspect, origin=origin, extent=extent)
+        plt.imshow(self.model, aspect=aspect, interpolation=interpolation,
+                origin=origin, extent=extent)
         plt.subplot(223)
         plt.title("Residuals")
-        plt.imshow(self.port - self.modelmasked, aspect=aspect, origin=origin,
-                extent=extent)
+        plt.imshow(self.port - self.modelmasked, aspect=aspect,
+                interpolation=interpolation, origin=origin, extent=extent)
         plt.colorbar()
         #plt.subplot(224)
         #plt.title(r"Log$_{10}$(abs(Residuals/Data))")

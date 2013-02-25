@@ -245,18 +245,21 @@ class GetTOAs:
             rotate_portrait(modelx, -phi, 0.0, P, freqsx, nu0)))
         port = rotate_portrait(port, phi, DM, P, freqs, nu0)
         aspect = "auto"
+        interpolation = "none"
         origin = "lower"
         extent = (0.0, 1.0, self.freqs[0], self.freqs[-1])
         plt.subplot(221)
         plt.title("Data Portrait")
-        plt.imshow(port, aspect=aspect, origin=origin, extent=extent)
+        plt.imshow(port, aspect=aspect, interpolation=interpolation,
+                origin=origin, extent=extent)
         plt.subplot(222)
         plt.title("Fitted Model Portrait")
-        plt.imshow(fitmodel, aspect=aspect, origin=origin, extent=extent)
+        plt.imshow(fitmodel, aspect=aspect, interpolation=interpolation
+                origin=origin, extent=extent)
         plt.subplot(223)
         plt.title("Residuals")
-        plt.imshow(port - fitmodel, aspect=aspect, origin=origin,
-                extent=extent)
+        plt.imshow(port - fitmodel, aspect=aspect, interpolation=interpolation,
+                origin=origin, extent=extent)
         plt.colorbar()
         #plt.subplot(224)
         #plt.title(r"Log$_{10}$(abs(Residuals/Data))")

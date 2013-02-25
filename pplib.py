@@ -796,19 +796,21 @@ def fft_rotate(arr, bins):
     phasor = np.exp(complex(0.0, 2*np.pi) * freqs * bins / float(arr.size))
     return np.fft.irfft(phasor * np.fft.rfft(arr), arr.size)
 
-def show_port(port, freqs, phases=None, title=None, rvrsd=False, aspect="auto", origin="lower"):
+def show_port(port, freqs, phases=None, title=None, rvrsd=False, aspect="auto", interpolation="none", origin="lower", extent=None):
     """
     """
     if phases is None:
-        phases = [0.0,1.0]
+        phases = [0.0, 1.0]
+    if extent is None:
+        extent = (phases[0], phases[-1], freqs[-1], freqs[0])
     plt.figure()
     plt.xlabel("Phase [rot]")
     plt.ylabel("Frequency [MHz]")
     if title: plt.title(title)
     if rvrsd:
-        plt.imshow(port[::-1], aspect=aspect, origin=origin, extent=(phases[0],
-            phases[-1],freqs[-1],freqs[0]))
+        plt.imshow(port[::-1], aspect=aspect, origin=origin, extent=extent,
+                interpolation=interpolation)
     else:
-        plt.imshow(port, aspect=aspect, origin=origin, extent=(phases[0],
-            phases[-1],freqs[0],freqs[-1]))
+        plt.imshow(port, aspect=aspect, origin=origin, extent=extent,
+                interpolation=interpolation)
     plt.show()
