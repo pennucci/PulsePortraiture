@@ -13,7 +13,6 @@ import time
 import matplotlib.pyplot as plt
 import numpy as np
 import numpy.fft as fft
-import numpy.ma as ma
 import scipy.optimize as opt
 import lmfit as lm
 import psrchive as pr
@@ -350,16 +349,16 @@ def fit_gaussian_profile(data, init_params, errs, quiet=True):
     redchi_sq = results.redchi
     residuals = results.residual
     if not quiet:
-        print "------------------------------------------------------------------"
+        print "---------------------------------------------------------------"
         print "Multi-Gaussian Profile Fit Results"
-        print "------------------------------------------------------------------"
+        print "---------------------------------------------------------------"
         print "lmfit status:", results.message
         print "gaussians:", ngauss
         print "DOF:", dof
         print "reduced chi-sq: %.2f" % redchi_sq
         print "residuals mean: %.3g" % np.mean(residuals)
         print "residuals stdev: %.3g" % np.std(residuals)
-        print "------------------------------------------------------------------"
+        print "---------------------------------------------------------------"
     return fit_params, redchi_sq, dof, residuals
 
 def fit_gaussian_portrait(data, errs, init_params, fix_params, phases, freqs, nu_ref, quiet=True):
@@ -398,16 +397,16 @@ def fit_gaussian_portrait(data, errs, init_params, fix_params, phases, freqs, nu
     residuals = results.residual
     model = gen_gaussian_portrait(fit_params,phases,freqs,nu_ref)
     if not quiet:
-        print "------------------------------------------------------------------"
+        print "---------------------------------------------------------------"
         print "Gaussian Portrait Fit"
-        print "------------------------------------------------------------------"
+        print "---------------------------------------------------------------"
         print "lmfit status:", results.message
         print "gaussians:", ngauss
         print "DOF:", dof
         print "reduced chi-sq: %.2f" % redchi_sq
         print "residuals mean: %.3g" % np.mean(residuals)
         print "residuals stdev: %.3g" % np.std(residuals)
-        print "------------------------------------------------------------------"
+        print "---------------------------------------------------------------"
     return fit_params, chi_sq, dof
 
 def fit_portrait(data,model,init_params,P=None,freqs=None,nu_ref=np.inf,scales=True):
@@ -454,27 +453,34 @@ def first_guess(data, model, nguess=1000):
     for ii in range(nguess):
         phase = phaseguess[ii]
         crosscorr[ii] = np.correlate(fft_rotate(np.sum(data, axis=0),
-            phase * len(np.sum(data,axis=0))), np.sum(model,axis=0))
+            phase * len(np.sum(data, axis=0))), np.sum(model, axis=0))
     phaseguess = phaseguess[crosscorr.argmax()]
     return phaseguess
 
-def make_model(modelfile,phases,freqs,quiet=False):
+def read_model(modelfile, phases, freqs, quiet=False):
     """
     """
     nbin = len(phases)
     nchan = len(freqs)
-    modeldata = open(modelfile,"r").readlines()
-    ngauss = len(modeldata)-3
-    params = np.zeros(ngauss*6+1)
-    source = modeldata.pop(0)[:-1]
+    modeldata = open(modelfile, "r").readlines()
+    ngauss = len(modeldata) - 3
+    params = np.zeros(ngauss*6 + 1)
+    name = modeldata.pop(0)[:-1]
     nu_ref = float(modeldata.pop(0))
     params[0] = float(modeldata.pop(0))
     for gg in xrange(ngauss):
-        comp = map(float,modeldata[gg].split())
-        params[1+gg*6:7+(gg*6)] = comp
-    model = gen_gaussian_portrait(params,phases,freqs,nu_ref)
-    if not quiet: print "\nMade %d component model for %s with %d frequency channels, %d profile bins, %.0f MHz bandwidth centered near %.2f MHz"%(ngauss,source,nchan,nbin,(freqs[-1]-freqs[0])+((freqs[-1]-freqs[-2])),freqs.mean())
-    return source,ngauss,model
+        comp = map(float, modeldata[gg].split())
+        params[1 + gg*6 : 7 + (gg*6)] = comp
+    model = gen_gaussian_portrait(params, phases, freqs, nu_ref)
+    if not quiet:
+        print "Model: %s"%name
+        print "\nMade %d component model for %s with %d frequency channels,"%(
+                ngauss, source, nchan)
+        print "%d profile bins, %.0f MHz bandwidth, centered near %.2f MHz,"%(
+                nbin, (freqs[-1]-freqs[0]) + ((freqs[-1]-freqs[-2])),
+                freqs.mean())
+        print "with model parameters referenced to %.2f MHz."%nu_ref
+    return ngauss, model
 
 def get_noise(data,frac=4,tau=False,chans=False,fd=False):     #FIX: Make sure to use on portraits w/o zapped freq. channels, i.e. portxs     FIX: MAKE SIMPLER!!!    FIX: Implement k_max from wiener/brick-wall filter fit        #FIX This is not right 
     """
@@ -550,152 +556,120 @@ def rotate_portrait(port,phase,DM=None,P=None,freqs=None,nu_ref=np.inf):
             pFFT[nn,:] *= phasor
     return fft.irfft(pFFT)
 
-def write_model(filenm,source,model_params,nu_ref):
+def write_model(filenm, name, model_params, nu_ref):
     """
     """
-    outfile = open(filenm,"a")
-    outfile.write("%s\n"%source)
+    outfile = open(filenm, "a")
+    outfile.write("%s\n"%name)
     outfile.write("%.8f\n"%nu_ref)
     outfile.write("%.8f\n"%model_params[0])
-    ngauss = (len(model_params)-1)/6
+    ngauss = (len(model_params) - 1) / 6
     for nn in xrange(ngauss):
-        comp = model_params[1+nn*6:7+nn*6]
-        outfile.write("%.8f\t %.8f\t %.8f\t %.8f\t %.8f\t %.8f\n"%(comp[0],comp[1],comp[2],comp[3],comp[4],comp[5]))
+        comp = model_params[1 + nn*6:7 + nn*6]
+        outfile.write("%.8f\t %.8f\t %.8f\t %.8f\t %.8f\t %.8f\n"%(comp[0],
+            comp[1], comp[2], comp[3], comp[4] ,comp[5]))
     outfile.close()
     print "%s written."%filenm
 
-def load_data(filenm,dedisperse=False,tscrunch=False,pscrunch=False,quiet=False,rm_baseline=(0,0)):
+def load_data(filenm, dedisperse=False, dededisperse=False, tscrunch=False,
+        pscrunch=False, rm_baseline=True, flux_prof=False, quiet=False):
     """
-    Will read data using PSRCHIVE.
+    Will read and return data using PSRCHIVE.  The returned archive is
+    'refreshed'.
     """
     #Load archive
     arch = pr.Archive_load(filenm)
     source = arch.get_source()
     if not quiet:
         print "\nReading data from %s on source %s..."%(filenm, source)
-    #Get some metadata
-    nu0 = arch.get_centre_frequency()   #Center of the band
+    #Center of the band
+    nu0 = arch.get_centre_frequency()
     #bw = abs(arch.get_bandwidth())      #For the -200 MHz cases.  Good fix?
-    bw = arch.get_bandwidth()      #For the -200 MHz cases.  Good fix?
+    bw = arch.get_bandwidth()
     nchan = arch.get_nchan()
-    #By-hand frequency calculation, equivalent to below from psrchive
-    #chanwidth = bw/nchan
-    #lofreq = nu0-(bw/2)
-    #freqs = np.linspace(lofreq+(chanwidth/2.0),lofreq+bw-(chanwidth/2.0),nchan)     #Centers of frequency channels
-    freqs = np.array([arch.get_Integration(0).get_centre_frequency(ii) for ii in range(nchan)])
+    #Centers of frequency channels
+    freqs = np.array([arch.get_Integration(0).get_centre_frequency(ii) for ii
+        in range(nchan)])
     #freqs.sort()                #Again, for the negative BW cases.  Good fix?
+    #By-hand frequency calculation, equivalent to above from PSRCHIVE
+    #chanwidth = bw / nchan
+    #lofreq = nu0 - (bw/2)
+    #freqs = np.linspace(lofreq + (chanwidth/2.0),lofreq + bw - (chanwidth/2.0
+    #    ), nchan)
     nbin = arch.get_nbin()
-    phases = np.arange(nbin, dtype='d')/nbin
-    #Dedisperse?
-    if dedisperse:
-        arch.dedisperse()
-    else:
-        arch.dededisperse()
-    #This is where I think the bandpass is being removed (needs to be robust...)
-    baseline_removed = 0
-    if rm_baseline[0] + rm_baseline[1] == 0:
-        arch.remove_baseline()
-        baseline_removed = 1
-    #pscrunchd?
+    #Centers of phase bins
+    phases = np.linspace(0.0 + (nbin*2)**-1, 1.0 - (nbin*2)**-1, nbin)
+    #phases = np.arange(nbin, dtype='d') / nbin #NOT centers...
+    #De/dedisperse?
+    if dedisperse: arch.dedisperse()
+    if dededisperse: arch.dededisperse()
+    #Maybe use better basline subtraction??
+    if rm_baseline: arch.remove_baseline()
+    #pscrunch?
     if pscrunch: arch.pscrunch()
-    else:
-        print "Full Stokes not ready.  Try again later.  Sorry"
-        return 0
-    #if arch.get_state != 'Intensity': arch.pscrunch()  #Stokes
-    #tscrunch?
-#    if tscrunch:
-#        arch.tscrunch()
-#        nsub = arch.get_nsubint()
-#        P = arch.get_Integration(0).get_folding_period()
-#        #Get data
-#        port = arch.get_data()[0]           #Stokes
-#        for ss in range(4):                 #Stokes
-#            for ff in range(nchan):         #Stokes
-#                port[ss,ff] -= port[ss,ff,260:298].mean()   #Stokes     ##UGLY HARDCODE!!
-#                #port[ss,ff] -= port[ss,ff,260/6:298/6].mean()   #Stokes        ##UGLY HARDCODE!!
-#        #Get weights !!!Careful about this!!!
-#        #weights = arch.get_weights()[0]
-#        weights = port[0].sum(axis=1)  #STOKES FAKE WEIGHTS
-#        normweights = np.divide(map(int,weights),map(int,weights))
-#        maskweights = (normweights+1)%2
-#        portweights = np.array([np.ones(nbin)*maskweights[ii] for ii in xrange(nchan)])
-#        portx = []    #Stokes
-#        for ss in range(4):     #Stokes
-#            sp = screen_portrait(port[ss],portweights)  #Does not change port in this case (already "masked")   #Stokes
-#            portx.append(sp[1])
-#        portx = np.array(portx)
-#        #Estimate noise
-#        noise_stdev = np.zeros(4)     #Stokes
-#        for ss in range(4):
-#            noise_stdev[ss] = get_noise(portx[ss])   #Stokes #FIX This is probably not right
-#        #Make flux profile
-#        #fluxprof = port.sum(1)/nbin  #This is about equal to bscrunch to ~6 places     #Stokes
-#        #fluxprofx = ma.masked_array(fluxprof,mask=maskweights).compressed()            #Stokes
-#        freqsx = ma.masked_array(freqs,mask=maskweights).compressed()
-#        #Get pulse profile
-#        arch.fscrunch()
-#        prof = arch.get_data()[0][0][0]
-#        if not quiet:
-#            print "\tcenter freq. (MHz) = %.5f\n\
-#            bandwidth (MHz)    = %.1f\n\
-#            # bins in prof.    = %d\n\
-#            # channels         = %d\n\
-#            unzapped chan.     = %d"%(nu0,bw,nbin,nchan,len(portx[0]))
-#        arch.refresh()
-#        return source,arch,port,portx,noise_stdev,prof,nbin,phases,nu0,bw,nchan,freqs,freqsx,nsub,P,weights,normweights,maskweights,portweights    #Stokes
-#    else:
     #tscrunch?
     if tscrunch: arch.tscrunch()
     nsub = arch.get_nsubint()
     #Get data
-    ports = arch.get_data()[:,0,:,:]     #FIX Here assumes pscrunched in second index
-    Ps = np.array([arch.get_Integration(ii).get_folding_period() for ii in xrange(nsub)],dtype=np.double)
-    MJDs = [arch.get_Integration(ii).get_epoch() for ii in xrange(nsub)]
-    #Get weights !!!Careful about this!!!
+    #PSRCHIVE indices [subint:pol:chan:bin]
+    subints = arch.get_data()[:,:,:,:]
+    npol = subints.shape[1]
+    Ps = np.array([arch.get_Integration(ii).get_folding_period() for ii in
+        xrange(nsub)],dtype=np.double)
+    epochs = [arch.get_Integration(ii).get_epoch() for ii in xrange(nsub)]
+    #Get weights
     weights = arch.get_weights()
-    normweights = np.zeros([len(weights),nchan])
-    okinds = np.array([np.compress(weights[ii] > 0.0,
-        np.arange(len(weights[ii]))) for ii in xrange(len(weights))])
-    for ii in xrange(len(weights)): np.put(normweights[ii], okinds[ii], 1.0)
-    maskweights = (normweights+1)%2
-    portweights = np.array([np.array([np.ones(nbin)*maskweights[ii,jj] for jj in xrange(nchan)]) for ii in xrange(nsub)])
-    ports,portxs = np.array([screen_portrait(ports[ii],portweights[ii])[0] for ii in xrange(nsub)]),np.array([screen_portrait(ports[ii],portweights[ii])[1] for ii in xrange(nsub)])    #FIX latter part may not work if portxs have different sizes
-    arch.tscrunch()
-    port = ports.mean(axis=0)
-    portx = portxs.mean(axis=0)
-    #Estimate noise
-    noise_stdev = np.zeros(nsub)
-    for nn in range(nsub):
-        noise_stdev[nn] = get_noise(portxs[nn])     #FIX This is probably not right
-    fluxprof = port.sum(1)/nbin  #This is about equal to bscrunch to ~6 places
-    fluxprofx = ma.masked_array(fluxprof,mask=np.array(map(round,maskweights.mean(axis=0)))).compressed()
-    freqsx = ma.masked_array(freqs,mask=np.array(map(round,maskweights.mean(axis=0)))).compressed()     #FIX will not work if portxs have different sizes/different things zapped
+    weights_norm = np.where(weights == 0.0, np.zeros(weights.shape),
+            np.ones(weights.shape))
+    masks = np.einsum('ij,k', weights_norm, np.ones(nbin))
+    masks = np.einsum('j,ikl',np.ones(npol),masks)
+    #These are the data free of zapped channels and subints
+    subintsx = [np.compress(weights_norm[ii], subints[ii], axis=1) for ii in
+            xrange(nsub)]
+    #The channel center frequencies for the non-zapped subints
+    freqsx = [np.compress(weights_norm[ii], freqs) for ii in xrange(nsub)]
+    #The rest is now ignoring npol...
+    arch.pscrunch()
+    #Estimate noise -- needs improvement
+    noise_std = np.array([get_noise(subints[ii,0]) for ii in xrange(nsub)])
+    if flux_prof:
+        #Flux profile
+        #The below is about equal to bscrunch to ~6 places
+        arch.dedisperse()
+        arch.tscrunch()
+        flux_prof = arch.get_data().mean(axis=3)[0][0]
+        #Non-zapped data
+        flux_profx = np.compress(arch.get_weights()[0], flux_prof)
+    else:
+        flux_prof = np.array([])
+        flux_profx = np.array([])
     #Get pulse profile
+    arch.tscrunch()
     arch.fscrunch()
-    prof = arch.get_data()[0][0][0]
+    prof = arch.get_data()[0,0,0]
+    #Number unzapped channels, subints
+    uzchan = int(round(np.mean([subintsx[ii].shape[1] for ii in
+        xrange(nsub)])))
+    uzsub = np.compress([subintsx[ii].shape[1] for ii in xrange(nsub)],
+            np.ones(nsub)).sum()
     if not quiet:
-        print "\tcenter freq. (MHz) = %.5f\n\
-        bandwidth (MHz)    = %.1f\n\
-        # bins in prof.    = %d\n\
+        print "\tcenter freq. [MHz] = %.5f\n\
+        bandwidth [MHz]    = %.1f\n\
+        # bins in prof     = %d\n\
         # channels         = %d\n\
-        # unzapped chan.   ~ %d\n\
-        # sub ints         = %d"%(nu0,bw,nbin,nchan,int(np.array(map(len,portxs)).mean()),nsub) #FIX might not work if subints masked differently
-    arch.refresh()      #FIX return as is or as requested scrunched?
-    if tscrunch: return source,arch,ports[0],portxs[0],noise_stdev[0],fluxprof,fluxprofx,prof,nbin,phases,nu0,bw,nchan,freqs,freqsx,nsub,Ps[0],MJDs[0],weights[0],normweights[0],maskweights[0],portweights[0]
-    else: return source,arch,ports,portxs,noise_stdev,fluxprof,fluxprofx,prof,nbin,phases,nu0,bw,nchan,freqs,freqsx,nsub,Ps,MJDs,weights,normweights,maskweights,portweights
-
-def screen_portrait(port,portweights):
-    """
-    """
-    #nbin = portweights.sum(axis=1).max()
-    try: nbin = len(port[0])
-    except(TypeError): nbin = len(port)
-    normweights = (portweights.sum(axis=1)+1)%(nbin+1)
-    nchan = nbin-portweights.sum(axis=0).max()
-    maskedport = np.transpose(normweights*np.transpose(port))
-    portx = ma.masked_array(port,mask=portweights).compressed()
-    portx = portx.reshape(len(portx)/nbin,nbin)
-    return maskedport,portx
+        # chan (mean)      = %d\n\
+        # subints          = %d\n\
+        # unzapped subint  = %d"%(nu0, bw, nbin, nchan, uzchan, nsub, uzsub)
+    #Returns refreshed arch; could be changed...
+    arch.refresh()
+    #Return dictionary!
+    data = {"arch":arch, "bw":bw, "flux_prof":flux_prof,
+            "flux_profx":flux_profx, "freqs":freqs, "freqsx":freqsx,
+            "masks":masks, "epochs":epochs, "nbin":nbin, "nchan":nchan,
+            "noise_std":noise_std, "nsub":nsub, "nu0":nu0, "phases":phases,
+            "prof":prof, "Ps":Ps, "source":source, "subints":subints,
+            "subintsx":subintsx, "weights":weights_norm}
+    return data
 
 def plot_lognorm(mu,tau,lo=0.0,hi=5.0,npts=500,plot=1,show=0):
     """
@@ -738,17 +712,9 @@ def DM_delay(DM,freq,freq2=None,P=None):
     else: return delay
 
 def make_fake():
-    noise = np.random.normal(size=64**2)
-    noise = noise.reshape(64,64)
-    fake = np.zeros([64,64])
-    fake[:,25] += 5
-    fake[:,26] += 3
-    fake[:,27] += 1
-    fake[:,24] += 3
-    fake[:,23] += 1
-    model = 12.1*rotate_portrait(fake,-0.17)
-    fake += noise
-    return fake,model
+    """
+    """
+    return 0
 
 def write_princeton_toa(toa_MJDi, toa_MJDf, toaerr, freq, DM, obs='@', name=' '*13):
     """
@@ -796,21 +762,37 @@ def fft_rotate(arr, bins):
     phasor = np.exp(complex(0.0, 2*np.pi) * freqs * bins / float(arr.size))
     return np.fft.irfft(phasor * np.fft.rfft(arr), arr.size)
 
-def show_port(port, freqs, phases=None, title=None, rvrsd=False, aspect="auto", interpolation="none", origin="lower", extent=None):
+def show_port(port, freqs=None, phases=None, title=None, rvrsd=False,
+        colorbar=True, aspect="auto", interpolation="none", origin="lower",
+        extent=None, **kwargs):
     """
     """
+    if freqs is None:
+        freqs = np.arange(len(port))
+        ylabel = "Channel Number"
+    else:
+        ylabel = "Frequency [MHz]"
     if phases is None:
-        phases = [0.0, 1.0]
+        phases = np.linspace(0.0, 1.0, len(port[0]))
     if extent is None:
-        extent = (phases[0], phases[-1], freqs[-1], freqs[0])
+        extent = (phases[0], phases[-1], freqs[0], freqs[-1])
     plt.figure()
     plt.xlabel("Phase [rot]")
-    plt.ylabel("Frequency [MHz]")
+    plt.ylabel(ylabel)
     if title: plt.title(title)
     if rvrsd:
-        plt.imshow(port[::-1], aspect=aspect, origin=origin, extent=extent,
-                interpolation=interpolation)
+        rvrsd_extent = (phases[0], phases[-1], freqs[-1], freqs[0])
+        plt.imshow(port[::-1], aspect=aspect, origin=origin,
+                extent=rvrsd_extent, interpolation=interpolation, **kwargs)
     else:
         plt.imshow(port, aspect=aspect, origin=origin, extent=extent,
-                interpolation=interpolation)
+                interpolation=interpolation, **kwargs)
+    if colorbar: plt.colorbar()
     plt.show()
+
+def unpack_dict(data):
+    """
+    Dictionary has to be named 'data'...
+    """
+    for key in data.keys():
+        exec(key + " = data['" + key + "']")

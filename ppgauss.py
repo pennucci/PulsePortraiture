@@ -1,7 +1,246 @@
 #!/usr/bin/env python
 
+
 from matplotlib.patches import Rectangle
 from pplib import *
+
+
+class DataPortrait:
+    """
+    """
+    def __init__(self, datafile, quiet=False):
+        ""
+        ""
+        self.datafile = datafile
+        self.initial_model_run = False
+        self.data = load_data(datafile, dedisperse=True, dededisperse=False,
+                tscrunch=True, pscrunch=True, rm_baseline=True, flux_prof=True,
+                quiet=quiet)
+        #Unpack the data dictionary into the local namespace; see load_data for
+        #dictionary keys.
+        for key in self.data.keys():
+            exec("self." + key + " = self.data['" + key + "']")
+        if self.source is None: self.source = "noname"
+        self.port = (self.masks*self.subints)[0,0]
+        self.portx = self.subintsx[0][0]
+        self.lofreq = self.freqs[0]-(self.bw/(2*self.nchan))
+        self.init_params = []
+
+    def show_data_portrait(self):
+        """
+        """
+        title = "%s Portrait"%self.source
+        show_port(self.port, self.freqs, title=title)
+
+    def fit_profile(self, profile):
+        """
+        """
+        fig = plt.figure()
+        profplot = fig.add_subplot(211)
+        #Maybe can do better than self.noise_std below
+        interactor = GaussianSelector(profplot, profile, self.noise_std,
+                minspanx=None, minspany=None, useblit=True)
+        plt.show()
+        self.init_params = interactor.fit_params
+        self.ngauss = (len(self.init_params) - 1) / 3
+
+    def fit_flux_profile(self, guessA=1.0, guessalpha=0.0, fit=True, plot=True,
+            quiet=False):
+        """
+        Will fit a power law across frequency in a portrait by bin scrunching.
+        This should be the usual average pulsar power-law spectrum.  The plot
+        will show obvious scintles.
+        """
+        if fit:
+            params, param_errs, chi2,dof, residuals = fit_powlaw(
+                    self.flux_profx, self.freqsx[0], self.nu0,
+                    np.ones(len(self.flux_profx)),
+                    np.array([guessA,guessalpha]),self.noise_std)
+            if not quiet:
+                print ""
+                print "Flux-density power-law fit"
+                print "----------------------------------"
+                print "residual mean = %.2f"%residuals.mean()
+                print "residual std. = %.2f"%residuals.std()
+                print "A = %.3f (flux at %.2f MHz)"%(params[0], self.nu0)
+                print "alpha = %.3f "%params[1]
+            if plot:
+                if fit: plt.subplot(211)
+                else: plt.subplot(111)
+                plt.xlabel("Frequency [MHz]")
+                plt.ylabel("Flux Units")
+                plt.title("Average Flux Profile for %s"%self.source)
+                if fit:
+                    plt.plot(self.freqs, powlaw(self.freqs, self.nu0,
+                        params[0], params[1]), 'k-')
+                    plt.plot(self.freqsx[0], self.flux_profx, 'r+')
+                    plt.subplot(212)
+                    plt.xlabel("Frequency [MHz]")
+                    plt.ylabel("Flux Units")
+                    plt.title("Residuals")
+                    plt.plot(self.freqsx[0], residuals, 'r+')
+                plt.show()
+            self.spect_index = params[1]
+
+    def set_model_run(self):
+        self.initial_model_run = True
+
+    def make_gaussian_model_portrait(self, ref_prof=None, locparams=0.0,
+            fixloc=False, widparams=0.0, fixwid=False, ampparams=0.0,
+            fixamp=False, niter=0, writemodel=False, outfile=None,
+            model_name=None, residplot=None, quiet=False):
+        """
+        """
+        self.nu_ref = ref_prof[0]
+        self.bw_ref = ref_prof[1]
+        if self.nu_ref is None: self.nu_ref = self.nu0
+        if self.bw_ref is None: self.bw_ref = abs(self.bw)
+        okinds = np.compress(np.less(self.nu_ref - (self.bw_ref/2),
+            self.freqs) * np.greater(self.nu_ref + (self.bw_ref/2),
+            self.freqs) * self.weights[0], np.arange(self.nchan))
+        #The below profile average gives a slightly different set of values for
+        #the profile than self.profile, if given the full band and center 
+        #frequency.  Unsure why; shouldn't matter.
+        profile = np.take(self.port, okinds, axis=0).mean(axis=0)
+        self.fix_params = (fixloc, fixwid, fixamp)
+        if not len(self.init_params): self.fit_profile(profile)
+        if type(locparams) is not np.ndarray:
+            try:
+                locparams = np.ones(self.ngauss) * locparams
+            except ValueError:
+                print "Not enough parameters for ngauss = %d."%self.ngauss
+                return 0
+        if type(widparams) is not np.ndarray:
+            try:
+                widparams = np.ones(self.ngauss) * widparams
+            except ValueError:
+                print "Not enough parameters for ngauss = %d."%self.ngauss
+                return 0
+        if type(ampparams) is not np.ndarray:
+            try:
+                ampparams = np.ones(self.ngauss) * ampparams
+            except ValueError:
+                print "Not enough parameters for ngauss = %d."%self.ngauss
+                return 0
+        if outfile is None: outfile = self.datafile + ".model"
+        if model_name is None: model_name = self.source
+        self.init_model_params = np.empty([self.ngauss, 6])
+        for nn in range(self.ngauss):
+            self.init_model_params[nn] = np.array([self.init_params[1::3][nn],
+                locparams[nn], self.init_params[2::3][nn], widparams[nn],
+                self.init_params[3::3][nn], ampparams[nn]])
+        self.init_model_params = np.array([self.init_params[0]] +
+                list(np.ravel(self.init_model_params)))
+        itern = niter
+        if niter < 0: niter = 0
+        portx_noise = np.outer(get_noise(self.portx, chans=True),
+                np.ones(self.nbin))
+        print "Fitting gaussian model portrait..."
+        if not self.initial_model_run:
+            start = time.time()
+            self.fit_params, self.chi_sq, self.dof = fit_gaussian_portrait(
+                    self.portx, portx_noise, self.init_model_params,
+                    self.fix_params, self.phases, self.freqsx[0], self.nu_ref,
+                    quiet=quiet)
+            if not quiet:
+                print "Fit took %.2f min"%((time.time() - start) /  60.)
+            niter += 1
+        while(niter):
+           if niter and self.initial_model_run:
+               start = time.time()
+               self.fit_params, self.chi_sq, self.dof = fit_gaussian_portrait(
+                       self.portx, portx_noise, self.model_params,
+                       self.fix_params, self.phases, self.freqsx[0],
+                       self.nu_ref, quiet=quiet)
+               if not quiet:
+                   print "Fit took %.2f min"%((time.time() - start) / 60.)
+           self.model_params = self.fit_params
+           self.model = gen_gaussian_portrait(self.model_params, self.phases,
+                   self.freqs, self.nu_ref)
+           self.model_masked = np.transpose(self.weights[0] *
+                   np.transpose(self.model))
+           self.modelx = np.compress(self.weights[0], self.model, axis=0)
+           niter -= 1
+           dofit = 1
+           if dofit == 1:
+               phaseguess = first_guess(self.portx, self.modelx, nguess=1000)
+               DMguess = 0.0
+               phi, DM, nfeval, rc, scalesx, param_errs, red_chi2, duration = (
+                       fit_portrait(self.portx, self.modelx,
+                           np.array([phaseguess, DMguess]), self.Ps[0],
+                           self.freqsx[0], self.nu0, scales=True)
+                       )
+               phierr = param_errs[0]
+               DMerr = param_errs[1]
+               if not quiet:
+                   print "Iter %d:"%(itern - niter)
+                   print " phase offset of %.2e +/- %.2e [rot]"%(phi, phierr)
+                   print " DM of %.2e +/- %.2e [pc cm**-3]"%(DM, DMerr)
+                   print " red. chi**2 of %.2f."%red_chi2
+               else:
+                   if niter and (itern - niter) != 0:
+                       print "Iter %d..."%(itern - niter)
+               if min(abs(phi), abs(1 - phi)) < abs(phierr):
+                   if abs(DM) < abs(DMerr):
+                       print "\nIteration converged.\n"
+                       phi = 0.0
+                       DM = 0.0
+                       niter = 0
+               if niter:
+                   if not quiet:
+                       print "\nRotating data portrait for iteration %d."%(
+                               itern - niter + 1)
+                   self.port = rotate_portrait(self.port, phi,DM, self.Ps[0],
+                           self.freqs, self.nu0)
+                   self.portx = rotate_portrait(self.portx, phi, DM,
+                           self.Ps[0], self.freqsx[0], self.nu0)
+                   self.set_model_run()
+        if not quiet:
+            print "Residuals mean: %.3f"%(self.portx - self.modelx).mean()
+            print "Residuals std:  %.3f"%(self.portx - self.modelx).std()
+            print "Data std:       %.3f\n"%self.noise_std
+        if writemodel:
+            write_model(outfile, model_name, self.model_params, self.nu_ref)
+        if residplot:
+            self.show_residual_plot(residplot)
+
+    def show_residual_plot(self, savefig=None):
+        """
+        """
+        try:    #Make smarter
+            test_for_model = self.model.shape
+        except(AttributeError):
+            print "No model portrait. Use make_gaussian_model_portrait()."
+            return 0
+        modelfig = plt.figure()
+        aspect = "auto"
+        interpolation = "none"
+        origin = "lower"
+        extent = (0.0, 1.0, self.freqs[0], self.freqs[-1])
+        plt.subplot(221)
+        plt.title("Data Portrait")
+        plt.imshow(self.port, aspect=aspect, interpolation=interpolation,
+                origin=origin, extent=extent)
+        plt.subplot(222)
+        plt.title("Model Portrait")
+        plt.imshow(self.model, aspect=aspect, interpolation=interpolation,
+                origin=origin, extent=extent)
+        plt.subplot(223)
+        plt.title("Residuals")
+        plt.imshow(self.port - self.model_masked, aspect=aspect,
+                interpolation=interpolation, origin=origin, extent=extent)
+        plt.colorbar()
+        #plt.subplot(224)
+        #plt.title(r"Log$_{10}$(abs(Residuals/Data))")
+        #plt.imshow(np.log10(abs(self.port - self.model) / self.port),
+        #        aspect=aspect, origin=origin, extent=extent)
+        #plt.colorbar()
+
+        if savefig:
+            plt.savefig(savefig, format='png')
+        else:
+            plt.show()
+
 
 class GaussianSelector:
     def __init__(self, ax, profile, errs, minspanx=None,
@@ -194,227 +433,6 @@ class GaussianSelector:
         plt.close(1)
         plt.close(2)
 
-class DataPortrait:
-    """
-    """
-    def __init__(self, datafile, quiet):
-        ""
-        ""
-        self.datafile = datafile
-        self.initial_model_run = False
-        (self.source,self.arch,self.port,self.portx,self.noise_stdev,self.fluxprof,self.fluxprofx,self.prof,self.nbin,self.phases,self.nu0,self.bw,self.nchan,self.freqs,self.freqsx,self.nsub,self.P,self.MJD,self.weights,self.normweights,self.maskweights,self.portweights) = load_data(datafile,dedisperse=True,tscrunch=True,pscrunch=True,quiet=quiet,rm_baseline=(0,0))
-        self.lofreq = self.freqs[0]-(self.bw/(2*self.nchan))
-        self.init_params = []
-
-    def fit_profile(self, profile):
-        """
-        """
-        fig = plt.figure()
-        profplot = fig.add_subplot(211)
-        #Maybe can do better than self.noise_stdev below
-        interactor = GaussianSelector(profplot, profile, self.noise_stdev,
-                minspanx=None, minspany=None, useblit=True)
-        plt.show()
-        self.init_params = interactor.fit_params
-        self.ngauss = (len(self.init_params) - 1) / 3
-
-    def show_data_portrait(self):
-        """
-        """
-        title = "%s Portrait"
-        show_port(self.port, self.freqs, title=title)
-
-    def flux_profile(self, guessA=1.0, guessalpha=0.0, fit=True, plot=True,
-            quiet=False):
-        """
-        Will fit a power law across frequency in a portrait by bin scrunching.
-        This should be the usual average pulsar power-law spectrum.  The plot
-        will show obvious scintles.
-        """
-        if fit:
-            params, param_errs, chi2,dof, residuals = fit_powlaw(
-                    self.fluxprofx, self.freqsx, self.nu0,
-                    np.ones(len(self.fluxprofx)),
-                    np.array([guessA,guessalpha]),self.noise_stdev)
-            if not quiet:
-                print "Initial flux-density power-law fit"
-                print "----------------------------------"
-                print "residual mean = %.2f"%residuals.mean()
-                print "residual std. = %.2f"%residuals.std()
-                print "A = %.3f (flux at %.2f MHz)"%(params[0], self.nu0)
-                print "alpha = %.3f "%params[1]
-            if plot:
-                if fit: plt.subplot(211)
-                else: plt.subplot(111)
-                plt.xlabel("Frequency [MHz]")
-                plt.ylabel("Flux Units")
-                plt.title("Average Flux Profile for %s"%self.source)
-                if fit:
-                    plt.plot(self.freqs, powlaw(self.freqs, self.nu0,
-                        params[0], params[1]), 'k-')
-                    plt.plot(self.freqsx, self.fluxprofx, 'r+')
-                    plt.subplot(212)
-                    plt.xlabel("Frequency [MHz]")
-                    plt.ylabel("Flux Units")
-                    plt.title("Residuals")
-                    plt.plot(self.freqsx, residuals, 'r+')
-                plt.show()
-            self.spect_index = params[1]
-
-    def show_residual_plot(self, savefig=None):
-        """
-        """
-        try:    #Make smarter
-            test_for_model = self.model.shape
-        except(AttributeError):
-            print "No model portrait. Use make_gaussian_model_portrait()."
-            return 0
-        modelfig = plt.figure()
-        aspect = "auto"
-        interpolations = "none"
-        origin = "lower"
-        extent = (0.0, 1.0, self.freqs[0], self.freqs[-1])
-        plt.subplot(221)
-        plt.title("Data Portrait")
-        plt.imshow(self.port, aspect=aspect, interpolation=interpolation,
-                origin=origin, extent=extent)
-        plt.subplot(222)
-        plt.title("Model Portrait")
-        plt.imshow(self.model, aspect=aspect, interpolation=interpolation,
-                origin=origin, extent=extent)
-        plt.subplot(223)
-        plt.title("Residuals")
-        plt.imshow(self.port - self.modelmasked, aspect=aspect,
-                interpolation=interpolation, origin=origin, extent=extent)
-        plt.colorbar()
-        #plt.subplot(224)
-        #plt.title(r"Log$_{10}$(abs(Residuals/Data))")
-        #plt.imshow(np.log10(abs(self.port - self.model) / self.port),
-        #        aspect=aspect, origin=origin, extent=extent)
-        #plt.colorbar()
-        if not quiet:
-            print "Residuals mean: %.3f"%(self.portx - self.modelx).mean()
-            print "Residuals std:  %.3f"%(self.portx - self.modelx).std()
-            print "Data std:       %.3f"%self.noise_stdev
-        if savefig:
-            plt.savefig(savefig, format='png')
-        else:
-            plt.show()
-
-    def set_model_run(self):
-        self.initial_model_run = True
-
-    def make_gaussian_model_portrait(self, ref_prof=None, locparams=0.0,
-            fixloc=False, widparams=0.0, fixwid=False, ampparams=0.0,
-            fixamp=False, niter=0, writemodel=True, outfile=None,
-            residplot=None, quiet=False):
-        """
-        """
-        self.nu_ref = ref_prof[0]
-        self.bw_ref = ref_prof[1]
-        if self.nu_ref is None: self.nu_ref = self.nu0
-        if self.bw_ref is None: self.bw_ref = abs(self.bw)
-        okinds = np.compress(np.less(self.nu_ref-(self.bw_ref/2),self.freqs)*np.greater(self.nu_ref+(self.bw_ref/2),self.freqs)*self.normweights,np.arange(self.nchan))
-        #The below profile average gives a slightly different set of values for
-        #the profile than self.profile, if given the full band and center 
-        #frequency.  Unsure why; shouldn't matter.
-        profile = np.take(self.port, okinds, axis=0).mean(axis=0)
-        self.fix_params = (fixloc, fixwid, fixamp)
-        if not len(self.init_params): self.fit_profile(profile)
-        if type(locparams) is not np.ndarray:
-            try:
-                locparams = np.ones(self.ngauss) * locparams
-            except ValueError:
-                print "Not enough parameters for ngauss = %d."%self.ngauss
-                return 0
-        if type(widparams) is not np.ndarray:
-            try:
-                widparams = np.ones(self.ngauss) * widparams
-            except ValueError:
-                print "Not enough parameters for ngauss = %d."%self.ngauss
-                return 0
-        if type(ampparams) is not np.ndarray:
-            try:
-                ampparams = np.ones(self.ngauss) * ampparams
-            except ValueError:
-                print "Not enough parameters for ngauss = %d."%self.ngauss
-                return 0
-        if outfile is None: outfile = self.datafile + ".model"
-        self.init_model_params = np.empty([self.ngauss, 6])
-        for nn in range(self.ngauss):
-            self.init_model_params[nn] = np.array([self.init_params[1::3][nn],
-                locparams[nn], self.init_params[2::3][nn], widparams[nn],
-                self.init_params[3::3][nn], ampparams[nn]])
-        self.init_model_params = np.array([self.init_params[0]] +
-                list(np.ravel(self.init_model_params)))
-        itern = niter
-        if niter < 0: niter = 0
-        portx_noise = np.outer(get_noise(self.portx, chans=True),
-                np.ones(self.nbin))
-        print "Fitting gaussian model portrait..."
-        if not self.initial_model_run:
-            start = time.time()
-            self.fit_params, self.chi_sq, self.dof = fit_gaussian_portrait(
-                    self.portx, portx_noise, self.init_model_params,
-                    self.fix_params, self.phases, self.freqsx, self.nu_ref,
-                    quiet=quiet)
-            if not quiet:
-                print "Fit took %.2f min"%((time.time() - start) /  60.)
-            niter += 1
-        while(niter):
-           if niter and self.initial_model_run:
-               start = time.time()
-               self.fit_params, self.chi_sq, self.dof = fit_gaussian_portrait(
-                       self.portx, portx_noise, self.model_params,
-                       self.fix_params, self.phases, self.freqsx,
-                       self.nu_ref, quiet=quiet)
-               if not quiet:
-                   print "Fit took %.2f min"%((time.time() - start) / 60.)
-           self.model_params = self.fit_params
-           self.model = gen_gaussian_portrait(self.model_params, self.phases,
-                   self.freqs, self.nu_ref)
-           self.modelmasked, self.modelx = screen_portrait(self.model,
-                   self.portweights)
-           niter -= 1
-           dofit = 1
-           if dofit == 1:
-               phaseguess = first_guess(self.portx, self.modelx, nguess=1000)
-               DMguess = 0.0
-               phi, DM, nfeval, rc, scalesx, param_errs, red_chi2, duration = (
-                       fit_portrait(self.portx, self.modelx,
-                           np.array([phaseguess, DMguess]), self.P,
-                           self.freqsx, self.nu0, scales=True)
-                       )
-               phierr = param_errs[0]
-               DMerr = param_errs[1]
-               if not quiet:
-                   print "Iter %d:"%(itern - niter)
-                   print " phase offset of %.2e +/- %.2e [rot]"%(phi, phierr)
-                   print " DM of %.2e +/- %.2e [pc cm**-3]"%(DM, DMerr)
-                   print " red. chi**2 of %.2f."%red_chi2
-               else:
-                   if niter and (itern - niter) != 0:
-                       print "Iter %d..."%(itern - niter)
-               if min(abs(phi), abs(1 - phi)) < abs(phierr):
-                   if abs(DM) < abs(DMerr):
-                       print "Iteration converged."
-                       phi = 0.0
-                       DM = 0.0
-                       niter = 0
-               if niter:
-                   if not quiet:
-                       print "\nRotating data portrait for iteration %d."%(
-                               itern - niter + 1)
-                   self.port = rotate_portrait(self.port, phi,DM, self.P,
-                           self.freqs, self.nu0)
-                   self.portx = rotate_portrait(self.portx, phi, DM, self.P,
-                           self.freqsx, self.nu0)
-                   self.set_model_run()
-        if writemodel:
-            write_model(outfile, self.source, self.model_params, self.nu_ref)
-        if residplot:
-            self.show_residual_plot(residplot)
-
 
 if __name__ == "__main__":
 
@@ -431,6 +449,9 @@ if __name__ == "__main__":
     parser.add_option("-o", "--outfile",
                       action="store", metavar="outfile", dest="outfile",
                       help="Name of output model file name. [default=archive.model]")
+    parser.add_option("-m", "--model_name",
+                      action="store", metavar="model_name", dest="model_name",
+                      help="Name given to model. [default=PSRCHIVE Source name]")
     parser.add_option("--freq",
                       action="store", metavar="freq", dest="nu_ref", default=None,
                       help="Reference frequency [MHz] for the gaussian model; the initial profile to fit will be centered on this freq. [default=PSRCHIVE weighted center frequency]")
@@ -465,6 +486,7 @@ if __name__ == "__main__":
 
     datafile = options.datafile
     outfile = options.outfile
+    model_name = options.model_name
     if options.nu_ref: nu_ref = float(options.nu_ref)
     else: nu_ref = options.nu_ref
     if options.bw_ref: bw_ref = float(options.bw_ref)
@@ -479,5 +501,5 @@ if __name__ == "__main__":
     dp = DataPortrait(datafile, quiet)
     dp.make_gaussian_model_portrait(ref_prof=(nu_ref, bw_ref), locparams=0.0,
             fixloc=fixloc, widparams=0.0, fixwid=fixwid, ampparams=0.0,
-            fixamp=fixamp, niter=niter, outfile=outfile, residplot=figure,
-            quiet=quiet)
+            fixamp=fixamp, niter=niter, writemodel=True, outfile=outfile,
+            model_name=model_name, residplot=figure, quiet=quiet)

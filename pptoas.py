@@ -2,223 +2,256 @@
 
 from pplib import *
 
-class GaussianModelPortrait:
-    """
-    """
-    def __init__(self, modelfile, nbin, freqs, portweights=None, quiet=False):
-        """
-        """
-        self.modelfile = modelfile
-        self.nbin = nbin
-        self.freqs = freqs
-        self.portweights = portweights
-        self.phases = np.arange(nbin, dtype='d') / nbin
-        self.source, self.ngauss, self.model = make_model(modelfile,
-                self.phases, self.freqs, quiet=quiet)
-        if portweights is not None:
-            self.modelmasked, self.modelx = screen_portrait(self.model,
-                    portweights)
-        else:
-            self.modelmasked, self.modelx = self.model, self.model
-
-    def show_model_portrait(self):
-        title = "%s Model Portrait"%self.source
-        show_port(self.model, self.freqs, title=title)
-
-class SmoothedModelPortrait:
-    """
-    """
-    #FIX need to interpolate, or somehow account for 
-    #missing channels in model...
-    def __init__(self, modelfile, quiet=False):
-        """
-        """
-        self.modelfile = modelfile
-        (self.source,self.arch,self.port,self.portx,self.noise_stdev,self.fluxprof,self.fluxprofx,self.prof,self.nbin,self.phases,self.nu0,self.bw,self.nchan,self.freqs,self.freqsx,self.nsub,self.P,self.MJD,self.weights,self.normweights,self.maskweights,self.portweights) = load_data(modelfile,dedisperse=True,tscrunch=True,pscrunch=True,quiet=quiet,rm_baseline=(0,0))
-        self.model = self.port
-        self.modelx = self.portx
-
 class GetTOAs:
     """
     """
-    def __init__(self, datafile, modelfile, mtype=None, DM0=None ,bary_DM=True,
-                 one_DM=False, pam_cmd=False, outfile=None, errfile=None,
-                 write_TOAs=True, quiet=False):
+    def __init__(self, datafiles, modelfile, DM0=None , bary_DM=True,
+                 one_DM=False, common=True, quiet=False):
         """
         """
         start = time.time()
-        self.datafile = datafile
+        self.datafiles = datafiles
         self.modelfile = modelfile
-        self.mtype = mtype
-        self.outfile = outfile
-        (self.source,self.arch,self.ports,self.portxs,self.noise_stdev,self.fluxprof,self.fluxprofx,self.prof,self.nbin,self.phases,self.nu0,self.bw,self.nchan,self.freqs,self.freqsx,self.nsub,self.Ps,self.epochs,self.weights,self.normweights,self.maskweights,self.portweights) = load_data(datafile,dedisperse=False,tscrunch=False,pscrunch=True,quiet=quiet,rm_baseline=(0,0))
-        self.phis = np.empty(self.nsub,dtype=np.double)
-        self.phi_errs = np.empty(self.nsub)
-        self.DMs = np.empty(self.nsub,dtype=np.float)
-        self.DM_errs = np.empty(self.nsub)
-        self.nfevals = np.empty(self.nsub, dtype='int')
-        self.rcs = np.empty(self.nsub, dtype='int')
-        self.scales = np.empty([self.nsub, self.nchan])
-        #These next two are lists becuase in principle,
-        #the subints could have different numbers of zapped channels.
+        self.DM0 = DM0
+        self.bary_DM = bary_DM
+        self.one_DM = one_DM
+        self.common = common
+        self.nsubs = []
+        self.phis = []
+        self.phi_errs = []
+        self.DMs = []
+        self.DM_errs = []
+        self.scales = []
         self.scalesx = []
         self.scale_errs = []
-        self.red_chi2s = np.empty(self.nsub)
-        self.fit_duration = 0.0
-        self.MJDs = np.array([self.epochs[ii].in_days()
-            for ii in xrange(self.nsub)],dtype=np.double)
-        if DM0:
-            self.DM0 = DM0
-        else:
-            self.DM0 = self.arch.get_dispersion_measure()
-        if self.mtype == "gauss":
-            self.modelportrait = GaussianModelPortrait(modelfile, self.nbin,
-                    self.freqs, portweights=None, quiet=quiet)
-        elif self.mtype == "smooth":
-            self.modelportrait=SmoothedModelPortrait(modelfile, quiet=quiet)
-        else:
-            print 'Model type must be either "gauss" or "smooth".'
-            sys.exit()
-        mp = self.modelportrait
-        #FIX - determine observatory
-        if write_TOAs:
-            obs = self.arch.get_telescope()
-            obs_codes = ["@", "0", "1", "2"]
-            obs = "1"
-        if not quiet:
-            print "\nEach of the %d TOAs are approximately %.2f s"%(self.nsub,
-                    self.arch.integration_length() / self.nsub)
-            print "Doing Fourier-domain least-squares fit..."
-        for nn in range(self.nsub):
-            dataportrait = self.portxs[nn]
-            portx_fft = np.fft.rfft(dataportrait, axis=1)
-            pw = self.portweights[nn]
-            model, modelx = screen_portrait(mp.model, pw)
-            freqsx = ma.masked_array(self.freqs,
-                    mask=self.maskweights[nn]).compressed()
-            nu0 = self.nu0
-            P = self.Ps[nn]
-            MJD = self.MJDs[nn]
-            ####################
-            #DOPPLER CORRECTION#
-            ####################
-            #In principle, we should be able to correct the frequencies, but
-            #since this is a messy business, it is easier to correct the DM
-            #itself (below).
-            #df = self.arch.get_Integration(nn).get_doppler_factor()
-            #freqsx = doppler_correct_freqs(freqsx,df)
-            #nu0 = doppler_correct_freqs(self.nu0,df)
-            ####################
-            if nn == 0:
-                rot_dataportrait = rotate_portrait(self.portxs.mean(axis=0),
-                        0.0, self.DM0,P, freqsx, nu0)
-                #PSRCHIVE Dedisperses w.r.t. center of band...??
-                #Currently, first_guess ranges between +/- 0.5
-                phaseguess = first_guess(rot_dataportrait,modelx,nguess=1000)
-                DMguess = self.DM0
-                #if not quiet: print "Phase guess: %.8f ; DM guess: %.5f"%(
-                #        phaseguess, DMguess)
-            #The below else clause might not be a good idea if RFI or something
-            #throws it completely off, whereas first phaseguess only depends
-            #on pulse profile...but there may be special cases when invidual
-            #guesses are needed.
-            #else:
-            #    phaseguess = self.phis[nn-1]
-            #    DMguess = self.DMs[nn-1]
-            #   if not quiet:
-            #       print """
-            #       Phase guess: %.8f ; DM guess: %.5f"%(phaseguess, DMguess)
-            #       """
-            #Need a status bar?
-            if not quiet: print "Fitting for TOA %d"%(nn+1)
-            phi, DM, nfeval, rc, scalex, param_errs, red_chi2, duration = \
-                    fit_portrait(self.portxs[nn], modelx, np.array([phaseguess,
-                        DMguess]), P, freqsx, nu0, scales=True)
-            self.fit_duration += duration
-            self.phis[nn] = phi
-            self.phi_errs[nn] = param_errs[0]
-            ####################
-            #DOPPLER CORRECTION#
-            ####################
-            if bary_DM: #Default is True
-                #NB: the 'doppler factor' retrieved from psrchive seems to be
-                #the inverse of the convention nu_source/nu_observed
-                df = self.arch.get_Integration(nn).get_doppler_factor()
-                DM *= df
-            self.DMs[nn] = DM
-            self.DM_errs[nn] = param_errs[1]
-            self.nfevals[nn] = nfeval
-            self.rcs[nn] = rc
-            self.scalesx.append(scalex)
-            self.scale_errs.append(param_errs[2:])
-            scale = np.zeros(self.nchan)
-            ss = 0
-            for ii in range(self.nchan):
-                if self.normweights[nn, ii] == 1:
-                    scale[ii] = scalex[ss]
-                    ss += 1
-                else: pass
-            self.scales[nn] = scale
-            self.red_chi2s[nn] = red_chi2
-        self.DeltaDMs = self.DMs - self.DM0
-        #The below returns the weighted mean and the sum of the weights, but
-        #needs to do better in the case of small-error outliers from RFI, etc.         #Also, last TOA may mess things up...use median...?
-        self.DeltaDM_mean, self.DeltaDM_var = np.average(self.DeltaDMs,
-                weights=self.DM_errs**-2, returned=True)
-        self.DeltaDM_var = self.DeltaDM_var**-1
-        if self.nsub > 1:
-            #The below multiplie by the red. chi-squared to inflate the errors.
-            self.DeltaDM_var *= np.sum(((self.DeltaDMs-self.DeltaDM_mean)**2) /
-                    (self.DM_errs**2)) / (len(self.DeltaDMs) - 1)
-        self.DeltaDM_err = self.DeltaDM_var**0.5
-        if write_TOAs:
-            toas = np.array([self.epochs[nn] + pr.MJD((self.phis[nn] *
-                self.Ps[nn]) / (3600 * 24.)) for nn in xrange(self.nsub)])
-            toa_errs = self.phi_errs * self.Ps * 1e6
-            if self.outfile: sys.stdout = open(self.outfile,"a")
-            #Currently writes topocentric frequencies
-            #Need option for different kinds of TOA output
-            for nn in range(self.nsub):
-                if one_DM:
-                    write_princeton_toa(toas[nn].intday(), toas[nn].fracday(),
-                            toa_errs[nn], self.nu0, self.DeltaDM_mean, obs=obs)
-                else:
-                    write_princeton_toa(toas[nn].intday(), toas[nn].fracday(),
-                            toa_errs[nn], self.nu0, self.DeltaDMs[nn], obs=obs)
-        sys.stdout = sys.__stdout__
-        self.tot_duration = time.time() - start
-        if not quiet:
-            print "-------------------------"
-            print "~%.2f min/TOA"%(self.fit_duration / (60. * self.nsub))
-            print "Total ~%.2f min/TOA"%(self.tot_duration / (60 * self.nsub))
-            print "Avg. TOA error is %.3f us"%(self.phi_errs.mean() *
-                self.Ps.mean() * 1e6)
-        if pam_cmd:
-            pc = open("pam_cmds", "a")
-            pam_ext = self.datafile[-self.datafile[::-1].find("."):] + ".rot"
+        self.red_chi2s = []
+        self.nfevals = []
+        self.rcs = []
+        self.MJDs = []
+        self.fit_durations = []
+        if len(self.datafiles) == 1 or self.common is True:
+            self.data = load_data(self.datafile[0], dedisperse=False,
+                    dededisperse=False, tscrunch=True, pscrunch=True,
+                    rm_baseline=True, flux_prof=False, quiet=True)
+            self.ngauss, self.model = read_model(self.modelfile,
+                    self.data['phases'], self.data['freqs'], quiet))
+            if len(self.datafiles) != 1:
+                del(self.data)
+            else:
+                #Unpack the data dictionary into the local namespace; see
+                #load_data for dictionary keys.
+                for key in self.data.keys():
+                    exec("self." + key + " = self.data['" + key + "']")
+                if self.source is None: self.source = "noname"
+                self.lofreq = self.freqs[0]-(self.bw/(2*self.nchan))
+            #Need to remember to del(last DMs, etc for uncommon multiple files)
+            #after get_toas finishes; final self.model statement, etc and to
+            #make arrays of all things
+
+    def get_toas(showplot=False)
+        """
+        """
+        for datafile in self.datafiles:
+            fit_duration = 0.0
+            #Load data
+            if len(self.datafiles) == 1: data = self.data
+            else:
+                data = load_data(datafile, dedisperse=False,
+                        dededisperse=False, tscrunch=False, pscrunch=True,
+                        rm_baseline=True, flux_prof=False, quiet=True)
+            #Unpack the data dictionary into the local namespace; see load_data
+#           for dictionary keys.
+            for key in data.keys():
+                exec(key + " = data['" + key + "']")
+            if source is None: source = "noname"
+            #Read model
+            if len(self.datafiles) !=1 and self.common is False:
+                ngauss, model = read_model(self.modelfile, phases, freqs,
+                        quiet=quiet)
+            else:
+                ngauss, model = self.ngauss, self.model
+            phis = np.empty(nsub, dtype=np.double)
+            phi_errs = np.empty(nsub)
+            DMs = np.empty(nsub, dtype=np.float)
+            DM_errs = np.empty(nsub)
+            nfevals = np.empty(nsub, dtype='int')
+            rcs = np.empty(nsub, dtype='int')
+            scales = np.empty([nsub, nchan])
+            #These next two are lists becuase in principle,
+            #the subints could have different numbers of zapped channels.
+            scalesx = []
+            scale_errs = []
+            red_chi2s = np.empty(nsub)
+            MJDs = np.array([epochs[ii].in_days()
+                for ii in xrange(nsub)], dtype=np.double)
+            if self.DM0 is None:
+                DM0 = arch.get_dispersion_measure()
+            else:
+                DM0 = self.DM0
+            #FIX - determine observatory
+            if write_TOAs:
+                obs = arch.get_telescope()
+                obs_codes = ["@", "0", "1", "2"]
+                obs = "1"
+            if not quiet:
+                print "\nEach of the %d TOAs are approximately %.2f s"%(nsub,
+                        arch.integration_length() / nsub)
+                print "Doing Fourier-domain least-squares fit..."
+            self.nsubs.append(nsub)
+            for nn in range(nsub):
+                portx = subintsx[nn][0]
+                portx_fft = np.fft.rfft(portx, axis=1)
+                modelx = np.compress(weights[nn], model, axis=1)
+                freqsx = freqsx[nn]
+                nu0 = nu0
+                P = Ps[nn]
+                MJD = MJDs[nn]
+                ####################
+                #DOPPLER CORRECTION#
+                ####################
+                #In principle, we should be able to correct the frequencies, but
+                #since this is a messy business, it is easier to correct the DM
+                #itself (below).
+                #df = arch.get_Integration(nn).get_doppler_factor()
+                #freqsx = doppler_correct_freqs(freqsx, df)
+                #nu0 = doppler_correct_freqs(nu0, df)
+                ####################
+                if nn == 0:
+                    rot_portx = rotate_portrait(subints.mean(axis=0)[0],
+                            0.0, DM0, P, freqsx, nu0)
+                    #PSRCHIVE Dedisperses w.r.t. center of band...??
+                    #Currently, first_guess ranges between +/- 0.5
+                    phaseguess = first_guess(rot_portx, model,
+                            nguess=1000)
+                    DMguess = DM0
+                #    if not quiet: print "Phase guess: %.8f ; DM guess: %.5f"%(
+                #            phaseguess, DMguess)
+                #The below else clause might not be a good idea if RFI or
+                #something throws it completely off, whereas first phaseguess
+                #only depends on pulse profile...but there may be special cases
+                #when invidual guesses are needed.
+                #else:
+                #    phaseguess = phis[nn-1]
+                #    DMguess = DMs[nn-1]
+                #   if not quiet:
+                #       print """
+                #       Phase guess: %.8f
+                #       DM guess:    %.5f"""%(phaseguess, DMguess)
+                #
+                #Need a status bar?
+                if not quiet: print "Fitting for TOA %d"%(nn+1)
+                phi, DM, nfeval, rc, scalex, param_errs, red_chi2, duration = \
+                        fit_portrait(subintsx[nn][0], modelx,
+                                np.array([phaseguess, DMguess]), P, freqsx,
+                                nu0, scales=True)
+                fit_duration += duration
+                phis[nn] = phi
+                phi_errs[nn] = param_errs[0]
+                ####################
+                #DOPPLER CORRECTION#
+                ####################
+                if bary_DM: #Default is True
+                    #NB: the 'doppler factor' retrieved from PSRCHIVE seems to be
+                    #the inverse of the convention nu_source/nu_observed
+                    df = arch.get_Integration(nn).get_doppler_factor()
+                    DM *= df
+                DMs[nn] = DM
+                DM_errs[nn] = param_errs[1]
+                nfevals[nn] = nfeval
+                rcs[nn] = rc
+                scalesx.append(scalex)
+                scale_errs.append(param_errs[2:])
+                scale = np.zeros(nchan)
+                ss = 0
+                for ii in range(nchan):
+                    if weights[nn,ii] == 1:
+                        scale[ii] = scalex[ss]
+                        ss += 1
+                    else: pass
+                scales[nn] = scale
+                red_chi2s[nn] = red_chi2
+            self.phis.append(phis)
+            self.phi_errs.append(phi_errs)
+            self.DMs.append(DMs)
+            self.DM_errs.append(DM_errs)
+            self.scales.append(scales)
+            self.scalesx.append(scalesx)
+            self.scale_errs.append(scale_errs)
+            self.red_chi2s.append(red_chi2s)
+            self.nfevals.append(nfevals)
+            self.rcs.append(rcs)
+            self.MJDs.append(MJDs)
+            self.fit_durations.append(fit_duration)
+
+            DeltaDMs = DMs - DM0
             #The below returns the weighted mean and the sum of the weights,
             #but needs to do better in the case of small-error outliers from
             #RFI, etc.  Also, last TOA may mess things up...use median...?
-            self.phi_mean, self.phi_var = np.average(self.phis,
-                    weights=self.phi_errs**-2, returned=True)
-            self.phi_var = self.phi_var**-1
-            pc.write("pam -e %s -r %.7f -d %.5f %s\n"%(pam_ext, self.phi_mean,
-                self.DeltaDM_mean + self.DM0, self.datafile))
-            pc.close()
-        if errfile:
-            ef = open(errfile, "a")
-            if one_DM:
-                ef.write("%.5e\n"%self.DeltaDM_err)
-            else:
-                for nn in range(self.nsub):
-                    ef.write("%.5e\n"%self.DM_errs[nn])
+            DeltaDM_mean, DeltaDM_var = np.average(DeltaDMs,
+                    weights=DM_errs**-2, returned=True)
+            DeltaDM_var = DeltaDM_var**-1
+            if nsub > 1:
+                #The below multiplie by the red. chi-squared to inflate the
+                #errors.
+                DeltaDM_var *= np.sum(((DeltaDMs - DeltaDM_mean)**2) /
+                        (DM_errs**2)) / (len(DeltaDMs) - 1)
+            DeltaDM_err = DeltaDM_var**0.5
+            
+            
+            
+            
+    def write_toas():
+            
+            
+            if write_TOAs:
+                toas = np.array([epochs[nn] + pr.MJD((phis[nn] *
+                    Ps[nn]) / (3600 * 24.)) for nn in xrange(nsub)])
+                toa_errs = phi_errs * Ps * 1e6
+                if outfile: sys.stdout = open(outfile,"a")
+                #Currently writes topocentric frequencies
+                #Need option for different kinds of TOA output
+                for nn in range(nsub):
+                    if one_DM:
+                        write_princeton_toa(toas[nn].intday(), toas[nn].fracday(),
+                                toa_errs[nn], nu0, DeltaDM_mean, obs=obs)
+                    else:
+                        write_princeton_toa(toas[nn].intday(), toas[nn].fracday(),
+                                toa_errs[nn], nu0, DeltaDMs[nn], obs=obs)
+            sys.stdout = sys.__stdout__
+            tot_duration = time.time() - start
+            if not quiet:
+                print "-------------------------"
+                print "~%.2f min/TOA"%(fit_duration / (60. * nsub))
+                print "Total ~%.2f min/TOA"%(tot_duration / (60 * nsub))
+                print "Avg. TOA error is %.3f us"%(phi_errs.mean() *
+                    Ps.mean() * 1e6)
+            if pam_cmd:
+                pc = open("pam_cmds", "a")
+                pam_ext = datafile[-datafile[::-1].find("."):] + ".rot"
+                #The below returns the weighted mean and the sum of the weights,
+                #but needs to do better in the case of small-error outliers from
+                #RFI, etc.  Also, last TOA may mess things up...use median...?
+                phi_mean, phi_var = np.average(phis,
+                        weights=phi_errs**-2, returned=True)
+                phi_var = phi_var**-1
+                pc.write("pam -e %s -r %.7f -d %.5f %s\n"%(pam_ext, phi_mean,
+                    DeltaDM_mean + DM0, datafile))
+                pc.close()
+            if errfile:
+                ef = open(errfile, "a")
+                if one_DM:
+                    ef.write("%.5e\n"%DeltaDM_err)
+                else:
+                    for nn in range(nsub):
+                        ef.write("%.5e\n"%DM_errs[nn])
+            if showplot: self.show_results()
 
     def show_subint(self, subint=0):
         """
         subint 0 = python index 0
         """
         ii = subint
-        title = "Subint %d"%(subint)
+        title = "Subint %d"%subint
         show_port(self.ports[ii], self.freqs, title=title)
 
     def show_fit(self, subint=0):
@@ -254,7 +287,7 @@ class GetTOAs:
                 origin=origin, extent=extent)
         plt.subplot(222)
         plt.title("Fitted Model Portrait")
-        plt.imshow(fitmodel, aspect=aspect, interpolation=interpolation
+        plt.imshow(fitmodel, aspect=aspect, interpolation=interpolation,
                 origin=origin, extent=extent)
         plt.subplot(223)
         plt.title("Residuals")
@@ -406,9 +439,6 @@ if __name__ == "__main__":
     parser.add_option("-m", "--modelfile",
                       action="store", metavar="model", dest="modelfile",
                       help=".model file to which the data are fit.")
-    parser.add_option("-t", "--modeltype",
-                      action="store", metavar="mtype", dest="mtype",
-                      help='Must be either "gauss" (created by ppgauss.py) or "smooth" (created by psrsmooth).')
     parser.add_option("-o", "--outfile",
                       action="store", metavar="timfile", dest="outfile",
                       default=None,
@@ -428,7 +458,10 @@ if __name__ == "__main__":
                       help="If specified, will write the fitted DM errors to errfile. Will append.")
     parser.add_option("--pam_cmd",
                       action="store_true", dest="pam_cmd", default=False,
-                      help="Append pam commands to file pam_cmd.")
+                      help='Append pam commands to file "pam_cmd."')
+    parser.add_option("--uncommon",
+                      action="store_true", dest="uncommon", default=False,
+                      help="If supplying a metafile, use this flag if the data are not homogenous (i.e. have different nchan, nbin, nu0)")
     parser.add_option("--showplot",
                       action="store_true", dest="showplot", default=False,
                       help="Plot fit results. Only useful if nsubint > 1.")
@@ -439,7 +472,7 @@ if __name__ == "__main__":
     (options, args) = parser.parse_args()
 
     if (options.datafile is None and options.metafile is None or
-            options.modelfile is None or options.mtype is None):
+            options.modelfile is None):
             print "\npptoas.py - least-squares fit for TOAs and DMs.\n"
             parser.print_help()
             parser.exit()
@@ -447,7 +480,6 @@ if __name__ == "__main__":
     datafile = options.datafile
     metafile = options.metafile
     modelfile = options.modelfile
-    mtype = options.mtype
     DM0 = options.DM0
     if DM0: DM0 = float(DM0)
     bary_DM = options.bary_DM
@@ -455,16 +487,18 @@ if __name__ == "__main__":
     pam_cmd = options.pam_cmd
     outfile = options.outfile
     errfile = options.errfile
+    common = not options.uncommon
     showplot = options.showplot
     quiet = options.quiet
 
-    if not metafile:
-        gt = GetTOAs(datafile, modelfile, mtype, DM0, bary_DM, one_DM, pam_cmd,
-                outfile, errfile, quiet=quiet)
-        if showplot: gt.show_results()
+    if metafile is None:
+        datafiles = [datafile]
     else:
         datafiles = open(metafile, "r").readlines()
-        for datafile in datafiles:
-            gt = GetTOAs(datafile[:-1], modelfile, mtype, DM0, bary_DM, one_DM,
-                    pam_cmd, outfile, errfile, quiet=quiet)
-            if showplot: gt.show_results()
+        datafiles = [datafiles[xx][:-1] for xx in xrange(len(datafiles)]
+    gt = GetTOAs(datafiles=datafiles, modelfile=modelfile, DM0=DM0,
+        bary_DM=bary_DM, one_DM=one_DM, common=common, quiet=quiet)
+    gt.get_toas(showplot)
+    gt.write_toas(outfile)
+    if errfile is not None: gt.write_dm_errfile(errfile)
+    if pam_cmd: gt.write_pam_cmds()
