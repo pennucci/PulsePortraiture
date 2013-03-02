@@ -27,6 +27,8 @@ plt.close('all')
 #List of colors
 cols = ['b','g','r','c','m','y','b','g','r','c','m','y','b','g','r','c','m',
         'y','b','g','r','c','m','y','b','g','r','c','m','y']
+#List of obs
+obs_codes = {"bary":"@", "inf":"0", "gbt":"1", "atca":"2", "ao":"3","nanshan":"5", "tid43":"6", "pks":"7", "jb":"8", "vla":"c", "ncy":"f", "eff":"g", "jbdfb":"q", "wsrt":"i"}
 
 #Exact dispersion constant (e**2/(2*pi*m_e*c))
 #used by PRESTO
@@ -475,12 +477,12 @@ def read_model(modelfile, phases, freqs, quiet=False):
     if not quiet:
         print "Model: %s"%name
         print "\nMade %d component model for %s with %d frequency channels,"%(
-                ngauss, source, nchan)
+                ngauss, name, nchan)
         print "%d profile bins, %.0f MHz bandwidth, centered near %.2f MHz,"%(
                 nbin, (freqs[-1]-freqs[0]) + ((freqs[-1]-freqs[-2])),
                 freqs.mean())
         print "with model parameters referenced to %.2f MHz."%nu_ref
-    return ngauss, model
+    return name, ngauss, model
 
 def get_noise(data,frac=4,tau=False,chans=False,fd=False):     #FIX: Make sure to use on portraits w/o zapped freq. channels, i.e. portxs     FIX: MAKE SIMPLER!!!    FIX: Implement k_max from wiener/brick-wall filter fit        #FIX This is not right 
     """
@@ -613,7 +615,7 @@ def load_data(filenm, dedisperse=False, dededisperse=False, tscrunch=False,
     #Get data
     #PSRCHIVE indices [subint:pol:chan:bin]
     subints = arch.get_data()[:,:,:,:]
-    npol = subints.shape[1]
+    npol = arch.get_npol()
     Ps = np.array([arch.get_Integration(ii).get_folding_period() for ii in
         xrange(nsub)],dtype=np.double)
     epochs = [arch.get_Integration(ii).get_epoch() for ii in xrange(nsub)]
