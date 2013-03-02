@@ -43,20 +43,18 @@ class GetTOAs:
             self.model_name, self.ngauss, self.model = read_model(
                     self.modelfile, self.data['phases'], self.data['freqs'],
                     self.quiet)
-            if len(self.datafiles) != 1:
-                del(self.data)
-            else:
-                #Unpack the data dictionary into the local namespace; see
-                #load_data for dictionary keys.
-                #for key in self.data.keys():
-                #    exec("self." + key + " = self.data['" + key + "']")
-                #if self.source is None: self.source = "noname"
-                self.nchan = self.data['nchan']
-                self.nbin = self.data['nbin']
-                self.nu0 = self.data['nu0']
-                self.bw = self.data['bw']
-                self.freqs = self.data['freqs']
-                self.lofreq = self.freqs[0]-(self.bw/(2*self.nchan))
+            #Unpack the data dictionary into the local namespace; see load_data
+            #for dictionary keys.
+            #for key in self.data.keys():
+            #    exec("self." + key + " = self.data['" + key + "']")
+            #if self.source is None: self.source = "noname"
+            self.nchan = self.data['nchan']
+            self.nbin = self.data['nbin']
+            self.nu0 = self.data['nu0']
+            self.bw = self.data['bw']
+            self.freqs = self.data['freqs']
+            self.lofreq = self.freqs[0]-(self.bw/(2*self.nchan))
+            del(self.data)
 
     def get_toas(self, datafile=None, show_plot=False, append=True, safe=False,
             quiet=False):
@@ -73,11 +71,9 @@ class GetTOAs:
         for datafile in datafiles:
             fit_duration = 0.0
             #Load data
-            if len(datafiles) == 1: data = self.data
-            else:
-                data = load_data(datafile, dedisperse=False,
-                        dededisperse=False, tscrunch=False, pscrunch=True,
-                        rm_baseline=True, flux_prof=False, quiet=quiet)
+            data = load_data(datafile, dedisperse=False,
+                    dededisperse=False, tscrunch=False, pscrunch=True,
+                    rm_baseline=True, flux_prof=False, quiet=quiet)
             #Unpack the data dictionary into the local namespace; see load_data
 #           for dictionary keys.
             for key in data.keys():
@@ -96,7 +92,7 @@ class GetTOAs:
             nfevals = np.empty(nsub, dtype='int')
             rcs = np.empty(nsub, dtype='int')
             scales = np.empty([nsub, nchan])
-            #These next two are lists becuase in principle,
+            #These next two are lists because in principle,
             #the subints could have different numbers of zapped channels.
             scalesx = []
             scale_errs = []
@@ -114,7 +110,7 @@ class GetTOAs:
             for nn in range(nsub):
                 MJD = MJDs[nn]
                 P = Ps[nn]
-                freqsx = freqsx[nn]
+                freqsx = freqsxs[nn]
                 portx = subintsx[nn][0]
                 portx_fft = np.fft.rfft(portx, axis=1)
                 modelx = np.compress(weights[nn], model, axis=0)
@@ -392,12 +388,13 @@ class GetTOAs:
         MJDs = self.MJDs[dfi]
         Ps = self.Ps[dfi]
         phis = self.phis[dfi]
-        phi_errs = self.phierrs[dfi]
+        phi_errs = self.phi_errs[dfi]
         DMs = self.DMs[dfi]
         DM_errs = self.DM_errs[dfi]
         DM0 = self.DM0s[dfi]
-        DeltaDM_mean = self.DeltaDM_mean[dfi]
-        DeltaDM_err = self.DeltaDM_err[dfi]
+        DeltaDM_mean = self.DeltaDM_means[dfi]
+        DeltaDM_err = self.DeltaDM_errs[dfi]
+        rcs = self.rcs[dfi]
         cols = ['b','k','g','b','r']
         fig = plt.figure()
         pf = np.polynomial.polynomial.polyfit
@@ -594,7 +591,7 @@ if __name__ == "__main__":
         datafiles = [datafiles[xx][:-1] for xx in xrange(len(datafiles))]
     gt = GetTOAs(datafiles=datafiles, modelfile=modelfile, DM0=DM0,
         one_DM=one_DM, bary_DM=bary_DM, common=common, quiet=quiet)
-    gt.get_toas(show_plot=showplot, safe=True, quiet=quiet)
+    gt.get_toas(show_plot=showplot, safe=False, quiet=quiet)
     gt.write_toas(outfile)
     if errfile is not None: gt.write_dm_errs(errfile)
     if pam_cmd: gt.write_pam_cmds()

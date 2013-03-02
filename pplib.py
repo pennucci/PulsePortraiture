@@ -436,7 +436,8 @@ def fit_portrait(data,model,init_params,P=None,freqs=None,nu_ref=np.inf,scales=T
     nfeval = results.nfev
     return_code = results.status
     #If the fit fails...????
-    if results.success is not True: print "Fit failed.  Return code is %d"%results.status
+    if results.success is not True:
+        sys.stderr.write("Fit failed.  Return code is %d"%results.status)
     param_errs = list(pow(fit_portrait_function_2deriv(np.array([phi,DM]),mFFT,p,dFFT,d,errs,P,freqs,nu_ref),-0.5))
     DoF = len(data.ravel()) - (len(freqs)+2)
     red_chi2 = results.fun / DoF
@@ -629,7 +630,7 @@ def load_data(filenm, dedisperse=False, dededisperse=False, tscrunch=False,
     subintsx = [np.compress(weights_norm[ii], subints[ii], axis=1) for ii in
             xrange(nsub)]
     #The channel center frequencies for the non-zapped subints
-    freqsx = [np.compress(weights_norm[ii], freqs) for ii in xrange(nsub)]
+    freqsxs = [np.compress(weights_norm[ii], freqs) for ii in xrange(nsub)]
     #The rest is now ignoring npol...
     arch.pscrunch()
     #Estimate noise -- needs improvement
@@ -666,7 +667,7 @@ def load_data(filenm, dedisperse=False, dededisperse=False, tscrunch=False,
     arch.refresh()
     #Return dictionary!
     data = {"arch":arch, "bw":bw, "flux_prof":flux_prof,
-            "flux_profx":flux_profx, "freqs":freqs, "freqsx":freqsx,
+            "flux_profx":flux_profx, "freqs":freqs, "freqsxs":freqsxs,
             "masks":masks, "epochs":epochs, "nbin":nbin, "nchan":nchan,
             "noise_std":noise_std, "nsub":nsub, "nu0":nu0, "phases":phases,
             "prof":prof, "Ps":Ps, "source":source, "subints":subints,
