@@ -343,7 +343,7 @@ class GetTOAs:
         scales = self.scales[dfi][nn]
         scalesx = self.scalesx[dfi][nn]
         freqs = data['freqs']
-        freqsx = data['freqsx'][nn]
+        freqsxs = data['freqsxs'][nn]
         nu0 = data['nu0']
         P = data['Ps'][nn]
         port = data['subints'][nn,0]

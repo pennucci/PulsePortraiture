@@ -53,7 +53,7 @@ class DataPortrait:
         """
         if fit:
             params, param_errs, chi2,dof, residuals = fit_powlaw(
-                    self.flux_profx, self.freqsx[0], self.nu0,
+                    self.flux_profx, self.freqsxs[0], self.nu0,
                     np.ones(len(self.flux_profx)),
                     np.array([guessA,guessalpha]),self.noise_std)
             if not quiet:
@@ -73,12 +73,12 @@ class DataPortrait:
                 if fit:
                     plt.plot(self.freqs, powlaw(self.freqs, self.nu0,
                         params[0], params[1]), 'k-')
-                    plt.plot(self.freqsx[0], self.flux_profx, 'r+')
+                    plt.plot(self.freqsxs[0], self.flux_profx, 'r+')
                     plt.subplot(212)
                     plt.xlabel("Frequency [MHz]")
                     plt.ylabel("Flux Units")
                     plt.title("Residuals")
-                    plt.plot(self.freqsx[0], residuals, 'r+')
+                    plt.plot(self.freqsxs[0], residuals, 'r+')
                 plt.show()
             self.spect_index = params[1]
 
@@ -140,7 +140,7 @@ class DataPortrait:
             start = time.time()
             self.fit_params, self.chi_sq, self.dof = fit_gaussian_portrait(
                     self.portx, portx_noise, self.init_model_params,
-                    self.fix_params, self.phases, self.freqsx[0], self.nu_ref,
+                    self.fix_params, self.phases, self.freqsxs[0], self.nu_ref,
                     quiet=quiet)
             if not quiet:
                 print "Fit took %.2f min"%((time.time() - start) /  60.)
@@ -150,7 +150,7 @@ class DataPortrait:
                start = time.time()
                self.fit_params, self.chi_sq, self.dof = fit_gaussian_portrait(
                        self.portx, portx_noise, self.model_params,
-                       self.fix_params, self.phases, self.freqsx[0],
+                       self.fix_params, self.phases, self.freqsxs[0],
                        self.nu_ref, quiet=quiet)
                if not quiet:
                    print "Fit took %.2f min"%((time.time() - start) / 60.)
@@ -168,7 +168,7 @@ class DataPortrait:
                phi, DM, nfeval, rc, scalesx, param_errs, red_chi2, duration = (
                        fit_portrait(self.portx, self.modelx,
                            np.array([phaseguess, DMguess]), self.Ps[0],
-                           self.freqsx[0], self.nu0, scales=True)
+                           self.freqsxs[0], self.nu0, scales=True)
                        )
                phierr = param_errs[0]
                DMerr = param_errs[1]
@@ -193,7 +193,7 @@ class DataPortrait:
                    self.port = rotate_portrait(self.port, phi,DM, self.Ps[0],
                            self.freqs, self.nu0)
                    self.portx = rotate_portrait(self.portx, phi, DM,
-                           self.Ps[0], self.freqsx[0], self.nu0)
+                           self.Ps[0], self.freqsxs[0], self.nu0)
                    self.set_model_run()
         if not quiet:
             print "Residuals mean: %.3f"%(self.portx - self.modelx).mean()
