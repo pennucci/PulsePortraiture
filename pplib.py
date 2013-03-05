@@ -70,137 +70,143 @@ def gaussian_profile(N, loc, wid, norm=False, abs_wid=False, zeroout=True):
           (exactly 2*sqrt(2*ln(2))).
     """
     #Maybe should move these checks to gen_gaussian_portrait?
-    if abs_wid: wid = abs(wid)
-    if wid > 0.0: pass
-    elif wid == 0.0: return np.zeros(N, 'd')
-    elif wid < 0.0 and zeroout: return np.zeros(N, 'd')
-    elif wid < 0.0 and not zeroout: pass
-    else: return 0
-    sigma = wid / (2*np.sqrt(2*np.log(2)))
+    if abs_wid:
+        wid = abs(wid)
+    if wid > 0.0:
+        pass
+    elif wid == 0.0:
+        return np.zeros(N, 'd')
+    elif wid < 0.0 and zeroout:
+        return np.zeros(N, 'd')
+    elif wid < 0.0 and not zeroout:
+        pass
+    else:
+        return 0
+    sigma = wid / (2 * np.sqrt(2 * np.log(2)))
     mean = loc % 1.0
     locval = np.arange(N, dtype='d') / float(N)
     if (mean < 0.5):
-        locval = np.where(np.greater(locval, mean+0.5),
-                           locval-1.0, locval)
+        locval = np.where(np.greater(locval, mean + 0.5), locval - 1.0, locval)
     else:
-        locval = np.where(np.less(locval, mean-0.5),
-                           locval+1.0, locval)
+        locval = np.where(np.less(locval, mean - 0.5), locval + 1.0, locval)
     try:
-        zs = (locval-mean)/sigma
-        okzinds = np.compress(np.fabs(zs)<20.0, np.arange(N))   #Why 20?
+        zs = (locval - mean) / sigma
+        okzinds = np.compress(np.fabs(zs) < 20.0, np.arange(N))   #Why 20?
         okzs = np.take(zs, okzinds)
         retval = np.zeros(N, 'd')
-        np.put(retval, okzinds, np.exp(-0.5*(okzs)**2.0)/(sigma*np.sqrt(2* \
-                np.pi)))
-        if norm: return retval
-        #else: return retval/np.max(retval)
+        np.put(retval, okzinds, np.exp(-0.5 * (okzs)**2.0)/(sigma * np.sqrt(2 *
+            np.pi)))
+        if norm:
+            return retval
+        #else:
+        #    return retval / np.max(retval)
         else:
-            if np.max(abs(retval)) == 0.0: return retval   #TP hack
-            else: return retval/np.max(abs(retval))  #TP hack
+            if np.max(abs(retval)) == 0.0:
+                return retval   #TP hack
+            else:
+                return retval / np.max(abs(retval))  #TP hack
     except OverflowError:
-        print "Problem in gaussian prof:  mean = %f  sigma = %f" % \
-              (mean, sigma)
+        print "Problem in gaussian prof:  mean = %f  sigma = %f" %(mean, sigma)
         return np.zeros(N, 'd')
 
 def gen_gaussian_profile(params, N):
     """
     Taken and tweaked from SMR's pygaussfit.py
 
-    gen_gaussian_profile(params, N):
-        Return a model of a DC-component + M gaussians
-            params is a sequence of 1+M*3 values
-                the first value is the DC component.  Each remaining
-                group of three represents the gaussians loc (0-1),
-                wid (FWHM) (0-1), and amplitude (>0.0).
-            N is the number of points in the model.
+    Return a model of a DC-component + M gaussians.
+    params is a sequence of 1+M*3 values; the first value is the DC component.
+    Each remaining group of three represents the gaussians loc (0-1),
+    wid (FWHM) (0-1), and amplitude (>0.0). N is the number of points in the
+    model.
     """
-    ngauss = (len(params)-1)/3
+    ngauss = (len(params) - 1) / 3
     model = np.zeros(N, dtype='d') + params[0]
     for ii in xrange(ngauss):
-        loc, wid, amp = params[1+ii*3:4+ii*3]
+        loc, wid, amp = params[1 + ii*3:4 + ii*3]
         model += amp * gaussian_profile(N, loc, wid)
     return model
 
 def gen_gaussian_portrait(params, phases, freqs, nu_ref):
     """
     """
-    refparams = np.array([params[0]]+list(params[1::2]))
+    refparams = np.array([params[0]]+ list(params[1::2]))
     locparams = params[2::6]
     widparams = params[4::6]
     ampparams = params[6::6]
     ngauss = len(refparams[1::3])
     nbin = len(phases)
     nchan = len(freqs)
-    gport = np.empty([nchan,nbin])
-    gparams = np.empty([nchan,len(refparams)])
-    gparams[:,0] = refparams[0]    #DC term
-    gparams[:,1::3] = np.outer(freqs-nu_ref,locparams)+np.outer(np.ones(nchan),refparams[1::3])    #Locs
-    gparams[:,2::3] = np.outer(freqs-nu_ref,widparams)+np.outer(np.ones(nchan),refparams[2::3])    #Wids
-    #gparams[:,0::3][:,1:] = np.exp(np.outer(np.log(freqs)-np.log(nu_ref),ampparams)+np.outer(np.ones(nchan),np.log(refparams[0::3][1:])))    #Amps; I am unsure why I needed this fix at some point
-    gparams[:,3::3] = np.exp(np.outer(np.log(freqs)-np.log(nu_ref),ampparams)+np.outer(np.ones(nchan),np.log(refparams[3::3])))    #Amps
+    gport = np.empty([nchan, nbin])
+    gparams = np.empty([nchan, len(refparams)])
+    #DC term
+    gparams[:, 0] = refparams[0]
+    #Locs
+    gparams[:, 1::3] = np.outer(freqs - nu_ref, locparams) + np.outer(np.ones(
+        nchan), refparams[1::3])
+    #Wids
+    gparams[:, 2::3] = np.outer(freqs - nu_ref, widparams) + np.outer(np.ones(
+        nchan), refparams[2::3])
+    #Amps
+    gparams[:, 3::3] = np.exp(np.outer(np.log(freqs) - np.log(nu_ref),
+        ampparams) + np.outer(np.ones(nchan), np.log(refparams[3::3])))
+    #Amps; I am unsure why I needed this fix at some point
+    #gparams[:, 0::3][:, 1:] = np.exp(np.outer(np.log(freqs) - np.log(nu_ref),
+    #    ampparams) + np.outer(np.ones(nchan), np.log(refparams[0::3][1:])))
     for nn in range(nchan):
-        gport[nn] = gen_gaussian_profile(gparams[nn],nbin) #Maybe need to contrain so values don't go negative?
+        #Need to contrain so values don't go negative, etc., which is currently
+        #done in gaussian_profile
+        gport[nn] = gen_gaussian_profile(gparams[nn], nbin)
     return gport
 
-def powlaw(nu,nu0,A,alpha):
+def powlaw(nu, nu0, A, alpha):
     """
     Returns power-law spectrum given by:
-    F(nu) = A*(nu/nu0)**(alpha)
+    F(nu) = A*(nu/nu0)**alpha
     """
-    return A*((nu/nu0)**(alpha))
+    return A * (nu/nu0)**alpha
 
-def powlaw_integral(nu2,nu1,nu0,A,alpha):
+def powlaw_integral(nu2, nu1, nu0, A, alpha):
     """
-    Returns the integral over a powerlaw of form A*(nu/nu0)**(alpha)
+    Returns the integral over a powerlaw of form A*(nu/nu0)**alpha
     from nu1 to nu2
     """
     alpha = np.float(alpha)
     if alpha == -1.0:
-        return A*nu0*np.log(nu2/nu1)
+        return A * nu0 * np.log(nu2/nu1)
     else:
-        C = A*(nu0**-alpha)/(1+alpha)
-        diff = ((nu2**(1+alpha))-(nu1**(1+alpha)))
-        return C*diff
+        C = A * (nu0**-alpha) / (1 + alpha)
+        diff = ((nu2**(1+alpha)) - (nu1**(1+alpha)))
+        return C * diff
 
-def powlaw_freqs(lo,hi,N,alpha,mid=False):
+def powlaw_freqs(lo, hi, N, alpha, mid=False):
     """
     Returns frequencies such that a bandwidth from lo to hi frequencies
-    split into N chunks contains the same amount of power in each chunk
+    split into N chunks contains the same amount of power in each chunk,
     given a power-law across the band with spectral index alpha.  Default
     behavior returns N+1 frequencies (includes both lo and hi freqs); if
     mid=True, will return N frequencies, corresponding to the middle frequency
     in each chunk.
     """
     alpha = np.float(alpha)
-    nus = np.zeros(N+1)
+    nus = np.zeros(N + 1)
     if alpha == -1.0:
-        nus = np.exp(np.linspace(np.log(lo),np.log(hi),N+1))
+        nus = np.exp(np.linspace(np.log(lo), np.log(hi), N+1))
     else:
-        nus = np.power(np.linspace(lo**(1+alpha),hi**(1+alpha),N+1),(1+alpha)**-1)
+        nus = np.power(np.linspace(lo**(1+alpha), hi**(1+alpha), N+1),
+                (1+alpha)**-1)
         #Equivalently:
         #for nn in xrange(N+1):
-        #    nus[nn] = ((nn/np.float(N))*(hi**(1+alpha)) + (1-(nn/np.float(N)))*(lo**(1+alpha)))**(1/(1+alpha))
+        #    nus[nn] = ((nn / np.float(N)) * (hi**(1+alpha)) + (1 - (nn /
+        #        np.float(N))) * (lo**(1+alpha)))**(1 / (1+alpha))
     if mid:
         midnus = np.zeros(N)
         for nn in xrange(N):
-            midnus[nn] = 0.5*(nus[nn]+nus[nn+1])
+            midnus[nn] = 0.5 * (nus[nn] + nus[nn+1])
         nus = midnus
     return nus
 
-def fit_gauss_function(params, data=None, errs=None):
-    """
-    """
-    prms = np.array([param.value for param in params.itervalues()])
-    return (data - gen_gaussian_profile(prms, len(data))) / errs
-
-def fit_gaussian_portrait_function(params, phases, freqs, nu_ref, fjac=None, data=None, errs=None):
-    """
-    """
-    prms = np.array([param.value for param in params.itervalues()])
-    deviates = np.ravel((data - gen_gaussian_portrait(prms, phases, freqs, nu_ref)) / errs)
-    return deviates
-
-def fit_powlaw_function(params, freqs, nu0, weights=None, fjac=None, data=None, errs=None):
+def fit_powlaw_function(params, freqs, nu0, weights=None, data=None,
+        errs=None):
     """
     """
     prms = np.array([param.value for param in params.itervalues()])
@@ -215,25 +221,42 @@ def fit_powlaw_function(params, freqs, nu0, weights=None, fjac=None, data=None, 
         else: pass
     d=np.array(d)
     f=np.array(f)
-    return (d - powlaw(f,nu0,A,alpha)) / errs
+    return (d - powlaw(f, nu0, A, alpha)) / errs
 
-def fit_portrait_function(params, model=None, p=None, data=None, d=None, errs=None, P=None, freqs=None, nu_ref=np.inf):
+def fit_gauss_function(params, data=None, errs=None):
+    """
+    """
+    prms = np.array([param.value for param in params.itervalues()])
+    return (data - gen_gaussian_profile(prms, len(data))) / errs
+
+def fit_gaussian_portrait_function(params, phases, freqs, nu_ref, data=None,
+        errs=None):
+    """
+    """
+    prms = np.array([param.value for param in params.itervalues()])
+    deviates = np.ravel((data - gen_gaussian_portrait(prms, phases, freqs,
+        nu_ref)) / errs)
+    return deviates
+
+def fit_portrait_function(params, model=None, p=None, data=None, d=None,
+        errs=None, P=None, freqs=None, nu_ref=np.inf):
     """
     """
     phase = params[0]
     m = 0.0
     if P == None or freqs == None:
         Cdm = 0.0
-        freqs = np.inf*np.ones(len(model))
-    else: Cdm = Dconst*params[1]/P
+        freqs = np.inf * np.ones(len(model))
+    else: Cdm = Dconst * params[1] / P
     for nn in xrange(len(freqs)):
         err = errs[nn]
         freq = freqs[nn]
         harmind = np.arange(len(model[nn]))
-        phasor = np.exp(harmind * 2.0j*np.pi*(phase+(Cdm*(freq**-2.0 - nu_ref**-2.0))))
+        phasor = np.exp(harmind * 2.0j * np.pi * (phase + (Cdm * (freq**-2.0 -
+            nu_ref**-2.0))))
         mm = np.real(data[nn,:] * np.conj(model[nn,:]) * phasor).sum()
-        m += (mm**2.0)*err/p[nn]
-    return d-m
+        m += (mm**2.0) * err / p[nn]
+    return d - m
 
 def fit_portrait_function_deriv(params, model=None, p=None, data=None, d=None, errs=None, P=None, freqs=None, nu_ref=np.inf):
     """
@@ -814,6 +837,7 @@ def show_port(port, freqs=None, phases=None, title=None, rvrsd=False,
     if colorbar: plt.colorbar()
     plt.show()
 
+#This does not work yet
 def unpack_dict(data):
     """
     Dictionary has to be named 'data'...
