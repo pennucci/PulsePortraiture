@@ -64,6 +64,7 @@ class GetTOAs:
         the ordered metafile containing datafile names.
         """
         start = time.time()
+        tot_duration = 0.0
         if datafile is None:
             datafiles = self.datafiles
         else:
@@ -85,18 +86,18 @@ class GetTOAs:
                         self.modelfile, phases, freqs, quiet=quiet)
             else:
                 ngauss, model = self.ngauss, self.model
-            phis = np.empty(nsub, dtype=np.double)
-            phi_errs = np.empty(nsub)
-            DMs = np.empty(nsub, dtype=np.float)
-            DM_errs = np.empty(nsub)
-            nfevals = np.empty(nsub, dtype='int')
-            rcs = np.empty(nsub, dtype='int')
-            scales = np.empty([nsub, nchan])
+            phis = np.empty(nsubx, dtype=np.double)
+            phi_errs = np.empty(nsubx)
+            DMs = np.empty(nsubx, dtype=np.float)
+            DM_errs = np.empty(nsubx)
+            nfevals = np.empty(nsubx, dtype='int')
+            rcs = np.empty(nsubx, dtype='int')
+            scales = np.empty([nsubx, nchan])
             #These next two are lists because in principle,
             #the subints could have different numbers of zapped channels.
             scalesx = []
             scale_errs = []
-            red_chi2s = np.empty(nsub)
+            red_chi2s = np.empty(nsubx)
             MJDs = np.array([epochs[nn].in_days()
                 for nn in xrange(nsub)], dtype=np.double)
             if self.DM0 is None:
@@ -104,23 +105,27 @@ class GetTOAs:
             else:
                 DM0 = self.DM0
             if not quiet:
-                print "\nEach of the %d TOAs are approximately %.2f s"%(nsub,
+                print "\nEach of the %d TOAs are approximately %.2f s"%(nsubx,
                         arch.integration_length() / nsub)
                 print "Doing Fourier-domain least-squares fit..."
-            for nn in range(nsub):
-                MJD = MJDs[nn]
-                P = Ps[nn]
-                freqsx = freqsxs[nn]
-                portx = subintsx[nn][0]
+            #These are the subintegration indices that haven't been zapped
+            ok_sub_inds = map(int, np.compress(map(len,
+                np.array(subintsx)[:,0]), np.arange(nsub)))
+            for nn in range(nsubx):
+                subi = ok_sub_inds[nn]
+                MJD = MJDs[subi]
+                P = Ps[subi]
+                freqsx = freqsxs[subi]
+                portx = subintsx[subi][0]
                 portx_fft = np.fft.rfft(portx, axis=1)
-                modelx = np.compress(weights[nn], model, axis=0)
+                modelx = np.compress(weights[subi], model, axis=0)
                 ####################
                 #DOPPLER CORRECTION#
                 ####################
                 #In principle, we should be able to correct the frequencies, but
                 #since this is a messy business, it is easier to correct the DM
                 #itself (below).
-                #df = arch.get_Integration(nn).get_doppler_factor()
+                #df = arch.get_Integration(subi).get_doppler_factor()
                 #freqsx = doppler_correct_freqs(freqsx, df)
                 #nu0 = doppler_correct_freqs(nu0, df)
                 ####################
@@ -160,7 +165,7 @@ class GetTOAs:
                 if bary_DM: #Default is True
                     #NB: the 'doppler factor' retrieved from PSRCHIVE seems to be
                     #the inverse of the convention nu_source/nu_observed
-                    df = arch.get_Integration(nn).get_doppler_factor()
+                    df = arch.get_Integration(subi).get_doppler_factor()
                     DM *= df
                 DMs[nn] = DM
                 DM_errs[nn] = param_errs[1]
@@ -171,7 +176,7 @@ class GetTOAs:
                 scale = np.zeros(nchan)
                 ss = 0
                 for ii in range(nchan):
-                    if weights[nn,ii] == 1:
+                    if weights[subi,ii] == 1:
                         scale[ii] = scalex[ss]
                         ss += 1
                     else: pass
@@ -184,7 +189,7 @@ class GetTOAs:
             DeltaDM_mean, DeltaDM_var = np.average(DeltaDMs,
                     weights=DM_errs**-2, returned=True)
             DeltaDM_var = DeltaDM_var**-1
-            if nsub > 1:
+            if nsubx > 1:
                 #The below multiplie by the red. chi-squared to inflate the
                 #errors.
                 DeltaDM_var *= np.sum(((DeltaDMs - DeltaDM_mean)**2) /
@@ -193,10 +198,10 @@ class GetTOAs:
             if append:
                 self.obs.append(arch.get_telescope())
                 self.nu0s.append(nu0)
-                self.nsubs.append(nsub)
-                self.epochs.append(epochs)
-                self.MJDs.append(MJDs)
-                self.Ps.append(Ps)
+                self.nsubs.append(nsubx)
+                self.epochs.append(np.take(epochs, ok_sub_inds))
+                self.MJDs.append(np.take(MJDs, ok_sub_inds))
+                self.Ps.append(np.take(Ps, ok_sub_inds))
                 self.phis.append(phis)
                 self.phi_errs.append(phi_errs)
                 self.DM0s.append(DM0)
@@ -213,11 +218,14 @@ class GetTOAs:
                 self.fit_durations.append(fit_duration)
             if not quiet:
                 print "--------------------------"
-                print "~%.2f min/TOA"%(fit_duration / (60. * nsub))
+                print "~%.2f min/TOA"%(fit_duration / (60. * nsubx))
                 print "Avg. TOA error is %.3f us"%(phi_errs.mean() *
                         Ps.mean() * 1e6)
             if show_plot:
+                stop = time.time()
+                tot_duration += stop - start
                 self.show_results(datafile)
+                start = time.time()
             if not append:
                 return (phis, phi_errs, DMs, DM_errs, DeltaDM_mean,
                         DeltaDM_err, scales, scalesx, scale_errs, red_chi2s,
@@ -225,7 +233,8 @@ class GetTOAs:
             if safe:
                 self.write_toas("pptoas_toas.bak", datafile)
                 self.write_dm_errs("pptoas_dmerrs.bak", datafile)
-        tot_duration = time.time() - start
+        if not show_plot:
+            tot_duration = time.time() - start
         if not quiet:
             print "--------------------------"
             print "Total time: %.2f, ~%.2f min/TOA"%(tot_duration / 60,
@@ -246,18 +255,18 @@ class GetTOAs:
             except(KeyError):
                 obs_code = obs_codes["%s"%self.obs[dfi].upper()]
             nu0 = self.nu0s[dfi]
-            nsub = self.nsubs[dfi]
+            nsubx = self.nsubs[dfi]
             epochs = self.epochs[dfi]
             Ps = self.Ps[dfi]
             phis = self.phis[dfi]
             phi_errs = self.phi_errs[dfi]
             toas = np.array([epochs[nn] + pr.MJD((phis[nn] *
-                Ps[nn]) / (3600 * 24.)) for nn in xrange(nsub)])
+                Ps[nn]) / (3600 * 24.)) for nn in xrange(nsubx)])
             toa_errs = phi_errs * Ps * 1e6
             if outfile is not None: sys.stdout = open(outfile,"a")
             #Currently writes topocentric frequencies
             #Need option for different kinds of TOA output
-            for nn in range(nsub):
+            for nn in range(nsubx):
                 if self.one_DM:
                     DeltaDM_mean = self.DeltaDM_means[dfi]
                     write_princeton_toa(toas[nn].intday(), toas[nn].fracday(),
@@ -276,15 +285,15 @@ class GetTOAs:
             datafiles = [datafile]
         for datafile in datafiles:
             dfi = datafiles.index(datafile)
-            nsub = self.nsubs[dfi]
+            nsubx = self.nsubs[dfi]
             of = open(outfile, "a")
             if self.one_DM:
                 DeltaDM_err = self.DeltaDM_errs[dfi]
-                for nn in range(nsub):
+                for nn in range(nsubx):
                     of.write("%.5e\n"%DeltaDM_err)
             else:
                 DM_errs = self.DM_errs[dfi]
-                for nn in range(nsub):
+                for nn in range(nsubx):
                     of.write("%.5e\n"%DM_errs[nn])
 
     def write_pam_cmds(self, outfile=None, datafile=None):
@@ -384,7 +393,7 @@ class GetTOAs:
             dfi = self.datafiles.index(datafile)
         else:
             dfi = 0
-        nsub = self.nsubs[dfi]
+        nsubx = self.nsubs[dfi]
         MJDs = self.MJDs[dfi]
         Ps = self.Ps[dfi]
         phis = self.phis[dfi]
@@ -406,13 +415,13 @@ class GetTOAs:
         resids_mean,resids_var = np.average(resids, weights=phi_errs**-2,
                 returned=True)
         resids_var = resids_var**-1
-        if nsub > 1:
+        if nsubx > 1:
             resids_var *= np.sum(((resids - resids_mean)**2) /
                     (phi_errs**2)) / (len(resids) - 1)
         resids_err = resids_var**0.5
         RMS = resids_err
         ax1 = fig.add_subplot(311)
-        for nn in range(len(phis)):
+        for nn in range(nsubx):
             ax1.errorbar(MJDs[nn], phis[nn] * Ps[nn] * 1e6, phi_errs[nn] *
                     Ps[nn] * 1e6, color='%s'%cols[rcs[nn]], fmt='+')
         plt.plot(MJDs, (fit_results[0][0] + (fit_results[0][1] * MJDs)) * 1e3,
@@ -422,7 +431,7 @@ class GetTOAs:
         ax1.text(0.1, 0.9, "%.2e ms/s"%(fit_results[0][1] / (3600 * 24)),
                 ha='center', va='center', transform=ax1.transAxes)
         ax2 = fig.add_subplot(312)
-        for nn in range(len(phis)):
+        for nn in range(nsubx):
             ax2.errorbar(MJDs[nn], resids[nn] * 1e3, phi_errs[nn] * Ps[nn] *
                     1e6, color='%s'%cols[rcs[nn]], fmt='+')
         plt.plot(MJDs, np.ones(len(MJDs)) * resids_mean * 1e3, "m--")
@@ -435,7 +444,7 @@ class GetTOAs:
         ax2.text(0.1, 0.9, r"$\sim$weighted RMS = %d ns"%int(resids_err * 1e6),
                 ha='center', va='center', transform=ax2.transAxes)
         ax3 = fig.add_subplot(313)
-        for nn in range(len(phis)):
+        for nn in range(nsubx):
             ax3.errorbar(MJDs[nn], DMs[nn], DM_errs[nn],
                     color='%s'%cols[rcs[nn]], fmt='+')
         if abs(DeltaDM_mean) / DeltaDM_err < 10:
@@ -459,10 +468,12 @@ class GetTOAs:
         if datafile is None:
             nfevals = np.array(self.nfevals)
             rcs = np.array(self.rcs)
+            nsubx = self.nsubs
         else:
             dfi = self.datafiles.index(datafile)
             nfevals = self.nfevals[dfi]
             rcs = self.rcs[dfi]
+            nsubx = self.nsubs[dfi]
         cols = ['b','k','g','b','r']
         bins = nfevals.max()
         binmin = nfevals.min()
@@ -470,7 +481,7 @@ class GetTOAs:
         rc2=np.zeros(bins - binmin + 1)
         rc4=np.zeros(bins - binmin + 1)
         rc5=np.zeros(bins - binmin + 1)
-        for nn in range(len(nfevals)):
+        for nn in range(nsubx):
             nfeval = nfevals[nn]
             if rcs[nn] == 1:
                 rc1[nfeval - binmin] += 1
@@ -566,7 +577,7 @@ if __name__ == "__main__":
 
     if (options.datafile is None and options.metafile is None or
             options.modelfile is None):
-            print "\npptoas.py - least-squares fit for TOAs and DMs.\n"
+            print "\npptoas.py - simultaneous least-squares fit for TOAs and DMs\n"
             parser.print_help()
             parser.exit()
 

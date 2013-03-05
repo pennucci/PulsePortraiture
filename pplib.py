@@ -651,10 +651,10 @@ def load_data(filenm, dedisperse=False, dededisperse=False, tscrunch=False,
     arch.fscrunch()
     prof = arch.get_data()[0,0,0]
     #Number unzapped channels, subints
-    uzchan = int(round(np.mean([subintsx[ii].shape[1] for ii in
+    nchanx = int(round(np.mean([subintsx[ii].shape[1] for ii in
         xrange(nsub)])))
-    uzsub = np.compress([subintsx[ii].shape[1] for ii in xrange(nsub)],
-            np.ones(nsub)).sum()
+    nsubx = int(np.compress([subintsx[ii].shape[1] for ii in xrange(nsub)],
+            np.ones(nsub)).sum())
     if not quiet:
         print "\tcenter freq. [MHz] = %.5f\n\
         bandwidth [MHz]    = %.1f\n\
@@ -662,16 +662,16 @@ def load_data(filenm, dedisperse=False, dededisperse=False, tscrunch=False,
         # channels         = %d\n\
         # chan (mean)      = %d\n\
         # subints          = %d\n\
-        # unzapped subint  = %d"%(nu0, bw, nbin, nchan, uzchan, nsub, uzsub)
+        # unzapped subint  = %d"%(nu0, bw, nbin, nchan, nchanx, nsub, nsubx)
     #Returns refreshed arch; could be changed...
     arch.refresh()
     #Return dictionary!
     data = {"arch":arch, "bw":bw, "flux_prof":flux_prof,
             "flux_profx":flux_profx, "freqs":freqs, "freqsxs":freqsxs,
             "masks":masks, "epochs":epochs, "nbin":nbin, "nchan":nchan,
-            "noise_std":noise_std, "nsub":nsub, "nu0":nu0, "phases":phases,
-            "prof":prof, "Ps":Ps, "source":source, "subints":subints,
-            "subintsx":subintsx, "weights":weights_norm}
+            "nchanx":nchanx, "noise_std":noise_std, "nsub":nsub, "nsubx":nsubx,
+            "nu0":nu0, "phases":phases, "prof":prof, "Ps":Ps, "source":source,
+            "subints":subints, "subintsx":subintsx, "weights":weights_norm}
     return data
 
 def plot_lognorm(mu,tau,lo=0.0,hi=5.0,npts=500,plot=1,show=0):

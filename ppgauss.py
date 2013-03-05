@@ -480,7 +480,7 @@ if __name__ == "__main__":
     (options, args) = parser.parse_args()
 
     if options.datafile is None:
-        print "\nppgauss.py - Generate gaussian-component model portrait.\n"
+        print "\nppgauss.py - generates gaussian-component model portrait\n"
         parser.print_help()
         parser.exit()
 
