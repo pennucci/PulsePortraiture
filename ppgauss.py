@@ -168,7 +168,7 @@ class DataPortrait:
                phi, DM, nfeval, rc, scalesx, param_errs, red_chi2, duration = (
                        fit_portrait(self.portx, self.modelx,
                            np.array([phaseguess, DMguess]), self.Ps[0],
-                           self.freqsxs[0], self.nu0, scales=True)
+                           self.freqsxs[0], self.nu0, scales=True, quiet=quiet)
                        )
                phierr = param_errs[0]
                DMerr = param_errs[1]

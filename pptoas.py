@@ -155,7 +155,7 @@ class GetTOAs:
                 phi, DM, nfeval, rc, scalex, param_errs, red_chi2, duration = \
                         fit_portrait(portx, modelx,
                             np.array([phaseguess, DMguess]), P, freqsx,
-                            nu0, scales=True)
+                            nu0, scales=True, quiet=quiet)
                 fit_duration += duration
                 phis[nn] = phi
                 phi_errs[nn] = param_errs[0]

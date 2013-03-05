@@ -2,7 +2,7 @@
 
 # To be used with PSRCHIVE Archive files
 
-# This software lays on the bed of Procrustes all too comfortably.
+# This fitting algorithm lays on the bed of Procrustes all too comfortably.
 
 #Next two lines needed for dispatching on nodes (not implemented yet)
 #import matplotlib
@@ -22,13 +22,27 @@ import psrchive as pr
 #plt.gray()
 #plt.bone()
 plt.pink()
-plt.close('all')
+plt.close("all")
 
 #List of colors
 cols = ['b','g','r','c','m','y','b','g','r','c','m','y','b','g','r','c','m',
         'y','b','g','r','c','m','y','b','g','r','c','m','y']
-#List of obs
-obs_codes = {"bary":"@", "inf":"0", "gbt":"1", "atca":"2", "ao":"3","nanshan":"5", "tid43":"6", "pks":"7", "jb":"8", "vla":"c", "ncy":"f", "eff":"g", "jbdfb":"q", "wsrt":"i"}
+
+#List of observatory codes; not sure I have those first two ("@", "0") right.
+obs_codes = {"bary":"@", "inf":"0", "gbt":"1", "atca":"2", "ao":"3",
+             "nanshan":"5", "tid43":"6", "pks":"7", "jb":"8", "vla":"c",
+             "ncy":"f", "eff":"g", "jbdfb":"q", "wsrt":"i"}
+
+#RCSTRINGS dictionary, for the return codes given by scipy.optimize.fmin_tnc
+RCSTRINGS = {"-1":"INFEASIBLE: Infeasible (low > up).",
+             "0":"LOCALMINIMUM: Local minima reach (|pg| ~= 0).",
+             "1":"FCONVERGED: Converged (|f_n-f_(n-1)| ~= 0.)",
+             "2":"XCONVERGED: Converged (|x_n-x_(n-1)| ~= 0.)",
+             "3":"MAXFUN: Max. number of function evaluations reach.",
+             "4":"LSFAIL: Linear search failed.",
+             "5":"CONSTANT: All lower bounds are equal to the upper bounds.",
+             "6":"NOPROGRESS: Unable to progress.",
+             "7":"USERABORT: User requested end of minimization."}
 
 #Exact dispersion constant (e**2/(2*pi*m_e*c))
 #used by PRESTO
@@ -38,6 +52,7 @@ Dconst_exact = 4.148808e3 #[MHz**2 pc**-1 cm**3 s]
 #used by PSRCHIVE
 Dconst_trad = 0.000241**-1 #[MHz**2 pc**-1 cm**3 s]
 
+#Choose wisely.
 Dconst = Dconst_trad
 
 def gaussian_profile(N, loc, wid, norm=False, abs_wid=False, zeroout=True):
@@ -411,7 +426,8 @@ def fit_gaussian_portrait(data, errs, init_params, fix_params, phases, freqs, nu
         print "---------------------------------------------------------------"
     return fit_params, chi_sq, dof
 
-def fit_portrait(data,model,init_params,P=None,freqs=None,nu_ref=np.inf,scales=True):
+def fit_portrait(data,model, init_params, P=None, freqs=None, nu_ref=np.inf,
+        scales=True, quiet=True):
     """
     """
     #errs = get_noise(data,tau=True,chans=True,fd=True,frac=4) #tau = precision = 1/variance.  FIX Need to use better filtering instead of frac     #FIX get_noise is not right
@@ -435,9 +451,14 @@ def fit_portrait(data,model,init_params,P=None,freqs=None,nu_ref=np.inf,scales=T
     DM = results.x[1]
     nfeval = results.nfev
     return_code = results.status
+    rcstring = RCSTRINGS["%s"%str(return_code)]
     #If the fit fails...????
     if results.success is not True:
-        sys.stderr.write("Fit failed.  Return code is %d"%results.status)
+        sys.stderr.write("Fit failed with return code %d: %s\n"
+                %(results.status, rcstring))
+    if not quiet and results.success is True:
+        sys.stderr.write("Fit suceeded with return code %d: %s\n"
+                %(results.status, rcstring))
     param_errs = list(pow(fit_portrait_function_2deriv(np.array([phi,DM]),mFFT,p,dFFT,d,errs,P,freqs,nu_ref),-0.5))
     DoF = len(data.ravel()) - (len(freqs)+2)
     red_chi2 = results.fun / DoF
