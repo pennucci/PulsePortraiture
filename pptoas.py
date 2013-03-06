@@ -10,6 +10,8 @@ class GetTOAs:
         """
         """
         self.datafiles = datafiles
+        if type(self.datafiles) is str:
+            self.datafiles = [self.datafiles]
         self.modelfile = modelfile
         self.DM0 = DM0
         self.one_DM = one_DM
@@ -36,32 +38,38 @@ class GetTOAs:
         self.rcs = []
         self.fit_durations = []
         self.quiet = quiet
+        self.order = []
         if len(self.datafiles) == 1 or self.common is True:
-            self.data = load_data(self.datafiles[0], dedisperse=False,
+            data = load_data(self.datafiles[0], dedisperse=False,
                     dededisperse=False, tscrunch=True, pscrunch=True,
                     rm_baseline=True, flux_prof=False, quiet=True)
             self.model_name, self.ngauss, self.model = read_model(
-                    self.modelfile, self.data['phases'], self.data['freqs'],
+                    #self.modelfile, data["phases"], data["freqs"],
+                    self.modelfile, data.phases, data.freqs,
                     self.quiet)
             #Unpack the data dictionary into the local namespace; see load_data
             #for dictionary keys.
             #for key in self.data.keys():
             #    exec("self." + key + " = self.data['" + key + "']")
-            #if self.source is None: self.source = "noname"
-            self.nchan = self.data['nchan']
-            self.nbin = self.data['nbin']
-            self.nu0 = self.data['nu0']
-            self.bw = self.data['bw']
-            self.freqs = self.data['freqs']
+            #self.source = data["source"]
+            #self.nchan = data["nchan"]
+            #self.nbin = data["nbin"]
+            #self.nu0 = data["nu0"]
+            #self.bw = data["bw"]
+            #self.freqs = data["freqs"]
+            self.source = data.source
+            self.nchan = data.nchan
+            self.nbin = data.nbin
+            self.nu0 = data.nu0
+            self.bw = data.bw
+            self.freqs = data.freqs
             self.lofreq = self.freqs[0]-(self.bw/(2*self.nchan))
-            del(self.data)
+            if self.source is None: self.source = "noname"
+            del(data)
 
-    def get_toas(self, datafile=None, show_plot=False, append=True, safe=False,
+    def get_toas(self, datafile=None, show_plot=False, safe=False,
             quiet=False):
         """
-        Only use append if you are prepared to keep track of the order in which
-        you have appended to the global lists (it could then be different from
-        the ordered metafile containing datafile names.
         """
         start = time.time()
         tot_duration = 0.0
@@ -76,7 +84,7 @@ class GetTOAs:
                     dededisperse=False, tscrunch=False, pscrunch=True,
                     rm_baseline=True, flux_prof=False, quiet=quiet)
             #Unpack the data dictionary into the local namespace; see load_data
-#           for dictionary keys.
+            #for dictionary keys.
             for key in data.keys():
                 exec(key + " = data['" + key + "']")
             if source is None: source = "noname"
@@ -162,7 +170,7 @@ class GetTOAs:
                 ####################
                 #DOPPLER CORRECTION#
                 ####################
-                if bary_DM: #Default is True
+                if self.bary_DM: #Default is True
                     #NB: the 'doppler factor' retrieved from PSRCHIVE seems to be
                     #the inverse of the convention nu_source/nu_observed
                     df = arch.get_Integration(subi).get_doppler_factor()
@@ -195,27 +203,27 @@ class GetTOAs:
                 DeltaDM_var *= np.sum(((DeltaDMs - DeltaDM_mean)**2) /
                         (DM_errs**2)) / (len(DeltaDMs) - 1)
             DeltaDM_err = DeltaDM_var**0.5
-            if append:
-                self.obs.append(arch.get_telescope())
-                self.nu0s.append(nu0)
-                self.nsubs.append(nsubx)
-                self.epochs.append(np.take(epochs, ok_sub_inds))
-                self.MJDs.append(np.take(MJDs, ok_sub_inds))
-                self.Ps.append(np.take(Ps, ok_sub_inds))
-                self.phis.append(phis)
-                self.phi_errs.append(phi_errs)
-                self.DM0s.append(DM0)
-                self.DMs.append(DMs)
-                self.DM_errs.append(DM_errs)
-                self.DeltaDM_means.append(DeltaDM_mean)
-                self.DeltaDM_errs.append(DeltaDM_err)
-                self.scales.append(scales)
-                self.scalesx.append(scalesx)
-                self.scale_errs.append(scale_errs)
-                self.red_chi2s.append(red_chi2s)
-                self.nfevals.append(nfevals)
-                self.rcs.append(rcs)
-                self.fit_durations.append(fit_duration)
+            self.order.append(datafile)
+            self.obs.append(arch.get_telescope())
+            self.nu0s.append(nu0)
+            self.nsubs.append(nsubx)
+            self.epochs.append(np.take(epochs, ok_sub_inds))
+            self.MJDs.append(np.take(MJDs, ok_sub_inds))
+            self.Ps.append(np.take(Ps, ok_sub_inds))
+            self.phis.append(phis)
+            self.phi_errs.append(phi_errs)
+            self.DM0s.append(DM0)
+            self.DMs.append(DMs)
+            self.DM_errs.append(DM_errs)
+            self.DeltaDM_means.append(DeltaDM_mean)
+            self.DeltaDM_errs.append(DeltaDM_err)
+            self.scales.append(scales)
+            self.scalesx.append(scalesx)
+            self.scale_errs.append(scale_errs)
+            self.red_chi2s.append(red_chi2s)
+            self.nfevals.append(nfevals)
+            self.rcs.append(rcs)
+            self.fit_durations.append(fit_duration)
             if not quiet:
                 print "--------------------------"
                 print "~%.2f min/TOA"%(fit_duration / (60. * nsubx))
@@ -226,13 +234,9 @@ class GetTOAs:
                 tot_duration += stop - start
                 self.show_results(datafile)
                 start = time.time()
-            if not append:
-                return (phis, phi_errs, DMs, DM_errs, DeltaDM_mean,
-                        DeltaDM_err, scales, scalesx, scale_errs, red_chi2s,
-                        nfevals, rcs, fit_duration)
             if safe:
-                self.write_toas("pptoas_toas.bak", datafile)
-                self.write_dm_errs("pptoas_dmerrs.bak", datafile)
+                self.write_toas(datafile, "pptoas_toas.bak")
+                self.write_dm_errs(datafile, "pptoas_dmerrs.bak")
         if not show_plot:
             tot_duration = time.time() - start
         if not quiet:
@@ -240,7 +244,7 @@ class GetTOAs:
             print "Total time: %.2f, ~%.2f min/TOA"%(tot_duration / 60,
                     tot_duration / (60 * np.sum(np.array(self.nsubs))))
 
-    def write_toas(self, outfile=None, datafile=None, retrn=False):
+    def write_toas(self, datafile=None, outfile=None, retrn=False):
         """
         """
         #FIX - determine observatory
@@ -278,7 +282,7 @@ class GetTOAs:
         sys.stdout = sys.__stdout__
         if retrn: return toas, toa_errs
 
-    def write_dm_errs(self, outfile=None, datafile=None):
+    def write_dm_errs(self, datafile=None, outfile=None):
         if datafile is None:
             datafiles = self.datafiles
         else:
@@ -286,7 +290,10 @@ class GetTOAs:
         for datafile in datafiles:
             dfi = datafiles.index(datafile)
             nsubx = self.nsubs[dfi]
-            of = open(outfile, "a")
+            if outfile is not None:
+                of = open(outfile, "a")
+            else:
+                of = sys.__stdout__
             if self.one_DM:
                 DeltaDM_err = self.DeltaDM_errs[dfi]
                 for nn in range(nsubx):
@@ -295,6 +302,7 @@ class GetTOAs:
                 DM_errs = self.DM_errs[dfi]
                 for nn in range(nsubx):
                     of.write("%.5e\n"%DM_errs[nn])
+        if outfile is not None: of.close()
 
     def write_pam_cmds(self, outfile=None, datafile=None):
         if outfile is None: outfile = "pam_cmds"
@@ -603,6 +611,6 @@ if __name__ == "__main__":
     gt = GetTOAs(datafiles=datafiles, modelfile=modelfile, DM0=DM0,
         one_DM=one_DM, bary_DM=bary_DM, common=common, quiet=quiet)
     gt.get_toas(show_plot=showplot, safe=False, quiet=quiet)
-    gt.write_toas(outfile)
-    if errfile is not None: gt.write_dm_errs(errfile)
+    gt.write_toas(outfile=outfile)
+    if errfile is not None: gt.write_dm_errs(outfile=errfile)
     if pam_cmd: gt.write_pam_cmds()

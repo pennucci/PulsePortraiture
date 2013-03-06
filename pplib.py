@@ -55,6 +55,16 @@ Dconst_trad = 0.000241**-1 #[MHz**2 pc**-1 cm**3 s]
 #Choose wisely.
 Dconst = Dconst_trad
 
+class DataBunch(dict):
+    """
+    This class is a baller recipe!  Creates a simple class instance
+    db = DataBunch(a=1, b=2,....) that has attributes a and b callable and
+    update-able via either syntax db.a or db['a'], etc.
+    """
+    def __init__(self, **kwds):
+        dict.__init__(self, kwds)
+        self.__dict__ = self
+
 def gaussian_profile(N, loc, wid, norm=False, abs_wid=False, zeroout=True):
     """
     Taken and tweaked from SMR's pygaussfit.py
@@ -258,43 +268,55 @@ def fit_portrait_function(params, model=None, p=None, data=None, d=None,
         m += (mm**2.0) * err / p[nn]
     return d - m
 
-def fit_portrait_function_deriv(params, model=None, p=None, data=None, d=None, errs=None, P=None, freqs=None, nu_ref=np.inf):
+def fit_portrait_function_deriv(params, model=None, p=None, data=None, d=None,
+        errs=None, P=None, freqs=None, nu_ref=np.inf):
     """
     """
     phase = params[0]
-    Cdm = Dconst*params[1]/P
-    d_phi,d_DM = 0.0,0.0
+    Cdm = Dconst * params[1] / P
+    d_phi,d_DM = 0.0, 0.0
     for nn in xrange(len(freqs)):
         err = errs[nn]
         freq = freqs[nn]
         harmind = np.arange(len(model[nn]))
-        phasor = np.exp(harmind * 2.0j*np.pi*(phase+(Cdm*(freq**-2.0 - nu_ref**-2.0))))
-        g1 = np.real(data[nn,:]*np.conj(model[nn,:]) * phasor).sum()
-        gp2 = np.real(2j*np.pi*harmind * data[nn,:] * np.conj(model[nn,:]) * phasor).sum()
-        gd2 = np.real(2j*np.pi*harmind * (freq**-2.0 - nu_ref**-2.0)*(Dconst/P) *data[nn,:] * np.conj(model[nn,:]) * phasor).sum()
-        d_phi += -2*g1*gp2*err/p[nn]
-        d_DM += -2*g1*gd2*err/p[nn]
-    return np.array([d_phi,d_DM])
+        phasor = np.exp(harmind * 2.0j * np.pi * (phase + (Cdm * (freq**-2.0 -
+            nu_ref**-2.0))))
+        g1 = np.real(data[nn,:] * np.conj(model[nn,:]) * phasor).sum()
+        gp2 = np.real(2j * np.pi * harmind * data[nn,:] *
+                np.conj(model[nn,:]) * phasor).sum()
+        gd2 = np.real(2j * np.pi * harmind * (freq**-2.0 - nu_ref**-2.0) *
+                (Dconst/P) * data[nn,:] * np.conj(model[nn,:]) * phasor).sum()
+        d_phi += -2 * g1 * gp2 * err / p[nn]
+        d_DM += -2 * g1 * gd2 * err / p[nn]
+    return np.array([d_phi, d_DM])
 
-def fit_portrait_function_2deriv(params, model=None, p=None, data=None, d=None, errs=None, P=None, freqs=None, nu_ref=np.inf):      #Covariance matrix...??
+def fit_portrait_function_2deriv(params, model=None, p=None, data=None, d=None,
+        errs=None, P=None, freqs=None, nu_ref=np.inf):
+    #Need Covariance matrix...
     """
     """
     phase = params[0]
-    Cdm = Dconst*params[1]/P
-    d2_phi,d2_DM = 0.0,0.0
+    Cdm = Dconst * params[1] / P
+    d2_phi, d2_DM = 0.0, 0.0
     for nn in xrange(len(freqs)):
         err = errs[nn]
         freq = freqs[nn]
         harmind = np.arange(len(model[nn]))
-        phasor = np.exp(harmind * 2.0j*np.pi*(phase+(Cdm*(freq**-2.0 - nu_ref**-2.0))))
-        g1 = np.real(data[nn,:]*np.conj(model[nn,:]) * phasor).sum()
-        gp2 = np.real(2.0j*np.pi*harmind * data[nn,:] * np.conj(model[nn,:]) * phasor).sum()
-        gd2 = np.real(2.0j*np.pi*harmind * (freq**-2.0 - nu_ref**-2.0)*(Dconst/P) *data[nn,:] * np.conj(model[nn,:]) * phasor).sum()
-        gp3 = np.real(pow(2.0j*np.pi*harmind,2.0)*data[nn,:] * np.conj(model[nn,:])* phasor).sum()
-        gd3 = np.real(pow(2.0j*np.pi*harmind*(freq**-2.0 - nu_ref**-2.0)*(Dconst/P),2) * data[nn,:] * np.conj(model[nn,:]) * phasor).sum()
-        d2_phi += -2.0*err*(pow(gp2,2.0)+(g1*gp3))/p[nn]
-        d2_DM += -2.0*err*(pow(gd2,2.0)+(g1*gd3))/p[nn]
-    return np.array([d2_phi,d2_DM])
+        phasor = np.exp(harmind * 2.0j * np.pi * (phase + (Cdm * (freq**-2.0 -
+            nu_ref**-2.0))))
+        g1 = np.real(data[nn,:] * np.conj(model[nn,:]) * phasor).sum()
+        gp2 = np.real(2.0j * np.pi * harmind * data[nn,:] *
+                np.conj(model[nn,:]) * phasor).sum()
+        gd2 = np.real(2.0j * np.pi * harmind * (freq**-2.0 - nu_ref**-2.0) *
+                (Dconst/P) * data[nn,:] * np.conj(model[nn,:]) * phasor).sum()
+        gp3 = np.real(pow(2.0j * np.pi * harmind, 2.0) * data[nn,:] *
+                np.conj(model[nn,:]) * phasor).sum()
+        gd3 = np.real(pow(2.0j * np.pi * harmind *
+            (freq**-2.0 - nu_ref**-2.0) * (Dconst/P),2) * data[nn,:] *
+            np.conj(model[nn,:]) * phasor).sum()
+        d2_phi += -2.0 * err * (pow(gp2, 2.0) + (g1 * gp3)) / p[nn]
+        d2_DM += -2.0 * err * (pow(gd2,2.0) + (g1 * gd3)) / p[nn]
+    return np.array([d2_phi, d2_DM])
 
 def estimate_portrait(phase, DM, data, scales, P, freqs, nu_ref=np.inf): #here, all vars have additional epoch-index except nu_ref, i.e. all have to be arrays of at least len 1; errs are precision
     """
@@ -520,13 +542,13 @@ def read_model(modelfile, phases, freqs, quiet=False):
         params[1 + gg*6 : 7 + (gg*6)] = comp
     model = gen_gaussian_portrait(params, phases, freqs, nu_ref)
     if not quiet:
-        print "Model: %s"%name
+        print "Model Name: %s"%name
         print "\nMade %d component model for %s with %d frequency channels,"%(
                 ngauss, name, nchan)
-        print "%d profile bins, %.0f MHz bandwidth, centered near %.2f MHz,"%(
+        print "%d profile bins, %.0f MHz bandwidth, centered near %.3f MHz,"%(
                 nbin, (freqs[-1]-freqs[0]) + ((freqs[-1]-freqs[-2])),
                 freqs.mean())
-        print "with model parameters referenced to %.2f MHz."%nu_ref
+        print "with model parameters referenced at %.3f MHz."%nu_ref
     return name, ngauss, model
 
 def get_noise(data,frac=4,tau=False,chans=False,fd=False):     #FIX: Make sure to use on portraits w/o zapped freq. channels, i.e. portxs     FIX: MAKE SIMPLER!!!    FIX: Implement k_max from wiener/brick-wall filter fit        #FIX This is not right 
@@ -710,12 +732,19 @@ def load_data(filenm, dedisperse=False, dededisperse=False, tscrunch=False,
     #Returns refreshed arch; could be changed...
     arch.refresh()
     #Return dictionary!
-    data = {"arch":arch, "bw":bw, "flux_prof":flux_prof,
-            "flux_profx":flux_profx, "freqs":freqs, "freqsxs":freqsxs,
-            "masks":masks, "epochs":epochs, "nbin":nbin, "nchan":nchan,
-            "nchanx":nchanx, "noise_std":noise_std, "nsub":nsub, "nsubx":nsubx,
-            "nu0":nu0, "phases":phases, "prof":prof, "Ps":Ps, "source":source,
-            "subints":subints, "subintsx":subintsx, "weights":weights_norm}
+    #data = {"arch":arch, "bw":bw, "flux_prof":flux_prof,
+    #        "flux_profx":flux_profx, "freqs":freqs, "freqsxs":freqsxs,
+    #        "masks":masks, "epochs":epochs, "nbin":nbin, "nchan":nchan,
+    #        "nchanx":nchanx, "noise_std":noise_std, "nsub":nsub, "nsubx":nsubx,
+    #        "nu0":nu0, "phases":phases, "prof":prof, "Ps":Ps, "source":source,
+    #        "subints":subints, "subintsx":subintsx, "weights":weights_norm}
+    #Return attribute-accessible class!
+    data = DataBunch(arch=arch, bw=bw, flux_prof=flux_prof,
+            flux_profx=flux_profx, freqs=freqs, freqsxs=freqsxs,
+            masks=masks, epochs=epochs, nbin=nbin, nchan=nchan,
+            nchanx=nchanx, noise_std=noise_std, nsub=nsub, nsubx=nsubx,
+            nu0=nu0, phases=phases, prof=prof, Ps=Ps, source=source,
+            subints=subints, subintsx=subintsx, weights=weights_norm)
     return data
 
 def plot_lognorm(mu,tau,lo=0.0,hi=5.0,npts=500,plot=1,show=0):
@@ -763,7 +792,8 @@ def make_fake():
     """
     return 0
 
-def write_princeton_toa(toa_MJDi, toa_MJDf, toaerr, freq, DM, obs='@', name=' '*13):
+def write_princeton_toa(toa_MJDi, toa_MJDf, toaerr, freq, DM, obs='@',
+        name=' ' * 13):
     """
     Ripped and slightly altered from PRESTO
 
@@ -779,12 +809,11 @@ def write_princeton_toa(toa_MJDi, toa_MJDf, toaerr, freq, DM, obs='@', name=' '*
     """
     # Splice together the fractional and integer MJDs
     toa = "%5d"%int(toa_MJDi) + ("%.13f"%toa_MJDf)[1:]
-    if DM!=0.0:
-        print obs+" %13s %8.3f %s %8.3f              %9.5f" % \
-              (name, freq, toa, toaerr, DM)
+    if DM != 0.0:
+        print obs + " %13s %8.3f %s %8.3f              %9.5f"%(name, freq, toa,
+                toaerr, DM)
     else:
-        print obs+" %13s %8.3f %s %8.3f" % \
-              (name, freq, toa, toaerr)
+        print obs + " %13s %8.3f %s %8.3f"%(name, freq, toa, toaerr)
 
 def doppler_correct_freqs(freqs,doppler_factor):
     """
