@@ -23,14 +23,14 @@ class DataPortrait:
         if self.source is None: self.source = "noname"
         self.port = (self.masks*self.subints)[0,0]
         self.portx = self.subintsx[0][0]
-        self.lofreq = self.freqs[0]-(self.bw/(2*self.nchan))
+        self.lofreq = self.freqs[0] - (self.bw / (2*self.nchan))
         self.init_params = []
 
     def show_data_portrait(self):
         """
         """
         title = "%s Portrait"%self.source
-        show_port(self.port, self.freqs, title=title)
+        show_port(self.port, self.phases, self.freqs, title, bool(self.bw < 0))
 
     def fit_profile(self, profile):
         """
@@ -123,7 +123,10 @@ class DataPortrait:
                 print "Not enough parameters for ngauss = %d."%self.ngauss
                 return 0
         if outfile is None: outfile = self.datafile + ".model"
-        if model_name is None: model_name = self.source
+        if model_name is None:
+            self.model_name = self.source
+        else:
+            self.model_name = model_name
         self.init_model_params = np.empty([self.ngauss, 6])
         for nn in range(self.ngauss):
             self.init_model_params[nn] = np.array([self.init_params[1::3][nn],
@@ -200,46 +203,13 @@ class DataPortrait:
             print "Residuals std:  %.3f"%(self.portx - self.modelx).std()
             print "Data std:       %.3f\n"%self.noise_std
         if writemodel:
-            write_model(outfile, model_name, self.model_params, self.nu_ref)
+            write_model(outfile, self.model_name, self.model_params,
+                    self.nu_ref)
         if residplot:
-            self.show_residual_plot(residplot)
-
-    def show_residual_plot(self, savefig=None):
-        """
-        """
-        try:    #Make smarter
-            test_for_model = self.model.shape
-        except(AttributeError):
-            print "No model portrait. Use make_gaussian_model_portrait()."
-            return 0
-        modelfig = plt.figure()
-        aspect = "auto"
-        interpolation = "none"
-        origin = "lower"
-        extent = (0.0, 1.0, self.freqs[0], self.freqs[-1])
-        plt.subplot(221)
-        plt.title("Data Portrait")
-        plt.imshow(self.port, aspect=aspect, interpolation=interpolation,
-                origin=origin, extent=extent)
-        plt.subplot(222)
-        plt.title("Model Portrait")
-        plt.imshow(self.model, aspect=aspect, interpolation=interpolation,
-                origin=origin, extent=extent)
-        plt.subplot(223)
-        plt.title("Residuals")
-        plt.imshow(self.port - self.model_masked, aspect=aspect,
-                interpolation=interpolation, origin=origin, extent=extent)
-        plt.colorbar()
-        #plt.subplot(224)
-        #plt.title(r"Log$_{10}$(abs(Residuals/Data))")
-        #plt.imshow(np.log10(abs(self.port - self.model) / self.port),
-        #        aspect=aspect, origin=origin, extent=extent)
-        #plt.colorbar()
-
-        if savefig:
-            plt.savefig(savefig, format='png')
-        else:
-            plt.show()
+            resids = self.port - self.model_masked
+            titles = ("%s"%self.datafile, "%s"%self.model_name, "Residuals")
+            show_residual_plot(self.port, self.model, resids, self.phases,
+                    self.freqs, titles, bool(self.bw < 0), savefig=residplot)
 
 
 class GaussianSelector:
@@ -259,7 +229,7 @@ class GaussianSelector:
         self.phases = np.arange(self.proflen, dtype='d') / self.proflen
         self.errs = errs
         self.visible = True
-        self.DCguess = sorted(profile)[len(profile)/10+1]
+        self.DCguess = sorted(profile)[len(profile)/10 + 1]
         self.init_params = [self.DCguess]
         self.ngauss = 0
         self.canvas = ax.figure.canvas
@@ -471,7 +441,7 @@ if __name__ == "__main__":
                       action="store", metavar="int", dest="niter", default=0,
                       help="Number of iterations to loop for generating better model. [default=0]")
     parser.add_option("--figure", metavar="figurename",
-                      action="store", dest="figure", default=None,
+                      action="store", dest="figure", default=False,
                       help="Save PNG figure of final fit to figurename. [default=Not saved]")
     parser.add_option("--verbose",
                       action="store_true", dest="verbose", default=False,

@@ -5,7 +5,7 @@ from pplib import *
 class GetTOAs:
     """
     """
-    def __init__(self, datafiles, modelfile, DM0=None , one_DM=False,
+    def __init__(self, datafiles, modelfile, DM0=None, one_DM=False,
             bary_DM=True, common=True, quiet=False):
         """
         """
@@ -44,19 +44,8 @@ class GetTOAs:
                     dededisperse=False, tscrunch=True, pscrunch=True,
                     rm_baseline=True, flux_prof=False, quiet=True)
             self.model_name, self.ngauss, self.model = read_model(
-                    #self.modelfile, data["phases"], data["freqs"],
                     self.modelfile, data.phases, data.freqs,
                     self.quiet)
-            #Unpack the data dictionary into the local namespace; see load_data
-            #for dictionary keys.
-            #for key in self.data.keys():
-            #    exec("self." + key + " = self.data['" + key + "']")
-            #self.source = data["source"]
-            #self.nchan = data["nchan"]
-            #self.nbin = data["nbin"]
-            #self.nu0 = data["nu0"]
-            #self.bw = data["bw"]
-            #self.freqs = data["freqs"]
             self.source = data.source
             self.nchan = data.nchan
             self.nbin = data.nbin
@@ -252,6 +241,8 @@ class GetTOAs:
             datafiles = self.datafiles
         else:
             datafiles = [datafile]
+        if outfile is not None:
+            sys.stdout = open(outfile,"a")
         for datafile in datafiles:
             dfi = datafiles.index(datafile)
             try:
@@ -267,7 +258,6 @@ class GetTOAs:
             toas = np.array([epochs[nn] + pr.MJD((phis[nn] *
                 Ps[nn]) / (3600 * 24.)) for nn in xrange(nsubx)])
             toa_errs = phi_errs * Ps * 1e6
-            if outfile is not None: sys.stdout = open(outfile,"a")
             #Currently writes topocentric frequencies
             #Need option for different kinds of TOA output
             for nn in range(nsubx):
@@ -287,13 +277,13 @@ class GetTOAs:
             datafiles = self.datafiles
         else:
             datafiles = [datafile]
+        if outfile is not None:
+            of = open(outfile, "a")
+        else:
+            of = sys.__stdout__
         for datafile in datafiles:
             dfi = datafiles.index(datafile)
             nsubx = self.nsubs[dfi]
-            if outfile is not None:
-                of = open(outfile, "a")
-            else:
-                of = sys.__stdout__
             if self.one_DM:
                 DeltaDM_err = self.DeltaDM_errs[dfi]
                 for nn in range(nsubx):
@@ -304,13 +294,15 @@ class GetTOAs:
                     of.write("%.5e\n"%DM_errs[nn])
         if outfile is not None: of.close()
 
-    def write_pam_cmds(self, outfile=None, datafile=None):
-        if outfile is None: outfile = "pam_cmds"
-        of = open(outfile, "a")
+    def write_pam_cmds(self, datafile=None, outfile=None):
         if datafile is None:
             datafiles = self.datafiles
         else:
             datafiles = [datafile]
+        if outfile is not None:
+            of = open(outfile, "a")
+        else:
+            of = sys.__stdout__
         for datafile in datafiles:
             dfi = datafiles.index(datafile)
             phis = self.phis[dfi]
@@ -324,75 +316,51 @@ class GetTOAs:
             phi_mean, phi_var = np.average(phis, weights=phi_errs**-2,
                     returned=True)
             phi_var = phi_var**-1
-            pc.write("pam -e %s -r %.7f -d %.5f %s\n"%(pam_ext, phi_mean,
+            of.write("pam -e %s -r %.7f -d %.5f %s\n"%(pam_ext, phi_mean,
                 DeltaDM_mean + DM0, datafile))
-        of.close()
+        if outfile is not None: of.close()
 
-    def show_subint(self, datafile=None, subint=0, quiet=False):
+    def show_subint(self, datafile, subint, quiet=False):
         """
         subint 0 = python index 0
         """
-        if datafile is not None:
-            dfi = datafiles.index(datafile)
-        else:
-            dfi = 0
+        dfi = self.datafiles.index(datafile)
         data = load_data(datafile, dedisperse=True, dededisperse=False,
                 tscrunch=False, pscrunch=True, rm_baseline=True,
                 flux_prof=False, quiet=quiet)
         title = "%s ; subint %d"%(datafile, subint)
-        show_port(data['subints'][subint,0], data['freqs'], title=title)
+        port = np.transpose(data.weights[subint] * np.transpose(
+            data.subints[subint,0]))
+        show_port(port, data.phases, data.freqs, title, bool(data.bw < 0))
 
-    def show_fit(self, datafile, subint=0, quiet=False):
+    def show_fit(self, datafile, subint, quiet=False):
         """
         subint 0 = python index 0
         """
-        if datafile is not None:
-            dfi = datafiles.index(datafile)
-        else:
-            dfi = 0
+        dfi = self.datafiles.index(datafile)
         data = load_data(datafile, dedisperse=True, dededisperse=False,
                 tscrunch=False, pscrunch=True, rm_baseline=True,
                 flux_prof=False, quiet=quiet)
-        fitfig = plt.figure()
         nn = subint
         phi = self.phis[dfi][nn]
         DM = self.DMs[dfi][nn]
         scales = self.scales[dfi][nn]
-        scalesx = self.scalesx[dfi][nn]
-        freqs = data['freqs']
-        freqsxs = data['freqsxs'][nn]
-        nu0 = data['nu0']
-        P = data['Ps'][nn]
-        port = data['subints'][nn,0]
-        port = rotate_portrait(port, phi, DM, P, freqs, nu0)
+        freqs = data.freqs
+        nu0 = data.nu0
+        P = data.Ps[nn]
+        phases = data.phases
+        port = data.subints[nn,0]
+        weights = data.weights[nn]
+        port = np.transpose(weights * np.transpose(rotate_portrait(port, phi,
+            DM, P, freqs, nu0)))
         model_name, ngauss, model = read_model(self.modelfile, phases, freqs,
                 quiet=quiet)
         model_fitted = np.transpose(scales * np.transpose(rotate_portrait(
             model, -phi, 0.0, P, freqs, nu0)))
-        aspect = "auto"
-        interpolation = "none"
-        origin = "lower"
-        extent = (0.0, 1.0, self.freqs[0], self.freqs[-1])
-        plt.subplot(221)
-        plt.title("%s ; subint %d"%(datafile, nn))
-        plt.imshow(port, aspect=aspect, interpolation=interpolation,
-                origin=origin, extent=extent)
-        plt.subplot(222)
-        plt.title("%s; Fitted Model"%(model_name))
-        plt.imshow(model_fitted, aspect=aspect, interpolation=interpolation,
-                origin=origin, extent=extent)
-        plt.subplot(223)
-        plt.title("Residuals")
-        plt.imshow(port - model_fitted, aspect=aspect,
-                interpolation=interpolation,
-                origin=origin, extent=extent)
-        plt.colorbar()
-        #plt.subplot(224)
-        #plt.title(r"Log$_{10}$(abs(Residuals/Data))")
-        #plt.imshow(np.log10(abs(port - model_fitted) / port), aspect=aspect,
-        #           origin=origin, extent=extent)
-        #plt.colorbar()
-        plt.show()
+        titles = ("%s ; subint %d"%(datafile, nn),
+                "Fitted Model %s"%(model_name), "Residuals")
+        show_residual_plot(port, model_fitted, None, phases, freqs, titles,
+                bool(data.bw < 0))
 
     def show_results(self, datafile=None):
         """
@@ -474,9 +442,14 @@ class GetTOAs:
 
     def show_hists(self, datafile=None):
         if datafile is None:
-            nfevals = np.array(self.nfevals)
-            rcs = np.array(self.rcs)
-            nsubx = self.nsubs
+            nfevals = []
+            rcs = []
+            nsubx = np.array(self.nsubs).sum()
+            for xx in xrange(len(self.datafiles)):
+                nfevals += list(self.nfevals[xx])
+                rcs += list(self.rcs[xx])
+            nfevals = np.array(nfevals)
+            rcs = np.array(rcs)
         else:
             dfi = self.datafiles.index(datafile)
             nfevals = self.nfevals[dfi]
