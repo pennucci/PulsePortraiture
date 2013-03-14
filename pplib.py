@@ -249,7 +249,7 @@ def fit_gaussian_portrait_function(params, phases, freqs, nu_ref, data=None,
     return deviates
 
 def fit_portrait_function(params, model=None, p=None, data=None, d=None,
-        errs=None, P=None, freqs=None, nu_ref=np.inf):
+        errs=None, P=None, freqs=None, nu0=np.inf):
     """
     """
     phase = params[0]
@@ -263,13 +263,13 @@ def fit_portrait_function(params, model=None, p=None, data=None, d=None,
         freq = freqs[nn]
         harmind = np.arange(len(model[nn]))
         phasor = np.exp(harmind * 2.0j * np.pi * (phase + (D * (freq**-2.0 -
-            nu_ref**-2.0))))
+            nu0**-2.0))))
         mm = np.real(data[nn,:] * np.conj(model[nn,:]) * phasor).sum()
         m += (mm**2.0) * err / p[nn]
     return d - m
 
 def fit_portrait_function_deriv(params, model=None, p=None, data=None, d=None,
-        errs=None, P=None, freqs=None, nu_ref=np.inf):
+        errs=None, P=None, freqs=None, nu0=np.inf):
     """
     """
     phase = params[0]
@@ -280,18 +280,18 @@ def fit_portrait_function_deriv(params, model=None, p=None, data=None, d=None,
         freq = freqs[nn]
         harmind = np.arange(len(model[nn]))
         phasor = np.exp(harmind * 2.0j * np.pi * (phase + (D * (freq**-2.0 -
-            nu_ref**-2.0))))
+            nu0**-2.0))))
         g1 = np.real(data[nn,:] * np.conj(model[nn,:]) * phasor).sum()
         gp2 = np.real(2j * np.pi * harmind * data[nn,:] *
                 np.conj(model[nn,:]) * phasor).sum()
-        gd2 = np.real(2j * np.pi * harmind * (freq**-2.0 - nu_ref**-2.0) *
+        gd2 = np.real(2j * np.pi * harmind * (freq**-2.0 - nu0**-2.0) *
                 (Dconst/P) * data[nn,:] * np.conj(model[nn,:]) * phasor).sum()
         d_phi += -2 * g1 * gp2 * err / p[nn]
         d_DM += -2 * g1 * gd2 * err / p[nn]
     return np.array([d_phi, d_DM])
 
 def fit_portrait_function_2deriv(params, model=None, p=None, data=None, d=None,
-        errs=None, P=None, freqs=None, nu_ref=np.inf):
+        errs=None, P=None, freqs=None, nu0=np.inf):
     #Need Covariance matrix...
     """
     """
@@ -303,36 +303,36 @@ def fit_portrait_function_2deriv(params, model=None, p=None, data=None, d=None,
         freq = freqs[nn]
         harmind = np.arange(len(model[nn]))
         phasor = np.exp(harmind * 2.0j * np.pi * (phase + (D * (freq**-2.0 -
-            nu_ref**-2.0))))
+            nu0**-2.0))))
         g1 = np.real(data[nn,:] * np.conj(model[nn,:]) * phasor).sum()
         gp2 = np.real(2.0j * np.pi * harmind * data[nn,:] *
                 np.conj(model[nn,:]) * phasor).sum()
-        gd2 = np.real(2.0j * np.pi * harmind * (freq**-2.0 - nu_ref**-2.0) *
+        gd2 = np.real(2.0j * np.pi * harmind * (freq**-2.0 - nu0**-2.0) *
                 (Dconst/P) * data[nn,:] * np.conj(model[nn,:]) * phasor).sum()
         gp3 = np.real(pow(2.0j * np.pi * harmind, 2.0) * data[nn,:] *
                 np.conj(model[nn,:]) * phasor).sum()
         gd3 = np.real(pow(2.0j * np.pi * harmind *
-            (freq**-2.0 - nu_ref**-2.0) * (Dconst/P), 2.0) * data[nn,:] *
+            (freq**-2.0 - nu0**-2.0) * (Dconst/P), 2.0) * data[nn,:] *
             np.conj(model[nn,:]) * phasor).sum()
         d2_phi += -2.0 * err * (pow(gp2, 2.0) + (g1 * gp3)) / p[nn]
         d2_DM += -2.0 * err * (pow(gd2, 2.0) + (g1 * gd3)) / p[nn]
     return np.array([d2_phi, d2_DM])
 
-def estimate_portrait(phase, DM, data, scales, P, freqs, nu_ref=np.inf):
-    #here, all vars have additional epoch-index except nu_ref
+def estimate_portrait(phase, DM, data, scales, P, freqs, nu0=np.inf):
+    #here, all vars have additional epoch-index except nu0
     #i.e. all have to be arrays of at least len 1; errs are precision
     """
     """
     #Next lines should be done just as in fit_portrait
     dFFT = fft.rfft(data, axis=2)
     #Below is Precision FIX
-    unnorm_errs = np.real(dFFT[:, :, -len(dFFT[0,0])/4:]).std(axis=2)**-2.0 
+    unnorm_errs = np.real(dFFT[:, :, -len(dFFT[0,0])/4:]).std(axis=2)**-2.0
     #norm_dFFT = np.transpose((unnorm_errs**0.5) * np.transpose(dFFT))
     #norm_errs = np.real(norm_dFFT[:, :, -len(norm_dFFT[0,0])/4:]
     #        ).std(axis=2)**-2.
     errs = unnorm_errs
     D = Dconst * DM / P
-    freqs2 = freqs**-2.0 - nu_ref**-2.0
+    freqs2 = freqs**-2.0 - nu0**-2.0
     phiD = np.outer(D, freqs2)
     phiprime = np.outer(phase, np.ones(len(freqs))) + phiD
     weight = np.sum(pow(scales, 2.0) * errs, axis=0)**-1
@@ -384,7 +384,7 @@ def fit_powlaw(data, freqs, nu0, weights, init_params, errs):
             'errs':errs}
     #Now fit it
     results = lm.minimize(fit_powlaw_function, params, kws=other_args)
-    fit_params = np.array([param.value for param in
+    fitted_params = np.array([param.value for param in
         results.params.itervalues()])
     dof = results.nfree
     chi_sq = results.chisqr
@@ -392,7 +392,7 @@ def fit_powlaw(data, freqs, nu0, weights, init_params, errs):
     residuals = results.residual
     fit_errs = np.array([param.stderr for param in
         results.params.itervalues()])
-    return fit_params, fit_errs, chi_sq, dof, residuals
+    return fitted_params, fit_errs, chi_sq, dof, residuals
 
 def fit_gaussian_profile(data, init_params, errs, quiet=True):
     """
@@ -420,7 +420,7 @@ def fit_gaussian_profile(data, init_params, errs, quiet=True):
     other_args = {'data':data, 'errs':errs}
     #Now fit it
     results = lm.minimize(fit_gauss_function, params, kws=other_args)
-    fit_params = np.array([param.value for param in
+    fitted_params = np.array([param.value for param in
         results.params.itervalues()])
     dof = results.nfree
     redchi_sq = results.redchi
@@ -436,7 +436,7 @@ def fit_gaussian_profile(data, init_params, errs, quiet=True):
         print "residuals mean: %.3g" % np.mean(residuals)
         print "residuals stdev: %.3g" % np.std(residuals)
         print "---------------------------------------------------------------"
-    return fit_params, redchi_sq, dof, residuals
+    return fitted_params, redchi_sq, dof, residuals
 
 def fit_gaussian_portrait(data, errs, init_params, fix_params, phases, freqs,
         nu_ref, quiet=True):
@@ -477,13 +477,13 @@ def fit_gaussian_portrait(data, errs, init_params, fix_params, phases, freqs,
     #Now fit it
     results = lm.minimize(fit_gaussian_portrait_function, params,
             kws=other_args)
-    fit_params = np.array([param.value for param in
+    fitted_params = np.array([param.value for param in
         results.params.itervalues()])
     dof = results.nfree
     chi_sq = results.chisqr
     redchi_sq = results.redchi
     residuals = results.residual
-    model = gen_gaussian_portrait(fit_params, phases, freqs, nu_ref)
+    model = gen_gaussian_portrait(fitted_params, phases, freqs, nu_ref)
     if not quiet:
         print "---------------------------------------------------------------"
         print "Gaussian Portrait Fit"
@@ -495,9 +495,9 @@ def fit_gaussian_portrait(data, errs, init_params, fix_params, phases, freqs,
         print "residuals mean: %.3g" %np.mean(residuals)
         print "residuals stdev: %.3g" %np.std(residuals)
         print "---------------------------------------------------------------"
-    return fit_params, chi_sq, dof
+    return fitted_params, chi_sq, dof
 
-def fit_portrait(data, model, init_params, P=None, freqs=None, nu_ref=np.inf,
+def fit_portrait(data, model, init_params, P=None, freqs=None, nu0=np.inf,
         scales=True, quiet=True):
     """
     """
@@ -516,9 +516,9 @@ def fit_portrait(data, model, init_params, P=None, freqs=None, nu_ref=np.inf,
         np.conj(dFFT)))))
     p = np.real(np.sum(mFFT * np.conj(mFFT), axis=1))
     #other_args = {'model':mFFT, 'p':p, 'data':dFFT, 'd':d, 'errs':errs, 'P':P,
-    #        'freqs':freqs, 'nu_ref':nu_ref}
+    #        'freqs':freqs, 'nu0':nu0}
     #BEWARE BELOW! Order matters!
-    other_args = (mFFT, p, dFFT, d, errs, P, freqs,nu_ref)
+    other_args = (mFFT, p, dFFT, d, errs, P, freqs, nu0)
     minimize = opt.minimize
     #fmin_tnc seems to work best, fastest
     method = 'TNC'
@@ -536,17 +536,17 @@ def fit_portrait(data, model, init_params, P=None, freqs=None, nu_ref=np.inf,
     rcstring = RCSTRINGS["%s"%str(return_code)]
     #If the fit fails...????
     if results.success is not True:
-        sys.stderr.write("Fit failed with return code %d: %s\n"
+        sys.stderr.write("Fit failed with return code %d -- %s\n"
                 %(results.status, rcstring))
     if not quiet and results.success is True:
-        sys.stderr.write("Fit suceeded with return code %d: %s\n"
+        sys.stderr.write("Fit suceeded with return code %d -- %s\n"
                 %(results.status, rcstring))
     param_errs = list(pow(fit_portrait_function_2deriv(np.array([phi, DM]),
-        mFFT, p, dFFT, d, errs, P, freqs, nu_ref), -0.5))
+        mFFT, p, dFFT, d, errs, P, freqs, nu0), -0.5))
     DoF = len(data.ravel()) - (len(freqs) + 2)
     red_chi2 = results.fun / DoF
     if scales:
-        scales = get_scales(data, model, phi, DM, P, freqs, nu_ref)
+        scales = get_scales(data, model, phi, DM, P, freqs, nu0)
         #Errors on scales, if ever needed
         param_errs += list(pow(2 * p * errs, -0.5))
         return (phi, DM, nfeval, return_code, scales, np.array(param_errs),
@@ -657,7 +657,7 @@ def get_noise(data, frac=4, tau=False, chans=False, fd=False):
                 else:
                     return np.median(noise)
 
-def get_scales(data, model, phase, DM, P, freqs, nu_ref):
+def get_scales(data, model, phase, DM, P, freqs, nu0):
     """
     """
     scales = np.zeros(len(model))
@@ -668,23 +668,23 @@ def get_scales(data, model, phase, DM, P, freqs, nu_ref):
     #FIX vectorize
     for kk in range(len(mFFT[0])):
         scales += np.real(dFFT[:,kk] * np.conj(mFFT[:,kk]) * np.exp(2j *
-            np.pi * kk * (phase + (D * (pow(freqs,-2) - pow(nu_ref,-2)))))) / p
+            np.pi * kk * (phase + (D * (pow(freqs,-2) - pow(nu0,-2)))))) / p
     return scales
 
-def rotate_portrait(port, phase, DM=None, P=None, freqs=None, nu_ref=np.inf):
+def rotate_portrait(port, phase, DM=None, P=None, freqs=None, nu0=np.inf):
     """
     Positive values of phase and DM rotate to earlier phase.
     """
     pFFT = fft.rfft(port, axis=1)
     for nn in xrange(len(pFFT)):
         if DM is None and freqs is None:
-            pFFT[nn,:] *= np.exp(np.arange(len(pFFT[nn])) * 2.0j * np.pi * 
+            pFFT[nn,:] *= np.exp(np.arange(len(pFFT[nn])) * 2.0j * np.pi *
                     phase)
         else:
             D = DM * Dconst / P
             freq = freqs[nn]
             phasor = np.exp(np.arange(len(pFFT[nn])) * 2.0j * np.pi * (phase +
-                (D * (freq**-2.0 - nu_ref**-2.0))))
+                (D * (freq**-2.0 - nu0**-2.0))))
             pFFT[nn,:] *= phasor
     return fft.irfft(pFFT)
 
@@ -883,7 +883,7 @@ def doppler_correct_freqs(freqs, doppler_factor):
 def fft_rotate(arr, bins):
     """
     Ripped and altered from PRESTO
-    
+
     Return array 'arr' rotated by 'bins' places to the left.
     The rotation is done in the Fourier domain using the Shift Theorem.            'bins' can be fractional.
     The resulting vector will have the same length as the original.
@@ -983,7 +983,10 @@ def show_residual_plot(port, model, resids=None, phases=None, freqs=None,
     else:
         plt.title(titles[2])
     plt.subplot(224)
-    text =  "Residuals mean ~ %.3f\nResiduals std ~  %.3f\nData std ~       %.3f"%(resids.mean(), resids.std(), get_noise(port))
+    weights = port.mean(axis=1)
+    portx = np.compress(weights, resids, axis=0)
+    residsx = np.compress(weights, resids, axis=0)
+    text =  "Residuals mean ~ %.3f\nResiduals std ~  %.3f\nData std ~       %.3f"%(residsx.mean(), residsx.std(), get_noise(portx))
     plt.text(0.5, 0.5, text, ha="center", va="center")
     if savefig:
         plt.savefig(savefig, format='png')
@@ -999,8 +1002,45 @@ def unpack_dict(data):
     for key in data.keys():
         exec(key + " = data['" + key + "']")
 
-#To be implemented as a class
-def make_fake():
+def make_fake_pulsar(datafile, modelfile, parfile, nsub, npol, nchan, nbin,
+        nu0, bw, phase, noise_std):
     """
+    Needs scintillation, RFI, weights, etc.  Most info in the written arch will
+    be false.  Should implement as a Class?
     """
-    return 0
+    DM = 0.0
+    P = 0.0
+    parfile = open(parfile,'r').readlines()
+    for xx in range(len(parfile)):
+        line = parfile[xx].split()
+        if line[0] == 'DM':
+            DM = float(line[1])
+        elif line[0] == 'F0':
+            P = 1/np.double(line[1])
+        elif line[0] == 'P0':
+            P = np.double(line[1])
+        else:
+            pass
+        if DM and P:
+            break
+    chanwidth = bw / nchan
+    lofreq = nu0 - (bw/2)
+    freqs = np.linspace(lofreq + (chanwidth/2.0), lofreq + bw -
+            (chanwidth/2.0), nchan)
+    phases = np.linspace(0.0 + (nbin*2)**-1, 1.0 - (nbin*2)**-1, nbin)
+    name, ngauss, model = read_model(modelfile, phases, freqs, quiet=False)
+    port = rotate_portrait(model, -phase, -DM, P, freqs, nu0) + np.reshape(
+            np.random.normal(0.0, noise_std, nchan*nbin), (nchan, nbin))
+    arch = pr.Archive_load(datafile)
+    arch.set_ephemeris(parfile)
+    if nsub == 1: arch.tscrunch()
+    if npol == 1: arch.pscrunch()
+    for yy in xrange(nchan):
+        for xx in xrange(nbin):
+            arch.get_Integration(0).get_Profile(0,yy)[xx] = port[yy,xx]
+    I = arch.get_Integration(0)
+    #arch.set_dispersion_measure(DM)
+    arch.dededisperse()
+    arch.set_dedispersed(False)
+    arch.unload()
+    print "\nUnloaded %s.\n"%datafile

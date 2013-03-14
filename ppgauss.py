@@ -21,16 +21,10 @@ class DataPortrait:
         for key in self.data.keys():
             exec("self." + key + " = self.data['" + key + "']")
         if self.source is None: self.source = "noname"
-        self.port = (self.masks*self.subints)[0,0]
+        self.port = (self.masks * self.subints)[0,0]
         self.portx = self.subintsx[0][0]
         self.lofreq = self.freqs[0] - (self.bw / (2*self.nchan))
         self.init_params = []
-
-    def show_data_portrait(self):
-        """
-        """
-        title = "%s Portrait"%self.source
-        show_port(self.port, self.phases, self.freqs, title, bool(self.bw < 0))
 
     def fit_profile(self, profile):
         """
@@ -41,7 +35,7 @@ class DataPortrait:
         interactor = GaussianSelector(profplot, profile, self.noise_std,
                 minspanx=None, minspany=None, useblit=True)
         plt.show()
-        self.init_params = interactor.fit_params
+        self.init_params = interactor.fitted_params
         self.ngauss = (len(self.init_params) - 1) / 3
 
     def fit_flux_profile(self, guessA=1.0, guessalpha=0.0, fit=True, plot=True,
@@ -82,8 +76,6 @@ class DataPortrait:
                 plt.show()
             self.spect_index = params[1]
 
-    def set_model_run(self):
-        self.initial_model_run = True
 
     def make_gaussian_model_portrait(self, ref_prof=None, locparams=0.0,
             fixloc=False, widparams=0.0, fixwid=False, ampparams=0.0,
@@ -134,74 +126,42 @@ class DataPortrait:
                 self.init_params[3::3][nn], ampparams[nn]])
         self.init_model_params = np.array([self.init_params[0]] +
                 list(np.ravel(self.init_model_params)))
-        itern = niter
-        if niter < 0: niter = 0
-        portx_noise = np.outer(get_noise(self.portx, chans=True),
+        self.portx_noise = np.outer(get_noise(self.portx, chans=True),
                 np.ones(self.nbin))
-        print "Fitting gaussian model portrait..."
-        if not self.initial_model_run:
-            start = time.time()
-            self.fit_params, self.chi_sq, self.dof = fit_gaussian_portrait(
-                    self.portx, portx_noise, self.init_model_params,
-                    self.fix_params, self.phases, self.freqsxs[0], self.nu_ref,
-                    quiet=quiet)
+        if niter < 0: niter = 0
+        self.niter = niter
+        self.itern = niter
+        self.model_params = self.init_model_params
+        self.total_time = 0.0
+        self.start = time.time()
+        if not quiet: print "Fitting gaussian model portrait..."
+        iterator = self.model_iteration(quiet)
+        iterator.next()
+        self.cnvrgnc = self.check_convergence(quiet)
+        while (self.niter and not self.cnvrgnc):
+            #if interactive:
+            if self.cnvrgnc:
+                break
+            else:
+                if not quiet:
+                    print "\nRotating data portrait for iteration %d."%(
+                            self.itern - self.niter + 1)
+                self.port = rotate_portrait(self.port, self.phi, self.DM,
+                        self.Ps[0], self.freqs, self.nu0)
+                self.portx = rotate_portrait(self.portx, self. phi, self.DM,
+                        self.Ps[0], self.freqsxs[0], self.nu0)
             if not quiet:
-                print "Fit took %.2f min"%((time.time() - start) /  60.)
-            niter += 1
-        while(niter):
-           if niter and self.initial_model_run:
-               start = time.time()
-               self.fit_params, self.chi_sq, self.dof = fit_gaussian_portrait(
-                       self.portx, portx_noise, self.model_params,
-                       self.fix_params, self.phases, self.freqsxs[0],
-                       self.nu_ref, quiet=quiet)
-               if not quiet:
-                   print "Fit took %.2f min"%((time.time() - start) / 60.)
-           self.model_params = self.fit_params
-           self.model = gen_gaussian_portrait(self.model_params, self.phases,
-                   self.freqs, self.nu_ref)
-           self.model_masked = np.transpose(self.weights[0] *
-                   np.transpose(self.model))
-           self.modelx = np.compress(self.weights[0], self.model, axis=0)
-           niter -= 1
-           dofit = 1
-           if dofit == 1:
-               phaseguess = first_guess(self.portx, self.modelx, nguess=1000)
-               DMguess = 0.0
-               phi, DM, nfeval, rc, scalesx, param_errs, red_chi2, duration = (
-                       fit_portrait(self.portx, self.modelx,
-                           np.array([phaseguess, DMguess]), self.Ps[0],
-                           self.freqsxs[0], self.nu0, scales=True, quiet=quiet)
-                       )
-               phierr = param_errs[0]
-               DMerr = param_errs[1]
-               if not quiet:
-                   print "Iter %d:"%(itern - niter)
-                   print " phase offset of %.2e +/- %.2e [rot]"%(phi, phierr)
-                   print " DM of %.2e +/- %.2e [pc cm**-3]"%(DM, DMerr)
-                   print " red. chi**2 of %.2f."%red_chi2
-               else:
-                   if niter and (itern - niter) != 0:
-                       print "Iter %d..."%(itern - niter)
-               if min(abs(phi), abs(1 - phi)) < abs(phierr):
-                   if abs(DM) < abs(DMerr):
-                       print "\nIteration converged.\n"
-                       phi = 0.0
-                       DM = 0.0
-                       niter = 0
-               if niter:
-                   if not quiet:
-                       print "\nRotating data portrait for iteration %d."%(
-                               itern - niter + 1)
-                   self.port = rotate_portrait(self.port, phi,DM, self.Ps[0],
-                           self.freqs, self.nu0)
-                   self.portx = rotate_portrait(self.portx, phi, DM,
-                           self.Ps[0], self.freqsxs[0], self.nu0)
-                   self.set_model_run()
+                print "Fitting gaussian model portrait..."
+            iterator.next()
+            self.niter -= 1
+            self.cnvrgnc = self.check_convergence(quiet)
         if not quiet:
             print "Residuals mean: %.3f"%(self.portx - self.modelx).mean()
             print "Residuals std:  %.3f"%(self.portx - self.modelx).std()
             print "Data std:       %.3f\n"%self.noise_std
+            print "Total fit time: %.2f min"%(self.total_time / 60.0)
+            print "Total time:     %.2f min\n"%((time.time() - self.start) /
+                    60.0)
         if writemodel:
             write_model(outfile, self.model_name, self.model_params,
                     self.nu_ref)
@@ -210,6 +170,59 @@ class DataPortrait:
             titles = ("%s"%self.datafile, "%s"%self.model_name, "Residuals")
             show_residual_plot(self.port, self.model, resids, self.phases,
                     self.freqs, titles, bool(self.bw < 0), savefig=residplot)
+
+    def model_iteration(self, quiet=False):
+        """
+        """
+        while (1):
+            start = time.time()
+            self.fitted_params, self.chi_sq, self.dof = (
+                    fit_gaussian_portrait(self.portx, self.portx_noise,
+                        self.model_params, self.fix_params, self.phases,
+                        self.freqsxs[0], self.nu_ref, quiet=quiet))
+            self.model_params = self.fitted_params
+            self.model = gen_gaussian_portrait(self.model_params,
+                    self.phases, self.freqs, self.nu_ref)
+            self.model_masked = np.transpose(self.weights[0] *
+                    np.transpose(self.model))
+            self.modelx = np.compress(self.weights[0], self.model, axis=0)
+            phaseguess = first_guess(self.portx, self.modelx, nguess=1000)
+            DMguess = 0.0
+            (self.phi, self.DM, self.nfeval, self.rc, self.scalesx, param_errs,
+                    self.red_chi2, self.fit_duration) = (
+                        fit_portrait(self.portx, self.modelx,
+                            np.array([phaseguess, DMguess]), self.Ps[0],
+                            self.freqsxs[0], self.nu0, scales=True,
+                            quiet=quiet))
+            self.phierr = param_errs[0]
+            self.DMerr = param_errs[1]
+            self.duration = time.time() - start
+            self.total_time += self.duration
+            yield
+
+    def check_convergence(self, quiet=False):
+        if not quiet:
+            print "Iter %d:"%(self.itern - self.niter)
+            print " duration of %.2f min"%(self.duration /  60.)
+            print " phase offset of %.2e +/- %.2e [rot]"%(self.phi,
+                self.phierr)
+            print " DM of %.2e +/- %.2e [pc cm**-3]"%(self.DM, self.DMerr)
+            print " red. chi**2 of %.2f."%self.red_chi2
+        else:
+            if self.niter and (self.itern - self.niter) != 0:
+                print "Iter %d..."%(self.itern - self.niter)
+        if min(abs(self.phi), abs(1 - self.phi)) < abs(self.phierr):
+            if abs(self.DM) < abs(self.DMerr):
+                print "\nIteration converged.\n"
+                return 1
+        else:
+            return 0
+
+    def show_data_portrait(self):
+        """
+        """
+        title = "%s Portrait"%self.source
+        show_port(self.port, self.phases, self.freqs, title, bool(self.bw < 0))
 
 
 class GaussianSelector:
@@ -365,16 +378,16 @@ class GaussianSelector:
             plt.draw()
         # Middle mouse button = fit the gaussians
         elif event1.button == event2.button == 2:
-            fit_params, chi_sq, dof, residuals = fit_gaussian_profile(
+            fitted_params, chi_sq, dof, residuals = fit_gaussian_profile(
                     self.profile, self.init_params, np.zeros(self.proflen) +
                     self.errs, quiet=True)
-            self.fit_params = fit_params
+            self.fitted_params = fitted_params
             # scaled uncertainties
             #scaled_fit_errs = fit_errs * np.sqrt(chi_sq / dof)
 
             # Plot the best-fit profile
-            self.plot_gaussians(fit_params)
-            fitprof = gen_gaussian_profile(fit_params, self.proflen)
+            self.plot_gaussians(fitted_params)
+            fitprof = gen_gaussian_profile(fitted_params, self.proflen)
             plt.plot(self.phases, fitprof, c='black', lw=1)
             plt.draw()
 

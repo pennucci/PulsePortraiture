@@ -320,30 +320,30 @@ class GetTOAs:
                 DeltaDM_mean + DM0, datafile))
         if outfile is not None: of.close()
 
-    def show_subint(self, datafile, subint, quiet=False):
+    def show_subint(self, datafile, subint, dedisperse=True, quiet=False):
         """
         subint 0 = python index 0
         """
         dfi = self.datafiles.index(datafile)
-        data = load_data(datafile, dedisperse=True, dededisperse=False,
-                tscrunch=False, pscrunch=True, rm_baseline=True,
-                flux_prof=False, quiet=quiet)
+        data = load_data(datafile, dedisperse=dedisperse,
+                dededisperse=bool(not dedisperse), tscrunch=False,
+                pscrunch=True, rm_baseline=True, flux_prof=False, quiet=quiet)
         title = "%s ; subint %d"%(datafile, subint)
         port = np.transpose(data.weights[subint] * np.transpose(
             data.subints[subint,0]))
         show_port(port, data.phases, data.freqs, title, bool(data.bw < 0))
 
-    def show_fit(self, datafile, subint, quiet=False):
+    def show_fit(self, datafile, subint, dedisperse=True, quiet=False):
         """
         subint 0 = python index 0
         """
         dfi = self.datafiles.index(datafile)
-        data = load_data(datafile, dedisperse=True, dededisperse=False,
-                tscrunch=False, pscrunch=True, rm_baseline=True,
-                flux_prof=False, quiet=quiet)
+        data = load_data(datafile, dedisperse=dedisperse,
+                dededisperse=bool(not dedisperse), tscrunch=False,
+                pscrunch=True, rm_baseline=True, flux_prof=False, quiet=quiet)
         nn = subint
         phi = self.phis[dfi][nn]
-        DM = self.DMs[dfi][nn]
+        DM = self.DMs[dfi][nn] - self.DM0s[dfi]
         scales = self.scales[dfi][nn]
         freqs = data.freqs
         nu0 = data.nu0
@@ -351,12 +351,11 @@ class GetTOAs:
         phases = data.phases
         port = data.subints[nn,0]
         weights = data.weights[nn]
-        port = np.transpose(weights * np.transpose(rotate_portrait(port, phi,
-            DM, P, freqs, nu0)))
+        port = np.transpose(weights * np.transpose(port))
         model_name, ngauss, model = read_model(self.modelfile, phases, freqs,
                 quiet=quiet)
         model_fitted = np.transpose(scales * np.transpose(rotate_portrait(
-            model, -phi, 0.0, P, freqs, nu0)))
+            model, -phi, -DM, P, freqs, nu0)))
         titles = ("%s ; subint %d"%(datafile, nn),
                 "Fitted Model %s"%(model_name), "Residuals")
         show_residual_plot(port, model_fitted, None, phases, freqs, titles,
