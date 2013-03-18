@@ -77,10 +77,10 @@ class DataPortrait:
             self.spect_index = params[1]
 
 
-    def make_gaussian_model_portrait(self, ref_prof=None, locparams=0.0,
-            fixloc=False, widparams=0.0, fixwid=False, ampparams=0.0,
-            fixamp=False, niter=0, writemodel=False, outfile=None,
-            model_name=None, residplot=None, quiet=False):
+    def make_gaussian_model_portrait(self, ref_prof=(None, None),
+            locparams=0.0, fixloc=False, widparams=0.0, fixwid=False,
+            ampparams=0.0, fixamp=False, niter=0, writemodel=False,
+            outfile=None, model_name=None, residplot=None, quiet=False):
         """
         """
         self.nu_ref = ref_prof[0]
@@ -222,8 +222,16 @@ class DataPortrait:
         """
         """
         title = "%s Portrait"%self.source
-        show_port(self.port, self.phases, self.freqs, title, bool(self.bw < 0))
+        show_port(self.port, self.phases, self.freqs, title, True, True,
+                bool(self.bw < 0))
 
+    def show_model_fit(self):
+        """
+        """
+        resids = self.port - self.model_masked
+        titles = ("%s"%self.datafile, "%s"%self.model_name, "Residuals")
+        show_residual_plot(self.port, self.model, resids, self.phases,
+                self.freqs, titles, bool(self.bw < 0))
 
 class GaussianSelector:
     def __init__(self, ax, profile, errs, minspanx=None,
@@ -435,8 +443,9 @@ if __name__ == "__main__":
     parser.add_option("-m", "--model_name",
                       action="store", metavar="model_name", dest="model_name",
                       help="Name given to model. [default=PSRCHIVE Source name]")
-    parser.add_option("--freq",
-                      action="store", metavar="freq", dest="nu_ref", default=None,
+    parser.add_option("--nu_ref",
+                      action="store", metavar="nu_ref", dest="nu_ref",
+                      default=None,
                       help="Reference frequency [MHz] for the gaussian model; the initial profile to fit will be centered on this freq. [default=PSRCHIVE weighted center frequency]")
     parser.add_option("--bw",
                       action="store", metavar="bw", dest="bw_ref", default=None,

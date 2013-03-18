@@ -5,20 +5,22 @@ from pplib import *
 class GetTOAs:
     """
     """
-    def __init__(self, datafiles, modelfile, DM0=None, one_DM=False,
-            bary_DM=True, common=True, quiet=False):
+    def __init__(self, datafiles, modelfile, nu_ref=None, DM0=None,
+            one_DM=False, bary_DM=True, common=True, quiet=False):
         """
         """
         self.datafiles = datafiles
         if type(self.datafiles) is str:
             self.datafiles = [self.datafiles]
         self.modelfile = modelfile
+        self.nu_ref = nu_ref
         self.DM0 = DM0
         self.one_DM = one_DM
         self.bary_DM = bary_DM
         self.common = common
         self.obs = []
         self.nu0s = []
+        self.nu_refs = []
         self.nsubs = []
         self.epochs = []
         self.MJDs = []
@@ -50,6 +52,7 @@ class GetTOAs:
             self.nchan = data.nchan
             self.nbin = data.nbin
             self.nu0 = data.nu0
+            if self.nu_ref is None: self.nu_ref = data.nu0
             self.bw = data.bw
             self.freqs = data.freqs
             self.lofreq = self.freqs[0]-(self.bw/(2*self.nchan))
@@ -97,6 +100,10 @@ class GetTOAs:
             red_chi2s = np.empty(nsubx)
             MJDs = np.array([epochs[nn].in_days()
                 for nn in xrange(nsub)], dtype=np.double)
+            if self.nu_ref is None:
+                nu_ref = nu0
+            else:
+                nu_ref = self.nu_ref
             if self.DM0 is None:
                 DM0 = arch.get_dispersion_measure()
             else:
@@ -128,7 +135,7 @@ class GetTOAs:
                 ####################
                 if nn == 0:
                     rot_port = rotate_portrait(subints.mean(axis=0)[0], 0.0,
-                            DM0, P, freqs, nu0)
+                            DM0, P, freqs, nu_ref)
                     #PSRCHIVE Dedisperses w.r.t. center of band...??
                     #Currently, first_guess ranges between +/- 0.5
                     phaseguess = first_guess(rot_port, model, nguess=1000)
@@ -152,7 +159,7 @@ class GetTOAs:
                 phi, DM, nfeval, rc, scalex, param_errs, red_chi2, duration = \
                         fit_portrait(portx, modelx,
                             np.array([phaseguess, DMguess]), P, freqsx,
-                            nu0, scales=True, quiet=quiet)
+                            nu_ref, scales=True, quiet=quiet)
                 fit_duration += duration
                 phis[nn] = phi
                 phi_errs[nn] = param_errs[0]
@@ -195,6 +202,7 @@ class GetTOAs:
             self.order.append(datafile)
             self.obs.append(arch.get_telescope())
             self.nu0s.append(nu0)
+            self.nu_refs.append(nu_ref)
             self.nsubs.append(nsubx)
             self.epochs.append(np.take(epochs, ok_sub_inds))
             self.MJDs.append(np.take(MJDs, ok_sub_inds))
@@ -249,7 +257,7 @@ class GetTOAs:
                 obs_code = obs_codes["%s"%self.obs[dfi].lower()]
             except(KeyError):
                 obs_code = obs_codes["%s"%self.obs[dfi].upper()]
-            nu0 = self.nu0s[dfi]
+            nu_ref = self.nu_refs[dfi]
             nsubx = self.nsubs[dfi]
             epochs = self.epochs[dfi]
             Ps = self.Ps[dfi]
@@ -264,11 +272,11 @@ class GetTOAs:
                 if self.one_DM:
                     DeltaDM_mean = self.DeltaDM_means[dfi]
                     write_princeton_toa(toas[nn].intday(), toas[nn].fracday(),
-                            toa_errs[nn], nu0, DeltaDM_mean, obs=obs_code)
+                            toa_errs[nn], nu_ref, DeltaDM_mean, obs=obs_code)
                 else:
                     DeltaDMs = self.DMs[dfi] - self.DM0s[dfi]
                     write_princeton_toa(toas[nn].intday(), toas[nn].fracday(),
-                            toa_errs[nn], nu0, DeltaDMs[nn], obs=obs_code)
+                            toa_errs[nn], nu_ref, DeltaDMs[nn], obs=obs_code)
         sys.stdout = sys.__stdout__
         if retrn: return toas, toa_errs
 
@@ -331,7 +339,8 @@ class GetTOAs:
         title = "%s ; subint %d"%(datafile, subint)
         port = np.transpose(data.weights[subint] * np.transpose(
             data.subints[subint,0]))
-        show_port(port, data.phases, data.freqs, title, bool(data.bw < 0))
+        show_port(port=port, phases=data.phases, freqs=data.freqs, title=title,
+                prof=True, fluxprof=True, rvrsd=bool(data.bw < 0))
 
     def show_fit(self, datafile, subint, dedisperse=True, quiet=False):
         """
@@ -346,7 +355,7 @@ class GetTOAs:
         DM = self.DMs[dfi][nn] - self.DM0s[dfi]
         scales = self.scales[dfi][nn]
         freqs = data.freqs
-        nu0 = data.nu0
+        nu_ref = data.nu_ref
         P = data.Ps[nn]
         phases = data.phases
         port = data.subints[nn,0]
@@ -355,11 +364,12 @@ class GetTOAs:
         model_name, ngauss, model = read_model(self.modelfile, phases, freqs,
                 quiet=quiet)
         model_fitted = np.transpose(scales * np.transpose(rotate_portrait(
-            model, -phi, -DM, P, freqs, nu0)))
+            model, -phi, -DM, P, freqs, nu_ref)))
         titles = ("%s ; subint %d"%(datafile, nn),
                 "Fitted Model %s"%(model_name), "Residuals")
-        show_residual_plot(port, model_fitted, None, phases, freqs, titles,
-                bool(data.bw < 0))
+        show_residual_plot(port=port, model=model_fitted, resids=None,
+                phases=phases, freqs=freqs, titles=titles,
+                rvrsd=bool(data.bw < 0))
 
     def show_results(self, datafile=None):
         """
@@ -527,6 +537,10 @@ if __name__ == "__main__":
                       action="store", metavar="timfile", dest="outfile",
                       default=None,
                       help="Name of output .tim file name. Will append. [default=stdout]")
+    parser.add_option("--nu_ref",
+                      action="store", metavar="nu_ref", dest="nu_ref",
+                      default=None,
+                      help="Frequency [MHz] to which the fitted TOAs/DMs are referenced, i.e. the frequency that has zero delay from a non-zero DM.  [default=nu0 (center of band)]")
     parser.add_option("--DM",
                       action="store", metavar="DM", dest="DM0", default=None,
                       help="Nominal DM [pc cm**-3] (float) from which to measure offset.  If unspecified, will use the DM stored in the archive.")
@@ -535,7 +549,7 @@ if __name__ == "__main__":
                       help='Do not Doppler-correct the fitted DM to make "barycentric DM".')
     parser.add_option("--one_DM",
                       action="store_true", dest="one_DM", default=False,
-                      help="Returns single DM value in output .tim file for the epoch instead of a fitted DM per subint.")
+                      help="Returns single DM value in output .tim file for all subints in the epoch instead of a fitted DM per subint.")
     parser.add_option("--errfile",
                       action="store", metavar="errfile", dest="errfile",
                       default=None,
@@ -564,6 +578,8 @@ if __name__ == "__main__":
     datafile = options.datafile
     metafile = options.metafile
     modelfile = options.modelfile
+    nu_ref = options.nu_ref
+    if nu_ref: nu_ref = float(nu_ref)
     DM0 = options.DM0
     if DM0: DM0 = float(DM0)
     bary_DM = options.bary_DM
@@ -580,8 +596,9 @@ if __name__ == "__main__":
     else:
         datafiles = open(metafile, "r").readlines()
         datafiles = [datafiles[xx][:-1] for xx in xrange(len(datafiles))]
-    gt = GetTOAs(datafiles=datafiles, modelfile=modelfile, DM0=DM0,
-        one_DM=one_DM, bary_DM=bary_DM, common=common, quiet=quiet)
+    gt = GetTOAs(datafiles=datafiles, modelfile=modelfile, nu_ref=nu_ref,
+            DM0=DM0, one_DM=one_DM, bary_DM=bary_DM, common=common,
+            quiet=quiet)
     gt.get_toas(show_plot=showplot, safe=False, quiet=quiet)
     gt.write_toas(outfile=outfile)
     if errfile is not None: gt.write_dm_errs(outfile=errfile)

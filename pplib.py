@@ -11,6 +11,7 @@
 import sys
 import time
 import matplotlib.pyplot as plt
+import matplotlib.gridspec as gs
 import numpy as np
 import numpy.fft as fft
 import scipy.optimize as opt
@@ -168,23 +169,23 @@ def gen_gaussian_portrait(params, phases, freqs, nu_ref):
         gport[nn] = gen_gaussian_profile(gparams[nn], nbin)
     return gport
 
-def powlaw(nu, nu0, A, alpha):
+def powlaw(nu, nu_ref, A, alpha):
     """
     Returns power-law spectrum given by:
-    F(nu) = A*(nu/nu0)**alpha
+    F(nu) = A*(nu/nu_ref)**alpha
     """
-    return A * (nu/nu0)**alpha
+    return A * (nu/nu_ref)**alpha
 
-def powlaw_integral(nu2, nu1, nu0, A, alpha):
+def powlaw_integral(nu2, nu1, nu_ref, A, alpha):
     """
-    Returns the integral over a powerlaw of form A*(nu/nu0)**alpha
+    Returns the integral over a powerlaw of form A*(nu/nu_ref)**alpha
     from nu1 to nu2
     """
     alpha = np.float(alpha)
     if alpha == -1.0:
-        return A * nu0 * np.log(nu2/nu1)
+        return A * nu_ref * np.log(nu2/nu1)
     else:
-        C = A * (nu0**-alpha) / (1 + alpha)
+        C = A * (nu_ref**-alpha) / (1 + alpha)
         diff = ((nu2**(1+alpha)) - (nu1**(1+alpha)))
         return C * diff
 
@@ -215,7 +216,7 @@ def powlaw_freqs(lo, hi, N, alpha, mid=False):
         nus = midnus
     return nus
 
-def fit_powlaw_function(params, freqs, nu0, weights=None, data=None,
+def fit_powlaw_function(params, freqs, nu_ref, weights=None, data=None,
         errs=None):
     """
     """
@@ -231,7 +232,7 @@ def fit_powlaw_function(params, freqs, nu0, weights=None, data=None,
         else: pass
     d=np.array(d)
     f=np.array(f)
-    return (d - powlaw(f, nu0, A, alpha)) / errs
+    return (d - powlaw(f, nu_ref, A, alpha)) / errs
 
 def fit_gauss_function(params, data=None, errs=None):
     """
@@ -249,7 +250,7 @@ def fit_gaussian_portrait_function(params, phases, freqs, nu_ref, data=None,
     return deviates
 
 def fit_portrait_function(params, model=None, p=None, data=None, d=None,
-        errs=None, P=None, freqs=None, nu0=np.inf):
+        errs=None, P=None, freqs=None, nu_ref=np.inf):
     """
     """
     phase = params[0]
@@ -263,13 +264,13 @@ def fit_portrait_function(params, model=None, p=None, data=None, d=None,
         freq = freqs[nn]
         harmind = np.arange(len(model[nn]))
         phasor = np.exp(harmind * 2.0j * np.pi * (phase + (D * (freq**-2.0 -
-            nu0**-2.0))))
+            nu_ref**-2.0))))
         mm = np.real(data[nn,:] * np.conj(model[nn,:]) * phasor).sum()
         m += (mm**2.0) * err / p[nn]
     return d - m
 
 def fit_portrait_function_deriv(params, model=None, p=None, data=None, d=None,
-        errs=None, P=None, freqs=None, nu0=np.inf):
+        errs=None, P=None, freqs=None, nu_ref=np.inf):
     """
     """
     phase = params[0]
@@ -280,18 +281,18 @@ def fit_portrait_function_deriv(params, model=None, p=None, data=None, d=None,
         freq = freqs[nn]
         harmind = np.arange(len(model[nn]))
         phasor = np.exp(harmind * 2.0j * np.pi * (phase + (D * (freq**-2.0 -
-            nu0**-2.0))))
+            nu_ref**-2.0))))
         g1 = np.real(data[nn,:] * np.conj(model[nn,:]) * phasor).sum()
         gp2 = np.real(2j * np.pi * harmind * data[nn,:] *
                 np.conj(model[nn,:]) * phasor).sum()
-        gd2 = np.real(2j * np.pi * harmind * (freq**-2.0 - nu0**-2.0) *
+        gd2 = np.real(2j * np.pi * harmind * (freq**-2.0 - nu_ref**-2.0) *
                 (Dconst/P) * data[nn,:] * np.conj(model[nn,:]) * phasor).sum()
         d_phi += -2 * g1 * gp2 * err / p[nn]
         d_DM += -2 * g1 * gd2 * err / p[nn]
     return np.array([d_phi, d_DM])
 
 def fit_portrait_function_2deriv(params, model=None, p=None, data=None, d=None,
-        errs=None, P=None, freqs=None, nu0=np.inf):
+        errs=None, P=None, freqs=None, nu_ref=np.inf):
     #Need Covariance matrix...
     """
     """
@@ -303,23 +304,23 @@ def fit_portrait_function_2deriv(params, model=None, p=None, data=None, d=None,
         freq = freqs[nn]
         harmind = np.arange(len(model[nn]))
         phasor = np.exp(harmind * 2.0j * np.pi * (phase + (D * (freq**-2.0 -
-            nu0**-2.0))))
+            nu_ref**-2.0))))
         g1 = np.real(data[nn,:] * np.conj(model[nn,:]) * phasor).sum()
         gp2 = np.real(2.0j * np.pi * harmind * data[nn,:] *
                 np.conj(model[nn,:]) * phasor).sum()
-        gd2 = np.real(2.0j * np.pi * harmind * (freq**-2.0 - nu0**-2.0) *
+        gd2 = np.real(2.0j * np.pi * harmind * (freq**-2.0 - nu_ref**-2.0) *
                 (Dconst/P) * data[nn,:] * np.conj(model[nn,:]) * phasor).sum()
         gp3 = np.real(pow(2.0j * np.pi * harmind, 2.0) * data[nn,:] *
                 np.conj(model[nn,:]) * phasor).sum()
         gd3 = np.real(pow(2.0j * np.pi * harmind *
-            (freq**-2.0 - nu0**-2.0) * (Dconst/P), 2.0) * data[nn,:] *
+            (freq**-2.0 - nu_ref**-2.0) * (Dconst/P), 2.0) * data[nn,:] *
             np.conj(model[nn,:]) * phasor).sum()
         d2_phi += -2.0 * err * (pow(gp2, 2.0) + (g1 * gp3)) / p[nn]
         d2_DM += -2.0 * err * (pow(gd2, 2.0) + (g1 * gd3)) / p[nn]
     return np.array([d2_phi, d2_DM])
 
-def estimate_portrait(phase, DM, data, scales, P, freqs, nu0=np.inf):
-    #here, all vars have additional epoch-index except nu0
+def estimate_portrait(phase, DM, data, scales, P, freqs, nu_ref=np.inf):
+    #here, all vars have additional epoch-index except nu_ref
     #i.e. all have to be arrays of at least len 1; errs are precision
     """
     """
@@ -332,7 +333,7 @@ def estimate_portrait(phase, DM, data, scales, P, freqs, nu0=np.inf):
     #        ).std(axis=2)**-2.
     errs = unnorm_errs
     D = Dconst * DM / P
-    freqs2 = freqs**-2.0 - nu0**-2.0
+    freqs2 = freqs**-2.0 - nu_ref**-2.0
     phiD = np.outer(D, freqs2)
     phiprime = np.outer(phase, np.ones(len(freqs))) + phiD
     weight = np.sum(pow(scales, 2.0) * errs, axis=0)**-1
@@ -372,7 +373,7 @@ def find_kc(prof, noise):
         X2[ii] = np.sum((wf - brickwall_filter(N, ii))**2)
     return X2.argmin()
 
-def fit_powlaw(data, freqs, nu0, weights, init_params, errs):
+def fit_powlaw(data, freqs, nu_ref, weights, init_params, errs):
     """
     """
     nparam = len(init_params)
@@ -380,7 +381,7 @@ def fit_powlaw(data, freqs, nu0, weights, init_params, errs):
     params = lm.Parameters()
     params.add('amp', init_params[0], vary=True, min=None, max=None)
     params.add('alpha', init_params[1], vary=True, min=None, max=None)
-    other_args = {'freqs':freqs, 'nu0':nu0, 'weights':weights, 'data':data,
+    other_args = {'freqs':freqs, 'nu_ref':nu_ref, 'weights':weights, 'data':data,
             'errs':errs}
     #Now fit it
     results = lm.minimize(fit_powlaw_function, params, kws=other_args)
@@ -497,7 +498,7 @@ def fit_gaussian_portrait(data, errs, init_params, fix_params, phases, freqs,
         print "---------------------------------------------------------------"
     return fitted_params, chi_sq, dof
 
-def fit_portrait(data, model, init_params, P=None, freqs=None, nu0=np.inf,
+def fit_portrait(data, model, init_params, P=None, freqs=None, nu_ref=np.inf,
         scales=True, quiet=True):
     """
     """
@@ -516,9 +517,9 @@ def fit_portrait(data, model, init_params, P=None, freqs=None, nu0=np.inf,
         np.conj(dFFT)))))
     p = np.real(np.sum(mFFT * np.conj(mFFT), axis=1))
     #other_args = {'model':mFFT, 'p':p, 'data':dFFT, 'd':d, 'errs':errs, 'P':P,
-    #        'freqs':freqs, 'nu0':nu0}
+    #        'freqs':freqs, 'nu_ref':nu_ref}
     #BEWARE BELOW! Order matters!
-    other_args = (mFFT, p, dFFT, d, errs, P, freqs, nu0)
+    other_args = (mFFT, p, dFFT, d, errs, P, freqs, nu_ref)
     minimize = opt.minimize
     #fmin_tnc seems to work best, fastest
     method = 'TNC'
@@ -542,11 +543,11 @@ def fit_portrait(data, model, init_params, P=None, freqs=None, nu0=np.inf,
         sys.stderr.write("Fit suceeded with return code %d -- %s\n"
                 %(results.status, rcstring))
     param_errs = list(pow(fit_portrait_function_2deriv(np.array([phi, DM]),
-        mFFT, p, dFFT, d, errs, P, freqs, nu0), -0.5))
+        mFFT, p, dFFT, d, errs, P, freqs, nu_ref), -0.5))
     DoF = len(data.ravel()) - (len(freqs) + 2)
     red_chi2 = results.fun / DoF
     if scales:
-        scales = get_scales(data, model, phi, DM, P, freqs, nu0)
+        scales = get_scales(data, model, phi, DM, P, freqs, nu_ref)
         #Errors on scales, if ever needed
         param_errs += list(pow(2 * p * errs, -0.5))
         return (phi, DM, nfeval, return_code, scales, np.array(param_errs),
@@ -657,7 +658,7 @@ def get_noise(data, frac=4, tau=False, chans=False, fd=False):
                 else:
                     return np.median(noise)
 
-def get_scales(data, model, phase, DM, P, freqs, nu0):
+def get_scales(data, model, phase, DM, P, freqs, nu_ref):
     """
     """
     scales = np.zeros(len(model))
@@ -668,10 +669,10 @@ def get_scales(data, model, phase, DM, P, freqs, nu0):
     #FIX vectorize
     for kk in range(len(mFFT[0])):
         scales += np.real(dFFT[:,kk] * np.conj(mFFT[:,kk]) * np.exp(2j *
-            np.pi * kk * (phase + (D * (pow(freqs,-2) - pow(nu0,-2)))))) / p
+            np.pi * kk * (phase + (D * (pow(freqs,-2) - pow(nu_ref,-2)))))) / p
     return scales
 
-def rotate_portrait(port, phase, DM=None, P=None, freqs=None, nu0=np.inf):
+def rotate_portrait(port, phase, DM=None, P=None, freqs=None, nu_ref=np.inf):
     """
     Positive values of phase and DM rotate to earlier phase.
     """
@@ -684,7 +685,7 @@ def rotate_portrait(port, phase, DM=None, P=None, freqs=None, nu0=np.inf):
             D = DM * Dconst / P
             freq = freqs[nn]
             phasor = np.exp(np.arange(len(pFFT[nn])) * 2.0j * np.pi * (phase +
-                (D * (freq**-2.0 - nu0**-2.0))))
+                (D * (freq**-2.0 - nu_ref**-2.0))))
             pFFT[nn,:] *= phasor
     return fft.irfft(pFFT)
 
@@ -837,9 +838,9 @@ def plot_gamma(alpha, beta, lo=0.0, hi=5.0, npts=500, plot=1, show=0):
 
 def DM_delay(DM, freq, freq2=np.inf, P=None):
     """
-    Calculates the delay [s] of emitted frequency freq [MHz] from 
+    Calculates the delay [s] of emitted frequency freq [MHz] from
     dispersion measure DM [cm**-3 pc] relative to freq2 [default=inf].
-    If a period P [s] is provided, the delay is returned in phase, 
+    If a period P [s] is provided, the delay is returned in phase,
     otherwise in seconds.
     """
     delay = Dconst * DM * ((freq**-2) - (freq2**-2))
@@ -858,7 +859,7 @@ def write_princeton_toa(toa_MJDi, toa_MJDf, toaerr, freq, DM, obs='@',
     columns     item
     1-1     Observatory (one-character code) '@' is barycenter
     2-2     must be blank
-    16-24   Observing frequency (MHz)
+    16-24   Reference (not necessarily Observing) frequency (MHz)
     25-44   TOA (decimal point must be in column 30 or column 31)
     45-53   TOA uncertainty (microseconds)
     69-78   DM correction (pc cm^-3)
@@ -893,11 +894,17 @@ def fft_rotate(arr, bins):
     phasor = np.exp(complex(0.0, 2*np.pi) * freqs * bins / float(arr.size))
     return np.fft.irfft(phasor * np.fft.rfft(arr), arr.size)
 
-def show_port(port, phases=None, freqs=None, title=None, rvrsd=False,
-        colorbar=True, savefig=False, aspect="auto", interpolation="none",
-        origin="lower", extent=None, **kwargs):
+def show_port(port, phases=None, freqs=None, title=None, prof=True,
+        fluxprof=True, rvrsd=False, colorbar=True, savefig=False,
+        aspect="auto", interpolation="none", origin="lower", extent=None,
+        **kwargs):
     """
     """
+    nn = 2*3*5  #Need something divisible by 2,3,5...
+    grid = gs.GridSpec(nn, nn)
+    pi = 0
+    fi = 0
+    ci = 0
     if freqs is None:
         freqs = np.arange(len(port))
         ylabel = "Channel Number"
@@ -908,19 +915,62 @@ def show_port(port, phases=None, freqs=None, title=None, rvrsd=False,
         xlabel = "Bin Number"
     else:
         xlabel = "Phase [rot]"
+    if rvrsd:
+        freqs = freqs[::-1]
+        port = port[::-1]
     if extent is None:
         extent = (phases[0], phases[-1], freqs[0], freqs[-1])
-    if rvrsd:
-        port = port[::-1]
-        if extent is None:
-            extent = (phases[0], phases[-1], freqs[-1], freqs[0])
-    fig = plt.figure()
-    plt.imshow(port, aspect=aspect, origin=origin, extent=extent,
-            interpolation=interpolation, **kwargs)
-    if colorbar: plt.colorbar()
+    if prof or fluxprof:
+        weights = port.mean(axis=1)
+    if prof:
+        portx = np.compress(weights, port, axis=0)
+        prof = portx.mean(axis=0)
+        pi = 1
+    if fluxprof:
+        fluxprof = port.mean(axis=1)
+        fluxprofx = np.compress(weights, fluxprof)
+        freqsx = np.compress(weights, freqs)
+        fi = 1
+    if colorbar: ci = 1
+    ax1 = plt.subplot(grid[(pi*nn/6):, (fi*nn/6):])
+    im = plt.imshow(port, aspect=aspect, origin=origin, extent=extent,
+        interpolation=interpolation, **kwargs)
+    if colorbar: plt.colorbar(im, ax=ax1, use_gridspec=False)
     plt.xlabel(xlabel)
-    plt.ylabel(ylabel)
-    if title: plt.title(title)
+    if not fi:
+        plt.ylabel(ylabel)
+    else:
+        #ytklbs = ax1.get_yticklabels()
+        ax1.set_yticklabels(())
+    if not pi:
+        if title: plt.title(title)
+    if pi:
+        if ci:
+            ax2 = plt.subplot(grid[:(pi*nn/6), (fi*nn/6):((3+fi+ci)*nn) /
+                (4+fi+ci)])
+        else:
+            ax2 = plt.subplot(grid[:(pi*nn/6), (fi*nn/6):])
+        ax2.plot(phases, prof, 'k-')
+        ax2.set_xticks(ax1.get_xticks())
+        ax2.set_xticklabels(())
+        ax2.set_yticks([0, round(prof.max() / 2, 1), round(prof.max(), 1)])
+        plt.xlim(phases.min(), phases.max())
+        plt.ylim(prof.min()-1.0, prof.max()*1.1)
+        plt.ylabel("Flux Units")
+        if title: plt.title(title)
+    if fi:
+        ax3 = plt.subplot(grid[(pi*nn/6):, :(fi*nn/6)])
+        ax3.plot(fluxprofx, freqsx, 'kx')
+        ax3.set_xticks([0, round(fluxprofx.max() / 2, 2),
+            round(fluxprofx.max(), 2)])
+        plt.xlim(fluxprofx.max()*1.1, fluxprofx.min()*0.9)
+        plt.xlabel("Flux Units")
+        ax3.set_yticks(ax1.get_yticks())
+        #ax3.set_yticklabels(ytklbs)
+        plt.ylim(freqs[0], freqs[-1])
+        plt.ylabel(ylabel)
+    #if title: plt.suptitle(title)
+    #plt.tight_layout(pad = 1.0, h_pad=0.0, w_pad=0.0)
     if savefig:
         plt.savefig(savefig, format='png')
         plt.close()
@@ -933,6 +983,9 @@ def show_residual_plot(port, model, resids=None, phases=None, freqs=None,
         **kwargs):
     """
     """
+    mm = 6
+    nn = (2*mm) + (mm/3)
+    grid = gs.GridSpec(nn, nn)
     if freqs is None:
         freqs = np.arange(len(port))
         ylabel = "Channel Number"
@@ -943,51 +996,54 @@ def show_residual_plot(port, model, resids=None, phases=None, freqs=None,
         xlabel = "Bin Number"
     else:
         xlabel = "Phase [rot]"
-    if extent is None:
-        extent = (phases[0], phases[-1], freqs[0], freqs[-1])
     if rvrsd:
+        freqs = freqs[::-1]
         port = port[::-1]
         model = model[::-1]
-        if extent is None:
-            extent = (phases[0], phases[-1], freqs[-1], freqs[0])
-    fig = plt.figure()
-    plt.subplot(221)
-    plt.imshow(port, aspect=aspect, origin=origin, extent=extent,
+    if extent is None:
+        extent = (phases[0], phases[-1], freqs[0], freqs[-1])
+    ax1 = plt.subplot(grid[:mm, :mm])
+    im = plt.imshow(port, aspect=aspect, origin=origin, extent=extent,
             interpolation=interpolation, **kwargs)
-    if colorbar: plt.colorbar()
+    if colorbar: plt.colorbar(im, ax=ax1, use_gridspec=False)
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
     if titles[0] is None:
         plt.title("")
     else:
         plt.title(titles[0])
-    plt.subplot(222)
-    plt.imshow(model, aspect=aspect, origin=origin, extent=extent,
+    ax2 = plt.subplot(grid[:mm, -mm:])
+    im = plt.imshow(model, aspect=aspect, origin=origin, extent=extent,
             interpolation=interpolation, **kwargs)
-    if colorbar: plt.colorbar()
+    if colorbar: plt.colorbar(im, ax=ax2, use_gridspec=False)
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
     if titles[1] is None:
         plt.title("")
     else:
         plt.title(titles[1])
-    plt.subplot(223)
+    ax3 = plt.subplot(grid[-mm:, :mm])
     if resids is None: resids = port - model
-    plt.imshow(resids, aspect=aspect, origin=origin, extent=extent,
+    im = plt.imshow(resids, aspect=aspect, origin=origin, extent=extent,
             interpolation=interpolation, **kwargs)
-    if colorbar: plt.colorbar()
+    if colorbar: plt.colorbar(im, ax=ax3, use_gridspec=False)
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
     if titles[2] is None:
         plt.title("")
     else:
         plt.title(titles[2])
-    plt.subplot(224)
+    ax4 = plt.subplot(grid[-mm:, -mm:])
     weights = port.mean(axis=1)
-    portx = np.compress(weights, resids, axis=0)
+    portx = np.compress(weights, port, axis=0)
     residsx = np.compress(weights, resids, axis=0)
     text =  "Residuals mean ~ %.3f\nResiduals std ~  %.3f\nData std ~       %.3f"%(residsx.mean(), residsx.std(), get_noise(portx))
-    plt.text(0.5, 0.5, text, ha="center", va="center")
+    ax4.text(0.5, 0.5, text, ha="center", va="center")
+    ax4.set_xticklabels(())
+    ax4.set_xticks(())
+    ax4.set_yticklabels(())
+    ax4.set_yticks(())
+    #plt.tight_layout(pad=1.0, h_pad=-10.0, w_pad=-10.0)
     if savefig:
         plt.savefig(savefig, format='png')
         plt.close()
@@ -1010,26 +1066,28 @@ def make_fake_pulsar(datafile, modelfile, parfile, nsub, npol, nchan, nbin,
     """
     DM = 0.0
     P = 0.0
-    parfile = open(parfile,'r').readlines()
-    for xx in range(len(parfile)):
-        line = parfile[xx].split()
+    params = open(parfile,'r').readlines()
+    for xx in range(len(params)):
+        line = params[xx].split()
         if line[0] == 'DM':
             DM = float(line[1])
-        elif line[0] == 'F0':
-            P = 1/np.double(line[1])
         elif line[0] == 'P0':
             P = np.double(line[1])
+        elif line[0] == 'F0':
+            P = 1/np.double(line[1])
         else:
             pass
         if DM and P:
             break
+    #Reference frequency versus center frequency
+    nu_ref = nu0
     chanwidth = bw / nchan
     lofreq = nu0 - (bw/2)
     freqs = np.linspace(lofreq + (chanwidth/2.0), lofreq + bw -
             (chanwidth/2.0), nchan)
     phases = np.linspace(0.0 + (nbin*2)**-1, 1.0 - (nbin*2)**-1, nbin)
     name, ngauss, model = read_model(modelfile, phases, freqs, quiet=False)
-    port = rotate_portrait(model, -phase, -DM, P, freqs, nu0) + np.reshape(
+    port = rotate_portrait(model, -phase, -DM, P, freqs, nu_ref) + np.reshape(
             np.random.normal(0.0, noise_std, nchan*nbin), (nchan, nbin))
     arch = pr.Archive_load(datafile)
     arch.set_ephemeris(parfile)
