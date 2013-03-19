@@ -821,14 +821,14 @@ def write_model(filenm, name, nu_ref, model_params, fit_flags):
     """
     outfile = open(filenm, "a")
     outfile.write("%s\n"%name)
-    outfile.write("%.8f\n"%nu_ref)
-    outfile.write("%.8f\t %d\n"%(model_params[0], fit_flags[0]))
+    outfile.write("%.4f\n"%nu_ref)
+    outfile.write("%.8f  %d\n"%(model_params[0], fit_flags[0]))
     ngauss = (len(model_params) - 1) / 6
     for nn in xrange(ngauss):
         comp = model_params[(1 + nn*6):(7 + nn*6)]
         fit_comp = fit_flags[(1 + nn*6):(7 + nn*6)]
         line = tuple(np.array(zip(comp, fit_comp)).ravel())
-        outfile.write("%.8f  %d  %.8f  %d  %.8f  %d  %.8f  %d  %.8f  %d  %.8f  %d\n"%line)
+        outfile.write("%1.8f  %d  % 10.8f  %d  % 10.8f  %d  % 10.8f  %d  % 12.8f  %d  % 12.8f  %d\n"%line)
     outfile.close()
     print "%s written."%filenm
 
