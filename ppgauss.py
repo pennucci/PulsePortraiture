@@ -134,7 +134,6 @@ class DataPortrait:
         iterator.next()
         self.cnvrgnc = self.check_convergence(quiet)
         while (self.niter and not self.cnvrgnc):
-            #if interactive:
             if self.cnvrgnc:
                 break
             else:
