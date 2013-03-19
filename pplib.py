@@ -568,29 +568,6 @@ def first_guess(data, model, nguess=1000):
     phaseguess = phaseguess[crosscorr.argmax()]
     return phaseguess
 
-def read_model(modelfile, phases, freqs, quiet=False):
-    """
-    """
-    nbin = len(phases)
-    nchan = len(freqs)
-    modeldata = open(modelfile, "r").readlines()
-    ngauss = len(modeldata) - 3
-    params = np.zeros(ngauss*6 + 1)
-    name = modeldata.pop(0)[:-1]
-    nu_ref = float(modeldata.pop(0))
-    params[0] = float(modeldata.pop(0))
-    for gg in xrange(ngauss):
-        comp = map(float, modeldata[gg].split())
-        params[1 + gg*6 : 7 + (gg*6)] = comp
-    model = gen_gaussian_portrait(params, phases, freqs, nu_ref)
-    if not quiet:
-        print "Model Name: %s"%name
-        print "Made %d component model with %d profile bins,"%(
-                ngauss, nbin)
-        print "%d frequency channels, %.0f MHz bandwidth, centered near %.3f MHz,"%(nchan, (freqs[-1] - freqs[0]) + ((freqs[-1] - freqs[-2])), freqs.mean())
-        print "with model parameters referenced at %.3f MHz."%nu_ref
-    return name, ngauss, model
-
 def get_noise(data, frac=4, tau=False, chans=False, fd=False):
     #FIX: Make sure to use on portraits w/o zapped freq. channels
     #i.e. portxs
@@ -689,20 +666,40 @@ def rotate_portrait(port, phase, DM=None, P=None, freqs=None, nu_ref=np.inf):
             pFFT[nn,:] *= phasor
     return fft.irfft(pFFT)
 
-def write_model(filenm, name, model_params, nu_ref):
+def fft_rotate(arr, bins):
     """
+    Ripped and altered from PRESTO
+
+    Return array 'arr' rotated by 'bins' places to the left.
+    The rotation is done in the Fourier domain using the Shift Theorem.            'bins' can be fractional.
+    The resulting vector will have the same length as the original.
     """
-    outfile = open(filenm, "a")
-    outfile.write("%s\n"%name)
-    outfile.write("%.8f\n"%nu_ref)
-    outfile.write("%.8f\n"%model_params[0])
-    ngauss = (len(model_params) - 1) / 6
-    for nn in xrange(ngauss):
-        comp = model_params[(1 + nn*6):(7 + nn*6)]
-        outfile.write("%.8f\t %.8f\t %.8f\t %.8f\t %.8f\t %.8f\n"%(comp[0],
-            comp[1], comp[2], comp[3], comp[4] ,comp[5]))
-    outfile.close()
-    print "%s written."%filenm
+    arr = np.asarray(arr)
+    freqs = np.arange(arr.size/2 + 1, dtype=np.float)
+    phasor = np.exp(complex(0.0, 2*np.pi) * freqs * bins / float(arr.size))
+    return np.fft.irfft(phasor * np.fft.rfft(arr), arr.size)
+
+def DM_delay(DM, freq, freq2=np.inf, P=None):
+    """
+    Calculates the delay [s] of emitted frequency freq [MHz] from
+    dispersion measure DM [cm**-3 pc] relative to freq2 [default=inf].
+    If a period P [s] is provided, the delay is returned in phase,
+    otherwise in seconds.
+    """
+    delay = Dconst * DM * ((freq**-2) - (freq2**-2))
+    if P:
+        return delay / P
+    else:
+        return delay
+
+def doppler_correct_freqs(freqs, doppler_factor):
+    """
+    Input topocentric frequencies, output barycentric frequencies.
+    doppler_factor = nu_source / nu_observed = sqrt( (1+beta) / (1-beta)),
+    for beta = v/c, and v is positive for increasing source distance.
+    NB: PSRCHIVE defines doppler_factor as the inverse of the above.
+    """
+    return doppler_factor * freqs
 
 def load_data(filenm, dedisperse=False, dededisperse=False, tscrunch=False,
         pscrunch=False, rm_baseline=True, flux_prof=False, quiet=False):
@@ -739,6 +736,7 @@ def load_data(filenm, dedisperse=False, dededisperse=False, tscrunch=False,
     #De/dedisperse?
     if dedisperse: arch.dedisperse()
     if dededisperse: arch.dededisperse()
+    DM = arch.get_dispersion_measure()
     #Maybe use better basline subtraction??
     if rm_baseline: arch.remove_baseline()
     #pscrunch?
@@ -790,13 +788,16 @@ def load_data(filenm, dedisperse=False, dededisperse=False, tscrunch=False,
     nsubx = int(np.compress([subintsx[ii].shape[1] for ii in xrange(nsub)],
             np.ones(nsub)).sum())
     if not quiet:
-        print "\tcenter freq. [MHz] = %.5f\n\
+        print "\tDM/P_ms            = %.1f\n\
+        center freq. [MHz] = %.4f\n\
         bandwidth [MHz]    = %.1f\n\
         # bins in prof     = %d\n\
         # channels         = %d\n\
         # chan (mean)      = %d\n\
         # subints          = %d\n\
-        # unzapped subint  = %d"%(nu0, bw, nbin, nchan, nchanx, nsub, nsubx)
+        # unzapped subint  = %d\n"%(DM /
+                (arch.get_Integration(0).get_folding_period()*1000.0), nu0, bw,
+                nbin, nchan, nchanx, nsub, nsubx)
     #Returns refreshed arch; could be changed...
     arch.refresh()
     #Return getitem/attribute-accessible class!
@@ -808,46 +809,134 @@ def load_data(filenm, dedisperse=False, dededisperse=False, tscrunch=False,
             subints=subints, subintsx=subintsx, weights=weights_norm)
     return data
 
-def plot_lognorm(mu, tau, lo=0.0, hi=5.0, npts=500, plot=1, show=0):
+def unpack_dict(data):
     """
+    This does not work yet; just for reference...
+    Dictionary has to be named 'data'...
     """
-    import pymc as pm
-    pts = np.empty(npts)
-    xs = np.linspace(lo, hi, npts)
-    for ii in xrange(npts):
-        pts[ii] = np.exp(pm.lognormal_like(xs[ii], mu, tau))
-    if plot:
-        plt.plot(xs, pts)
-    if show:
-        plt.show()
-    return xs, pts
+    for key in data.keys():
+        exec(key + " = data['" + key + "']")
 
-def plot_gamma(alpha, beta, lo=0.0, hi=5.0, npts=500, plot=1, show=0):
+def write_model(filenm, name, model_params, nu_ref):
     """
     """
-    import pymc as pm
-    pts = np.empty(npts)
-    xs = np.linspace(lo, hi, npts)
-    for ii in xrange(npts):
-        pts[ii] = np.exp(pm.gamma_like(xs[ii], alpha, beta))
-    if plot:
-        plt.plot(xs, pts)
-    if show:
-        plt.show()
-    return xs, pts
+    outfile = open(filenm, "a")
+    outfile.write("%s\n"%name)
+    outfile.write("%.8f\n"%nu_ref)
+    outfile.write("%.8f\n"%model_params[0])
+    ngauss = (len(model_params) - 1) / 6
+    for nn in xrange(ngauss):
+        comp = model_params[(1 + nn*6):(7 + nn*6)]
+        outfile.write("%.8f\t %.8f\t %.8f\t %.8f\t %.8f\t %.8f\n"%(comp[0],
+            comp[1], comp[2], comp[3], comp[4] ,comp[5]))
+    outfile.close()
+    print "%s written."%filenm
 
-def DM_delay(DM, freq, freq2=np.inf, P=None):
+def read_model(modelfile, phases, freqs, quiet=False):
     """
-    Calculates the delay [s] of emitted frequency freq [MHz] from
-    dispersion measure DM [cm**-3 pc] relative to freq2 [default=inf].
-    If a period P [s] is provided, the delay is returned in phase,
-    otherwise in seconds.
     """
-    delay = Dconst * DM * ((freq**-2) - (freq2**-2))
-    if P:
-        return delay / P
-    else:
-        return delay
+    nbin = len(phases)
+    nchan = len(freqs)
+    modeldata = open(modelfile, "r").readlines()
+    ngauss = len(modeldata) - 3
+    params = np.zeros(ngauss*6 + 1)
+    name = modeldata.pop(0)[:-1]
+    nu_ref = float(modeldata.pop(0))
+    params[0] = float(modeldata.pop(0))
+    for gg in xrange(ngauss):
+        comp = map(float, modeldata[gg].split())
+        params[1 + gg*6 : 7 + (gg*6)] = comp
+    model = gen_gaussian_portrait(params, phases, freqs, nu_ref)
+    if not quiet:
+        print "Model Name: %s"%name
+        print "Made %d component model with %d profile bins,"%(
+                ngauss, nbin)
+        print "%d frequency channels, %.0f MHz bandwidth, centered near %.3f MHz,"%(nchan, (freqs[-1] - freqs[0]) + ((freqs[-1] - freqs[-2])), freqs.mean())
+        print "with model parameters referenced at %.3f MHz."%nu_ref
+    return name, ngauss, model
+
+
+def make_fake_pulsar(modelfile, ephemfile, outfile, nsub, npol, nchan, nbin,
+        nu0, bw, tsub, start_MJD=None, mask=None, noise_std=1.0, bw_scint=None,
+        state="Coherence", obs="1", quiet=False):
+    """
+    Thanks to PBD.
+    """
+    chanwidth = bw / nchan
+    lofreq = nu0 - (bw/2)
+    #Channel frequency centers
+    freqs = np.linspace(lofreq + (chanwidth/2.0), lofreq + bw -
+            (chanwidth/2.0), nchan)
+    #Phase bin centers
+    phases = np.linspace(0.0 + (nbin*2)**-1, 1.0 - (nbin*2)**-1, nbin)
+
+    #Create the Archive instance.
+    #This is kind of a weird hack, if we create a PSRFITS
+    #Archive directly, some header info does not get filled
+    #in.  If we instead create an ASP archive, it will automatically
+    #be (correctly) converted to PSRFITS when it is unloaded...
+    arch = pr.Archive_new_Archive("ASP")
+    arch.resize(nsub,npol,nchan,nbin)
+    try:
+        import parfile
+        par = parfile.psr_par(ephemfile)
+        PSR = par.PSR
+        DECJ = par.DECJ
+        RAJ = par.RAJ
+        DM = par.DM
+    except(ImportError):
+        parfile = open(ephemfile,"r").readlines()
+        for xx in xrange(len(parfile)):
+            param = parfile[xx].split()
+            if param[0] == ("PSR" or "PSRJ"):
+                PSR = param[1]
+            elif param[0] == "RAJ":
+                RAJ = param[1]
+            elif param[0] == "DECJ":
+                DECJ = param[1]
+            elif param[0] == "DM":
+                DM = float(line[1])
+            else:
+                pass
+    #Dec needs to have a sign for the following sky_coord call
+    if (DECJ[0] != '+' and DECJ[0] != '-'):
+        DECJ = "+" + DECJ
+    arch.set_dispersion_measure(DM)
+    arch.set_source(PSR)
+    arch.set_coordinates(pr.sky_coord(RAJ + DECJ))
+    #Set some other stuff
+    arch.set_centre_frequency(nu0)
+    arch.set_bandwidth(bw)
+    arch.set_telescope(obs)
+    if npol==4:
+        arch.set_state(state) #Could also do 'Stokes' here
+    #Fill in some subintegration attributes
+    if start_MJD is None:
+        start_MJD = pr.MJD(50000, 0, 0.0)
+    epoch = start_MJD
+    epoch += tsub/2.0
+    for subint in arch:
+        subint.set_epoch(epoch)
+        subint.set_duration(tsub)
+        epoch += tsub
+        for ichan in range(nchan):
+            subint.set_centre_frequency(ichan, freqs[ichan])
+    #Fill in polycos
+    arch.set_ephemeris(ephemfile)
+    #Now finally, fill in the data!
+    #NB the different pols are not realistic: same model, same noise_std
+    name, ngauss, model = read_model(modelfile, phases, freqs, quiet=quiet)
+    #arch.set_dedispersed(True)
+    arch.dedisperse()
+    for subint in arch:
+        for ipol in range(npol):
+            for ichan in range(nchan):
+                prof = subint.get_Profile(ipol,ichan)
+                prof.get_amps()[:] = model[ichan] + np.random.normal(0.0,
+                        noise_std, nbin)
+    arch.dededisperse()
+    arch.unload(outfile)
+    if not quiet: print "\nUnloaded %s.\n"%outfile
 
 def write_princeton_toa(toa_MJDi, toa_MJDf, toaerr, freq, DM, obs='@',
         name=' ' * 13):
@@ -871,28 +960,6 @@ def write_princeton_toa(toa_MJDi, toa_MJDf, toaerr, freq, DM, obs='@',
                 toaerr, DM)
     else:
         print obs + " %13s %8.3f %s %8.3f"%(name, freq, toa, toaerr)
-
-def doppler_correct_freqs(freqs, doppler_factor):
-    """
-    Input topocentric frequencies, output barycentric frequencies.
-    doppler_factor = nu_source / nu_observed = sqrt( (1+beta) / (1-beta)),
-    for beta = v/c, and v is positive for increasing source distance.
-    NB: PSRCHIVE defines doppler_factor as the inverse of the above.
-    """
-    return doppler_factor * freqs
-
-def fft_rotate(arr, bins):
-    """
-    Ripped and altered from PRESTO
-
-    Return array 'arr' rotated by 'bins' places to the left.
-    The rotation is done in the Fourier domain using the Shift Theorem.            'bins' can be fractional.
-    The resulting vector will have the same length as the original.
-    """
-    arr = np.asarray(arr)
-    freqs = np.arange(arr.size/2 + 1, dtype=np.float)
-    phasor = np.exp(complex(0.0, 2*np.pi) * freqs * bins / float(arr.size))
-    return np.fft.irfft(phasor * np.fft.rfft(arr), arr.size)
 
 def show_port(port, phases=None, freqs=None, title=None, prof=True,
         fluxprof=True, rvrsd=False, colorbar=True, savefig=False,
@@ -1050,55 +1117,31 @@ def show_residual_plot(port, model, resids=None, phases=None, freqs=None,
     else:
         plt.show()
 
-#This does not work yet; just for reference
-def unpack_dict(data):
+def plot_lognorm(mu, tau, lo=0.0, hi=5.0, npts=500, plot=1, show=0):
     """
-    Dictionary has to be named 'data'...
     """
-    for key in data.keys():
-        exec(key + " = data['" + key + "']")
+    import pymc as pm
+    pts = np.empty(npts)
+    xs = np.linspace(lo, hi, npts)
+    for ii in xrange(npts):
+        pts[ii] = np.exp(pm.lognormal_like(xs[ii], mu, tau))
+    if plot:
+        plt.plot(xs, pts)
+    if show:
+        plt.show()
+    return xs, pts
 
-def make_fake_pulsar(datafile, modelfile, parfile, nsub, npol, nchan, nbin,
-        nu0, bw, phase, noise_std):
+def plot_gamma(alpha, beta, lo=0.0, hi=5.0, npts=500, plot=1, show=0):
     """
-    Needs scintillation, RFI, weights, etc.  Most info in the written arch will
-    be false.  Should implement as a Class?
     """
-    DM = 0.0
-    P = 0.0
-    params = open(parfile,'r').readlines()
-    for xx in range(len(params)):
-        line = params[xx].split()
-        if line[0] == 'DM':
-            DM = float(line[1])
-        elif line[0] == 'P0':
-            P = np.double(line[1])
-        elif line[0] == 'F0':
-            P = 1/np.double(line[1])
-        else:
-            pass
-        if DM and P:
-            break
-    #Reference frequency versus center frequency
-    nu_ref = nu0
-    chanwidth = bw / nchan
-    lofreq = nu0 - (bw/2)
-    freqs = np.linspace(lofreq + (chanwidth/2.0), lofreq + bw -
-            (chanwidth/2.0), nchan)
-    phases = np.linspace(0.0 + (nbin*2)**-1, 1.0 - (nbin*2)**-1, nbin)
-    name, ngauss, model = read_model(modelfile, phases, freqs, quiet=False)
-    port = rotate_portrait(model, -phase, -DM, P, freqs, nu_ref) + np.reshape(
-            np.random.normal(0.0, noise_std, nchan*nbin), (nchan, nbin))
-    arch = pr.Archive_load(datafile)
-    arch.set_ephemeris(parfile)
-    if nsub == 1: arch.tscrunch()
-    if npol == 1: arch.pscrunch()
-    for yy in xrange(nchan):
-        for xx in xrange(nbin):
-            arch.get_Integration(0).get_Profile(0,yy)[xx] = port[yy,xx]
-    I = arch.get_Integration(0)
-    #arch.set_dispersion_measure(DM)
-    arch.dededisperse()
-    arch.set_dedispersed(False)
-    arch.unload()
-    print "\nUnloaded %s.\n"%datafile
+    import pymc as pm
+    pts = np.empty(npts)
+    xs = np.linspace(lo, hi, npts)
+    for ii in xrange(npts):
+        pts[ii] = np.exp(pm.gamma_like(xs[ii], alpha, beta))
+    if plot:
+        plt.plot(xs, pts)
+    if show:
+        plt.show()
+    return xs, pts
+
