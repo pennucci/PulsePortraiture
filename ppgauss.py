@@ -77,57 +77,52 @@ class DataPortrait:
             self.spect_index = params[1]
 
 
-    def make_gaussian_model_portrait(self, ref_prof=(None, None),
-            locparams=0.0, fixloc=False, widparams=0.0, fixwid=False,
-            ampparams=0.0, fixamp=False, niter=0, writemodel=False,
-            outfile=None, model_name=None, residplot=None, quiet=False):
+    def make_gaussian_model_portrait(self, modelfile=None,
+            ref_prof=(None, None), fixloc=False, fixwid=False, fixamp=False,
+            niter=0, writemodel=False, outfile=None, model_name=None,
+            residplot=None, quiet=False):
         """
         """
-        self.nu_ref = ref_prof[0]
-        self.bw_ref = ref_prof[1]
-        if self.nu_ref is None: self.nu_ref = self.nu0
-        if self.bw_ref is None: self.bw_ref = abs(self.bw)
-        okinds = np.compress(np.less(self.nu_ref - (self.bw_ref/2),
-            self.freqs) * np.greater(self.nu_ref + (self.bw_ref/2),
-            self.freqs) * self.weights[0], np.arange(self.nchan))
-        #The below profile average gives a slightly different set of values for
-        #the profile than self.profile, if given the full band and center 
-        #frequency.  Unsure why; shouldn't matter.
-        profile = np.take(self.port, okinds, axis=0).mean(axis=0)
-        self.fix_params = (fixloc, fixwid, fixamp)
-        if not len(self.init_params): self.fit_profile(profile)
-        if type(locparams) is not np.ndarray:
-            try:
-                locparams = np.ones(self.ngauss) * locparams
-            except ValueError:
-                print "Not enough parameters for ngauss = %d."%self.ngauss
-                return 0
-        if type(widparams) is not np.ndarray:
-            try:
-                widparams = np.ones(self.ngauss) * widparams
-            except ValueError:
-                print "Not enough parameters for ngauss = %d."%self.ngauss
-                return 0
-        if type(ampparams) is not np.ndarray:
-            try:
-                ampparams = np.ones(self.ngauss) * ampparams
-            except ValueError:
-                print "Not enough parameters for ngauss = %d."%self.ngauss
-                return 0
-        if outfile is None: outfile = self.datafile + ".model"
-        if model_name is None:
-            self.model_name = self.source
+        if modelfile:
+            (self.model_name, self.nu_ref, self.ngauss, self.init_model_params,
+                    self.fit_flags) = read_model(modelfile)
         else:
-            self.model_name = model_name
-        self.init_model_params = np.empty([self.ngauss, 6])
-        for nn in range(self.ngauss):
-            self.init_model_params[nn] = np.array([self.init_params[1::3][nn],
-                locparams[nn], self.init_params[2::3][nn], widparams[nn],
-                self.init_params[3::3][nn], ampparams[nn]])
-        self.init_model_params = np.array([self.init_params[0]] +
+            if model_name is None:
+                self.model_name = self.source
+            else:
+                self.model_name = model_name
+            #Fit the profile
+            if not len(self.init_params):
+                self.nu_ref = ref_prof[0]
+                self.bw_ref = ref_prof[1]
+                if self.nu_ref is None: self.nu_ref = self.nu0
+                if self.bw_ref is None: self.bw_ref = abs(self.bw)
+                okinds = np.compress(np.less(self.nu_ref - (self.bw_ref/2),
+                    self.freqs) * np.greater(self.nu_ref + (self.bw_ref/2),
+                    self.freqs) * self.weights[0], np.arange(self.nchan))
+                #The below profile average gives a slightly different set of
+                #values for the profile than self.profile, if given the full
+                #band and center frequency.  Unsure why; shouldn't matter.
+                profile = np.take(self.port, okinds, axis=0).mean(axis=0)
+                self.fit_profile(profile)
+            #All slopes, spectral indices start at 0.0
+            locparams = widparams = ampparams = np.zeros(self.ngauss)
+            self.init_model_params = np.empty([self.ngauss, 6])
+            for nn in range(self.ngauss):
+                self.init_model_params[nn] = np.array(
+                        [self.init_params[1::3][nn], locparams[nn],
+                            self.init_params[2::3][nn], widparams[nn],
+                            self.init_params[3::3][nn], ampparams[nn]])
+            self.init_model_params = np.array([self.init_params[0]] +
                 list(np.ravel(self.init_model_params)))
+            self.fit_flags = np.ones(len(self.init_model_params))
+            self.fit_flags[2::6] *= not(fixloc)
+            self.fit_flags[4::6] *= not(fixwid)
+            self.fit_flags[6::6] *= not(fixamp)
+        #The noise...
         self.portx_noise = np.outer(get_noise(self.portx, chans=True),
                 np.ones(self.nbin))
+        #Here's the loop
         if niter < 0: niter = 0
         self.niter = niter
         self.itern = niter
@@ -163,8 +158,9 @@ class DataPortrait:
             print "Total time:     %.2f min\n"%((time.time() - self.start) /
                     60.0)
         if writemodel:
-            write_model(outfile, self.model_name, self.model_params,
-                    self.nu_ref)
+            if outfile is None: outfile = self.datafile + ".model"
+            write_model(outfile, self.model_name, self.nu_ref,
+                    self.model_params, self.fit_flags)
         if residplot:
             resids = self.port - self.model_masked
             titles = ("%s"%self.datafile, "%s"%self.model_name, "Residuals")
@@ -178,7 +174,7 @@ class DataPortrait:
             start = time.time()
             self.fitted_params, self.chi_sq, self.dof = (
                     fit_gaussian_portrait(self.portx, self.portx_noise,
-                        self.model_params, self.fix_params, self.phases,
+                        self.model_params, self.fit_flags, self.phases,
                         self.freqsxs[0], self.nu_ref, quiet=quiet))
             self.model_params = self.fitted_params
             self.model = gen_gaussian_portrait(self.model_params,
@@ -491,7 +487,7 @@ if __name__ == "__main__":
     quiet = not options.verbose
 
     dp = DataPortrait(datafile, quiet)
-    dp.make_gaussian_model_portrait(ref_prof=(nu_ref, bw_ref), locparams=0.0,
-            fixloc=fixloc, widparams=0.0, fixwid=fixwid, ampparams=0.0,
+    dp.make_gaussian_model_portrait(modelfile = None,
+            ref_prof=(nu_ref, bw_ref), fixloc=fixloc, fixwid=fixwid,
             fixamp=fixamp, niter=niter, writemodel=True, outfile=outfile,
             model_name=model_name, residplot=figure, quiet=quiet)

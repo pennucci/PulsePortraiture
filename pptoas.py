@@ -46,8 +46,7 @@ class GetTOAs:
                     dededisperse=False, tscrunch=True, pscrunch=True,
                     rm_baseline=True, flux_prof=False, quiet=True)
             self.model_name, self.ngauss, self.model = read_model(
-                    self.modelfile, data.phases, data.freqs,
-                    self.quiet)
+                    self.modelfile, data.phases, data.freqs, self.quiet)
             self.source = data.source
             self.nchan = data.nchan
             self.nbin = data.nbin

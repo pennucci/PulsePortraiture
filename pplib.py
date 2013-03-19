@@ -439,37 +439,36 @@ def fit_gaussian_profile(data, init_params, errs, quiet=True):
         print "---------------------------------------------------------------"
     return fitted_params, redchi_sq, dof, residuals
 
-def fit_gaussian_portrait(data, errs, init_params, fix_params, phases, freqs,
+def fit_gaussian_portrait(data, errs, init_params, fit_flags, phases, freqs,
         nu_ref, quiet=True):
     """
     """
     nparam = len(init_params)
     ngauss = (len(init_params) - 1) / 6
-    fixloc,fixwid,fixamp = fix_params
     #Generate the parameter structure
     params = lm.Parameters()
     for ii in xrange(nparam):
-        if ii == 0:         #DC, limited by 0
-            params.add('dc', init_params[ii], vary=True, min=None, max=None,
-                    expr=None)
-        elif ii%6 == 1:     #loc limits
-            params.add('loc%s'%str((ii-1)/6 + 1), init_params[ii], vary=True,
+        if ii == 0:         #DC, not limited
+            params.add('dc', init_params[ii], vary=bool(fit_flags[ii]),
                     min=None, max=None, expr=None)
+        elif ii%6 == 1:     #loc limits
+            params.add('loc%s'%str((ii-1)/6 + 1), init_params[ii],
+                    vary=bool(fit_flags[ii]), min=None, max=None, expr=None)
         elif ii%6 == 2:     #loc slope limits
             params.add('m_loc%s'%str((ii-1)/6 + 1), init_params[ii],
-                    vary=not(fixloc), min=None, max=None, expr=None)
+                    vary=bool(fit_flags[ii]), min=None, max=None, expr=None)
         elif ii%6 == 3:     #wid limits, limited by 0
-            params.add('wid%s'%str((ii-1)/6 + 1), init_params[ii], vary=True,
-                    min=0.0, max=None, expr=None)
+            params.add('wid%s'%str((ii-1)/6 + 1), init_params[ii],
+                    vary=bool(fit_flags[ii]), min=0.0, max=None, expr=None)
         elif ii%6 == 4:     #wid slope limits
             params.add('m_wid%s'%str((ii-1)/6 + 1), init_params[ii],
-                    vary=not(fixwid), min=None, max=None, expr=None)
+                    vary=bool(fit_flags[ii]), min=None, max=None, expr=None)
         elif ii%6 == 5:     #amp limits, limited by 0
-            params.add('amp%s'%str((ii-1)/6 + 1), init_params[ii], vary=True,
-                    min=0.0, max=None, expr=None)
+            params.add('amp%s'%str((ii-1)/6 + 1), init_params[ii],
+                    vary=bool(fit_flags[ii]), min=0.0, max=None, expr=None)
         elif ii%6 == 0:     #amp index limits
             params.add('alpha%s'%str((ii-1)/6 + 1), init_params[ii],
-                    vary=not(fixamp), min=None, max=None, expr=None)
+                    vary=bool(fit_flags[ii]), min=None, max=None, expr=None)
         else:
             print "Undefined index %d."%ii
             sys.exit()
@@ -817,44 +816,57 @@ def unpack_dict(data):
     for key in data.keys():
         exec(key + " = data['" + key + "']")
 
-def write_model(filenm, name, model_params, nu_ref):
+def write_model(filenm, name, nu_ref, model_params, fit_flags):
     """
     """
     outfile = open(filenm, "a")
     outfile.write("%s\n"%name)
     outfile.write("%.8f\n"%nu_ref)
-    outfile.write("%.8f\n"%model_params[0])
+    outfile.write("%.8f\t %d\n"%(model_params[0], fit_flags[0]))
     ngauss = (len(model_params) - 1) / 6
     for nn in xrange(ngauss):
         comp = model_params[(1 + nn*6):(7 + nn*6)]
-        outfile.write("%.8f\t %.8f\t %.8f\t %.8f\t %.8f\t %.8f\n"%(comp[0],
-            comp[1], comp[2], comp[3], comp[4] ,comp[5]))
+        fit_comp = fit_flags[(1 + nn*6):(7 + nn*6)]
+        line = tuple(np.array(zip(comp, fit_comp)).ravel())
+        outfile.write("%.8f  %d  %.8f  %d  %.8f  %d  %.8f  %d  %.8f  %d  %.8f  %d\n"%line)
     outfile.close()
     print "%s written."%filenm
 
-def read_model(modelfile, phases, freqs, quiet=False):
+def read_model(modelfile, phases=None, freqs=None, quiet=False):
     """
     """
-    nbin = len(phases)
-    nchan = len(freqs)
+    if phases is None and freqs is None:
+        read_only = True
     modeldata = open(modelfile, "r").readlines()
     ngauss = len(modeldata) - 3
     params = np.zeros(ngauss*6 + 1)
+    fit_flags = np.zeros(len(params))
     name = modeldata.pop(0)[:-1]
     nu_ref = float(modeldata.pop(0))
-    params[0] = float(modeldata.pop(0))
+    dc_line = modeldata.pop(0)
+    dc = float(dc_line.split()[0])
+    fit_dc = int(dc_line.split()[1])
+    params[0] = dc
+    fit_flags[0] = fit_dc
     for gg in xrange(ngauss):
-        comp = map(float, modeldata[gg].split())
+        comp = map(float, modeldata[gg].split()[::2])
+        fit_comp = map(int, modeldata[gg].split()[1::2])
         params[1 + gg*6 : 7 + (gg*6)] = comp
-    model = gen_gaussian_portrait(params, phases, freqs, nu_ref)
-    if not quiet:
+        fit_flags[1 + gg*6 : 7 + (gg*6)] = fit_comp
+    if not read_only:
+        nbin = len(phases)
+        nchan = len(freqs)
+        model = gen_gaussian_portrait(params, phases, freqs, nu_ref)
+    if not quiet and not read_only:
         print "Model Name: %s"%name
         print "Made %d component model with %d profile bins,"%(
                 ngauss, nbin)
         print "%d frequency channels, %.0f MHz bandwidth, centered near %.3f MHz,"%(nchan, (freqs[-1] - freqs[0]) + ((freqs[-1] - freqs[-2])), freqs.mean())
         print "with model parameters referenced at %.3f MHz."%nu_ref
-    return name, ngauss, model
-
+    if read_only:
+        return name, nu_ref, ngauss, params, fit_flags
+    else:
+        return name, ngauss, model
 
 def make_fake_pulsar(modelfile, ephemfile, outfile, nsub, npol, nchan, nbin,
         nu0, bw, tsub, start_MJD=None, mask=None, noise_std=1.0, bw_scint=None,
