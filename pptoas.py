@@ -531,7 +531,7 @@ if __name__ == "__main__":
                       help="List of archive filenames in metafile.")
     parser.add_option("-m", "--modelfile",
                       action="store", metavar="model", dest="modelfile",
-                      help=".model file to which the data are fit.")
+                      help=".model file from ppgauss.py (more general models coming soon).")
     parser.add_option("-o", "--outfile",
                       action="store", metavar="timfile", dest="outfile",
                       default=None,
@@ -561,7 +561,7 @@ if __name__ == "__main__":
                       help="If supplying a metafile, use this flag if the data are not homogenous (i.e. have different nchan, nbin, nu0)")
     parser.add_option("--showplot",
                       action="store_true", dest="showplot", default=False,
-                      help="Plot fit results. Only useful if nsubint > 1.")
+                      help="Plot fit results for each epoch. Only useful if nsubint > 1.")
     parser.add_option("--quiet",
                       action="store_true", dest="quiet", default=False,
                       help="Minimal to stdout.")

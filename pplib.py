@@ -653,6 +653,8 @@ def rotate_portrait(port, phase=0.0, DM=None, P=None, freqs=None,
         nu_ref=np.inf):
     """
     Positive values of phase and DM rotate to earlier phase.
+    When used to dediserpse, rotate_portrait is virtually identical to
+    arch.dedisperse() in PSRCHIVE.
     """
     pFFT = fft.rfft(port, axis=1)
     for nn in xrange(len(pFFT)):
@@ -873,8 +875,8 @@ def read_model(modelfile, phases=None, freqs=None, quiet=False):
         return name, ngauss, model
 
 def make_fake_pulsar(modelfile, ephemfile, outfile, nsub, npol, nchan, nbin,
-        nu0, bw, tsub, start_MJD=None, mask=None, noise_std=1.0, bw_scint=None,
-        state="Coherence", obs="1", quiet=False):
+        nu0, bw, tsub, start_MJD=None, weights=None, noise_std=1.0,
+        bw_scint=None, state="Coherence", obs="1", quiet=False):
     """
     Mostly written by PBD.
     """
@@ -942,22 +944,30 @@ def make_fake_pulsar(modelfile, ephemfile, outfile, nsub, npol, nchan, nbin,
     #Now finally, fill in the data!
     #NB the different pols are not realistic: same model, same noise_std
     name, ngauss, model = read_model(modelfile, phases, freqs, quiet=quiet)
+    #If wanting to use PSRCHIVE's rotation scheme, uncomment the dedisperse and
+    #dededisperse lines, and set rotmodel = model.
     #arch.set_dedispersed(True)
-    arch.dedisperse()
+    #arch.dedisperse()
+    if weights is None: weights = np.ones([nsub, nchan])
+    isub = 0
     for subint in arch:
+        P = subint.get_folding_period()
         for ipol in range(npol):
+            rotmodel = rotate_portrait(model, 0.0, -DM, P, freqs, nu0)
+            #rotmodel = model
             for ichan in range(nchan):
+                subint.set_weight(ichan, weights[isub, ichan])
                 prof = subint.get_Profile(ipol,ichan)
-                prof.get_amps()[:] = model[ichan] + np.random.normal(0.0,
+                prof.get_amps()[:] = rotmodel[ichan] + np.random.normal(0.0,
                         noise_std, nbin)
-    arch.dededisperse()
+        isub += 1
+    #arch.dededisperse()
     arch.unload(outfile)
     if not quiet: print "\nUnloaded %s.\n"%outfile
 
 def quick_add_archs(metafile, outfile, rotate=False, fiducial=0.5,
         concat=False, quiet=False):
     """
-    Consult make_fake_pulsar for details
     """
     from os import system
     archs = open(metafile, "r").readlines()
