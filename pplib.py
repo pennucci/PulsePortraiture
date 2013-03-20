@@ -695,6 +695,20 @@ def DM_delay(DM, freq, freq2=np.inf, P=None):
     else:
         return delay
 
+def find_DM_freq(freqs, SNRs=None):
+    """
+    Returns "optimal" frequency for fitting DM and phase
+    in the sense that it minimizes the covariance.
+    Intuited: "center of mass" where the weight in a given channel is given by:
+    SNR/freq**2
+    Default SNRs are ones.
+    """
+    nu0 = (freqs.min() + freqs.max()) * 0.5
+    if SNRs is None:
+        SNRs = np.ones(len(freqs))
+    diff = np.sum((freqs - nu0) * SNRs * freqs**-2) / np.sum(SNRs * freqs**-2)
+    return nu0 + diff
+
 def doppler_correct_freqs(freqs, doppler_factor):
     """
     Input topocentric frequencies, output barycentric frequencies.
@@ -1006,7 +1020,7 @@ def quick_add_archs(metafile, outfile, rotate=False, fiducial=0.5,
     arch.unload()
     print "\nUnloaded %s"%outfile
 
-def write_princeton_toa(toa_MJDi, toa_MJDf, toaerr, freq, DM, obs='@',
+def write_princeton_toa(toa_MJDi, toa_MJDf, toaerr, nu_ref, DM, obs='@',
         name=' ' * 13):
     """
     Ripped and altered from PRESTO
@@ -1016,7 +1030,7 @@ def write_princeton_toa(toa_MJDi, toa_MJDf, toaerr, freq, DM, obs='@',
     columns     item
     1-1     Observatory (one-character code) '@' is barycenter
     2-2     must be blank
-    16-24   Reference (not necessarily Observing) frequency (MHz)
+    16-24   Reference (not necessarily observing) frequency (MHz)
     25-44   TOA (decimal point must be in column 30 or column 31)
     45-53   TOA uncertainty (microseconds)
     69-78   DM correction (pc cm^-3)
@@ -1024,10 +1038,10 @@ def write_princeton_toa(toa_MJDi, toa_MJDf, toaerr, freq, DM, obs='@',
     #Splice together the fractional and integer MJDs
     toa = "%5d"%int(toa_MJDi) + ("%.13f"%toa_MJDf)[1:]
     if DM != 0.0:
-        print obs + " %13s %8.3f %s %8.3f              %9.5f"%(name, freq, toa,
-                toaerr, DM)
+        print obs + " %13s %8.3f %s %8.3f              %9.5f"%(name, nu_ref,
+                toa, toaerr, DM)
     else:
-        print obs + " %13s %8.3f %s %8.3f"%(name, freq, toa, toaerr)
+        print obs + " %13s %8.3f %s %8.3f"%(name, nu_ref, toa, toaerr)
 
 def show_port(port, phases=None, freqs=None, title=None, prof=True,
         fluxprof=True, rvrsd=False, colorbar=True, savefig=False,

@@ -20,7 +20,7 @@ class GetTOAs:
         self.common = common
         self.obs = []
         self.nu0s = []
-        self.nu_refs = []
+        self.nu_fits = []
         self.nsubs = []
         self.epochs = []
         self.MJDs = []
@@ -85,13 +85,14 @@ class GetTOAs:
                         self.modelfile, phases, freqs, quiet=quiet)
             else:
                 ngauss, model = self.ngauss, self.model
+            nu_fits = np.empty(nsubx, dtype=np.float)
             phis = np.empty(nsubx, dtype=np.double)
-            phi_errs = np.empty(nsubx)
+            phi_errs = np.empty(nsubx, dtype=np.double)
             DMs = np.empty(nsubx, dtype=np.float)
-            DM_errs = np.empty(nsubx)
+            DM_errs = np.empty(nsubx, dtype=np.float)
             nfevals = np.empty(nsubx, dtype='int')
             rcs = np.empty(nsubx, dtype='int')
-            scales = np.empty([nsubx, nchan])
+            scales = np.empty([nsubx, nchan], dtype=np.float)
             #These next two are lists because in principle,
             #the subints could have different numbers of zapped channels.
             scalesx = []
@@ -99,10 +100,6 @@ class GetTOAs:
             red_chi2s = np.empty(nsubx)
             MJDs = np.array([epochs[nn].in_days()
                 for nn in xrange(nsub)], dtype=np.double)
-            if self.nu_ref is None:
-                nu_ref = nu0
-            else:
-                nu_ref = self.nu_ref
             if self.DM0 is None:
                 DM0 = arch.get_dispersion_measure()
             else:
@@ -115,27 +112,31 @@ class GetTOAs:
             ok_sub_inds = map(int, np.compress(map(len,
                 np.array(subintsx)[:,0]), np.arange(nsub)))
             for nn in range(nsubx):
-                subi = ok_sub_inds[nn]
-                MJD = MJDs[subi]
-                P = Ps[subi]
-                freqsx = freqsxs[subi]
-                portx = subintsx[subi][0]
-                portx_fft = np.fft.rfft(portx, axis=1)
-                modelx = np.compress(weights[subi], model, axis=0)
+                isub = ok_sub_inds[nn]
+                MJD = MJDs[isub]
+                P = Ps[isub]
+                freqsx = freqsxs[isub]
+                portx = subintsx[isub][0]
+                modelx = np.compress(weights[isub], model, axis=0)
+                #A proxy for SNR, hopefully proportional:
+                channel_SNRs = portx.std(axis=1) / get_noise(portx, chans=True)
+                #This is the frequency used in the fit for DM and phase, which
+                #hopefully minimizes the covariance
+                nu_fit = find_DM_freq(freqsx, channel_SNRs)
                 ####################
                 #DOPPLER CORRECTION#
                 ####################
                 #In principle, we should be able to correct the frequencies, but
                 #since this is a messy business, it is easier to correct the DM
                 #itself (below).
-                #df = arch.get_Integration(subi).get_doppler_factor()
+                #df = arch.get_Integration(isub).get_doppler_factor()
                 #freqsx = doppler_correct_freqs(freqsx, df)
                 #nu0 = doppler_correct_freqs(nu0, df)
                 ####################
                 if nn == 0:
                     rot_port = rotate_portrait(subints.mean(axis=0)[0], 0.0,
-                            DM0, P, freqs, nu_ref)
-                    #PSRCHIVE Dedisperses w.r.t. center of band...??
+                            DM0, P, freqs, nu_fit)
+                    #PSRCHIVE Dedisperses w.r.t. center of band...?
                     #Currently, first_guess ranges between +/- 0.5
                     phaseguess = first_guess(rot_port, model, nguess=1000)
                     DMguess = DM0
@@ -158,7 +159,7 @@ class GetTOAs:
                 phi, DM, nfeval, rc, scalex, param_errs, red_chi2, duration = \
                         fit_portrait(portx, modelx,
                             np.array([phaseguess, DMguess]), P, freqsx,
-                            nu_ref, scales=True, bounds=bounds, quiet=quiet)
+                            nu_fit, scales=True, bounds=bounds, quiet=quiet)
                 fit_duration += duration
                 phis[nn] = phi
                 phi_errs[nn] = param_errs[0]
@@ -168,7 +169,7 @@ class GetTOAs:
                 if self.bary_DM: #Default is True
                     #NB: the 'doppler factor' retrieved from PSRCHIVE seems to be
                     #the inverse of the convention nu_source/nu_observed
-                    df = arch.get_Integration(subi).get_doppler_factor()
+                    df = arch.get_Integration(isub).get_doppler_factor()
                     DM *= df
                 DMs[nn] = DM
                 DM_errs[nn] = param_errs[1]
@@ -179,7 +180,7 @@ class GetTOAs:
                 scale = np.zeros(nchan)
                 ss = 0
                 for ii in range(nchan):
-                    if weights[subi,ii] == 1:
+                    if weights[isub,ii] == 1:
                         scale[ii] = scalex[ss]
                         ss += 1
                     else: pass
@@ -201,11 +202,12 @@ class GetTOAs:
             self.order.append(datafile)
             self.obs.append(arch.get_telescope())
             self.nu0s.append(nu0)
-            self.nu_refs.append(nu_ref)
+            self.nu_fits.append(nu_fits)
             self.nsubs.append(nsubx)
             self.epochs.append(np.take(epochs, ok_sub_inds))
             self.MJDs.append(np.take(MJDs, ok_sub_inds))
             self.Ps.append(np.take(Ps, ok_sub_inds))
+            #NB: phis and DMs are w.r.t nu_fit!!!
             self.phis.append(phis)
             self.phi_errs.append(phi_errs)
             self.DM0s.append(DM0)
@@ -231,7 +233,7 @@ class GetTOAs:
                 self.show_results(datafile)
                 start = time.time()
             if safe:
-                self.write_toas(datafile, "pptoas_toas.bak")
+                self.write_toas(datafile, "pptoas_toas.bak", self.nu_ref)
                 self.write_dm_errs(datafile, "pptoas_dmerrs.bak")
         if not show_plot:
             tot_duration = time.time() - start
@@ -240,7 +242,8 @@ class GetTOAs:
             print "Total time: %.2f, ~%.2f min/TOA"%(tot_duration / 60,
                     tot_duration / (60 * np.sum(np.array(self.nsubs))))
 
-    def write_toas(self, datafile=None, outfile=None, retrn=False):
+    def write_toas(self, datafile=None, outfile=None, nu_ref=None,
+            retrn=False):
         """
         """
         #FIX - determine observatory
@@ -257,7 +260,10 @@ class GetTOAs:
                 obs_code = obs_codes["%s"%self.obs[dfi].lower()]
             except(KeyError):
                 obs_code = obs_codes["%s"%self.obs[dfi].upper()]
-            nu_ref = self.nu_refs[dfi]
+            if nu_ref is None:
+                nu_ref = self.nu_refs[dfi]
+            ###NEED TO CONVERT TOAS###
+            #if nu_ref != nu_fit
             nsubx = self.nsubs[dfi]
             epochs = self.epochs[dfi]
             Ps = self.Ps[dfi]
@@ -327,7 +333,7 @@ class GetTOAs:
                 DeltaDM_mean + DM0, datafile))
         if outfile is not None: of.close()
 
-    def show_subint(self, datafile, subint, dedisperse=True, quiet=False):
+    def show_subint(self, datafile, isub, dedisperse=True, quiet=False):
         """
         subint 0 = python index 0
         """
@@ -335,36 +341,37 @@ class GetTOAs:
         data = load_data(datafile, dedisperse=dedisperse,
                 dededisperse=bool(not dedisperse), tscrunch=False,
                 pscrunch=True, rm_baseline=True, flux_prof=False, quiet=quiet)
-        title = "%s ; subint %d"%(datafile, subint)
-        port = np.transpose(data.weights[subint] * np.transpose(
-            data.subints[subint,0]))
+        title = "%s ; subint %d"%(datafile, isub)
+        port = np.transpose(data.weights[isub] * np.transpose(
+            data.subints[isub,0]))
         show_port(port=port, phases=data.phases, freqs=data.freqs, title=title,
                 prof=True, fluxprof=True, rvrsd=bool(data.bw < 0))
 
-    def show_fit(self, datafile, subint, dedisperse=True, quiet=False):
+    def show_fit(self, datafile=None, isub=0, dedisperse=True, quiet=False):
         """
         subint 0 = python index 0
         """
+        if datafile is None:
+            datafile = self.datafiles[0]
         dfi = self.datafiles.index(datafile)
         data = load_data(datafile, dedisperse=dedisperse,
                 dededisperse=bool(not dedisperse), tscrunch=False,
                 pscrunch=True, rm_baseline=True, flux_prof=False, quiet=quiet)
-        nn = subint
-        phi = self.phis[dfi][nn]
-        DM = self.DMs[dfi][nn] - self.DM0s[dfi]
-        scales = self.scales[dfi][nn]
+        phi = self.phis[dfi][isub]
+        DM = self.DMs[dfi][isub] - self.DM0s[dfi]
+        scales = self.scales[dfi][isub]
         freqs = data.freqs
-        nu_ref = data.nu_ref
-        P = data.Ps[nn]
+        nu_fit = self.nu_fits[dfi][isub]
+        P = data.Ps[isub]
         phases = data.phases
-        port = data.subints[nn,0]
-        weights = data.weights[nn]
+        port = data.subints[isub,0]
+        weights = data.weights[isub]
         port = np.transpose(weights * np.transpose(port))
         model_name, ngauss, model = read_model(self.modelfile, phases, freqs,
                 quiet=quiet)
         model_fitted = np.transpose(scales * np.transpose(rotate_portrait(
-            model, -phi, -DM, P, freqs, nu_ref)))
-        titles = ("%s ; subint %d"%(datafile, nn),
+            model, -phi, -DM, P, freqs, nu_fit)))
+        titles = ("%s ; subint %d"%(datafile, isub),
                 "Fitted Model %s"%(model_name), "Residuals")
         show_residual_plot(port=port, model=model_fitted, resids=None,
                 phases=phases, freqs=freqs, titles=titles,
@@ -600,6 +607,6 @@ if __name__ == "__main__":
             DM0=DM0, one_DM=one_DM, bary_DM=bary_DM, common=common,
             quiet=quiet)
     gt.get_toas(show_plot=showplot, safe=False, quiet=quiet)
-    gt.write_toas(outfile=outfile)
+    gt.write_toas(outfile=outfile, nu_ref=nu_ref)
     if errfile is not None: gt.write_dm_errs(outfile=errfile)
     if pam_cmd: gt.write_pam_cmds()
