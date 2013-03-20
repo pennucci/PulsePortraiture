@@ -244,6 +244,7 @@ class GetTOAs:
         """
         """
         #FIX - determine observatory
+        #FIX - options for different TOA formats
         if datafile is None:
             datafiles = self.datafiles
         else:
@@ -266,7 +267,6 @@ class GetTOAs:
                 Ps[nn]) / (3600 * 24.)) for nn in xrange(nsubx)])
             toa_errs = phi_errs * Ps * 1e6
             #Currently writes topocentric frequencies
-            #Need option for different kinds of TOA output
             for nn in range(nsubx):
                 if self.one_DM:
                     DeltaDM_mean = self.DeltaDM_means[dfi]
