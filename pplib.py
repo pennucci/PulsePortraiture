@@ -954,7 +954,47 @@ def make_fake_pulsar(modelfile, ephemfile, outfile, nsub, npol, nchan, nbin,
     arch.unload(outfile)
     if not quiet: print "\nUnloaded %s.\n"%outfile
 
-#def add_archs(metafile);
+def quick_add_archs(metafile, outfile, rotate=False, fiducial=0.5,
+        concat=False, quiet=False):
+    """
+    Consult make_fake_pulsar for details
+    """
+    from os import system
+    archs = open(metafile, "r").readlines()
+    for aa in range(len(archs)):
+        datafile = archs[aa].split()[0]
+        data = load_data(datafile, dedisperse=True, dededisperse=False,
+                tscrunch=True, pscrunch=True, rm_baseline=True,
+                flux_prof=False, quiet=True)
+        if aa == 0:
+            nchan = data.nchan
+            nbin = data.nbin
+            cmd = "cp %s %s"%(datafile, outfile)
+            system(cmd)
+            arch = pr.Archive_load(outfile)
+            arch.set_dispersion_measure(0.0)
+            arch.tscrunch()
+            arch.pscrunch()
+            totport = np.zeros([nchan, nbin])
+            totweights = np.zeros(nchan)
+        if rotate:
+            maxbin = data.prof.argmax()
+            rotport = rotate_portrait(data.subints[0,0], maxbin/float(nbin) -
+                    fiducial)
+        else:
+            rotport = data.subints[0,0]
+        totport += rotport
+        totweights += data.weights[0]
+        if not quiet: print "Added %s"%datafile
+    totweights = np.where(totweights==0, 1, totweights)
+    totport = np.transpose((totweights**-1) * np.transpose(totport))
+    I = arch.get_Integration(0)
+    for nn in range(nchan):
+        prof = I.get_Profile(0,nn)
+        prof.get_amps()[:] = totport[nn]
+    arch.dedisperse()
+    arch.unload()
+    print "\nUnloaded %s"%outfile
 
 def write_princeton_toa(toa_MJDi, toa_MJDf, toaerr, freq, DM, obs='@',
         name=' ' * 13):
