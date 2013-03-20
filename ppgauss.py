@@ -132,7 +132,7 @@ class DataPortrait:
         if not quiet: print "Fitting gaussian model portrait..."
         iterator = self.model_iteration(quiet)
         iterator.next()
-        self.cnvrgnc = self.check_convergence(quiet)
+        self.cnvrgnc = self.check_convergence(efac=1.0, quiet=quiet)
         while (self.niter and not self.cnvrgnc):
             if self.cnvrgnc:
                 break
@@ -148,7 +148,7 @@ class DataPortrait:
                 print "Fitting gaussian model portrait..."
             iterator.next()
             self.niter -= 1
-            self.cnvrgnc = self.check_convergence(quiet)
+            self.cnvrgnc = self.check_convergence(efac=1.0, quiet=quiet)
         if not quiet:
             print "Residuals mean: %.3f"%(self.portx - self.modelx).mean()
             print "Residuals std:  %.3f"%(self.portx - self.modelx).std()
@@ -195,7 +195,7 @@ class DataPortrait:
             self.total_time += self.duration
             yield
 
-    def check_convergence(self, quiet=False):
+    def check_convergence(self, efac=1.0, quiet=False):
         if not quiet:
             print "Iter %d:"%(self.itern - self.niter)
             print " duration of %.2f min"%(self.duration /  60.)
@@ -206,8 +206,8 @@ class DataPortrait:
         else:
             if self.niter and (self.itern - self.niter) != 0:
                 print "Iter %d..."%(self.itern - self.niter)
-        if min(abs(self.phi), abs(1 - self.phi)) < abs(self.phierr):
-            if abs(self.DM) < abs(self.DMerr):
+        if min(abs(self.phi), abs(1 - self.phi)) < abs(self.phierr)*efac:
+            if abs(self.DM) < abs(self.DMerr)*efac:
                 print "\nIteration converged.\n"
                 return 1
         else:
@@ -231,6 +231,9 @@ class DataPortrait:
 class GaussianSelector:
     def __init__(self, ax, profile, errs, minspanx=None,
                  minspany=None, useblit=True):
+        """
+        Ripped and tweaked from SMR's pygaussfit.py
+        """
         print ""
         print "============================================="
         print "Left mouse click to draw a Gaussian component"
@@ -469,6 +472,7 @@ if __name__ == "__main__":
     if options.datafile is None:
         print "\nppgauss.py - generates gaussian-component model portrait\n"
         parser.print_help()
+        print ""
         parser.exit()
 
     datafile = options.datafile

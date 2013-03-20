@@ -193,7 +193,7 @@ class GetTOAs:
                     weights=DM_errs**-2, returned=True)
             DeltaDM_var = DeltaDM_var**-1
             if nsubx > 1:
-                #The below multiplie by the red. chi-squared to inflate the
+                #The below multiply by the red. chi-squared to inflate the
                 #errors.
                 DeltaDM_var *= np.sum(((DeltaDMs - DeltaDM_mean)**2) /
                         (DM_errs**2)) / (len(DeltaDMs) - 1)
@@ -572,6 +572,7 @@ if __name__ == "__main__":
             options.modelfile is None):
             print "\npptoas.py - simultaneous least-squares fit for TOAs and DMs\n"
             parser.print_help()
+            print ""
             parser.exit()
 
     datafile = options.datafile

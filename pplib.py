@@ -47,7 +47,7 @@ RCSTRINGS = {"-1":"INFEASIBLE: Infeasible (low > up).",
 
 #Exact dispersion constant (e**2/(2*pi*m_e*c))
 #used by PRESTO
-Dconst_exact = 4.148808e3 #[MHz**2 pc**-1 cm**3 s]
+Dconst_exact = 4.148808e3  #[MHz**2 pc**-1 cm**3 s]
 
 #"Traditional" dispersion constant
 #used by PSRCHIVE
@@ -59,8 +59,8 @@ Dconst = Dconst_trad
 class DataBunch(dict):
     """
     This class is a baller little recipe!  Creates a simple class instance
-    db = DataBunch(a=1, b=2,....) that has attributes a and b callable and
-    update-able via either syntax db.a or db['a'], etc.
+    db = DataBunch(a=1, b=2,....) that has attributes a and b, which are
+    callable and update-able using either syntax db.a or db['a'].
     """
     def __init__(self, **kwds):
         dict.__init__(self, kwds)
@@ -234,7 +234,7 @@ def fit_powlaw_function(params, freqs, nu_ref, weights=None, data=None,
     f=np.array(f)
     return (d - powlaw(f, nu_ref, A, alpha)) / errs
 
-def fit_gauss_function(params, data=None, errs=None):
+def fit_gaussian_profile_function(params, data=None, errs=None):
     """
     """
     prms = np.array([param.value for param in params.itervalues()])
@@ -420,7 +420,8 @@ def fit_gaussian_profile(data, init_params, errs, quiet=True):
             sys.exit()
     other_args = {'data':data, 'errs':errs}
     #Now fit it
-    results = lm.minimize(fit_gauss_function, params, kws=other_args)
+    results = lm.minimize(fit_gaussian_profile_function, params,
+            kws=other_args)
     fitted_params = np.array([param.value for param in
         results.params.itervalues()])
     dof = results.nfree
@@ -634,7 +635,7 @@ def get_noise(data, frac=4, tau=False, chans=False, fd=False):
                 else:
                     return np.median(noise)
 
-def get_scales(data, model, phase, DM, P, freqs, nu_ref):
+def get_scales(data, model, phase, DM, P, freqs, nu_ref=np.inf):
     """
     """
     scales = np.zeros(len(model))
@@ -648,7 +649,8 @@ def get_scales(data, model, phase, DM, P, freqs, nu_ref):
             np.pi * kk * (phase + (D * (pow(freqs,-2) - pow(nu_ref,-2)))))) / p
     return scales
 
-def rotate_portrait(port, phase, DM=None, P=None, freqs=None, nu_ref=np.inf):
+def rotate_portrait(port, phase=0.0, DM=None, P=None, freqs=None,
+        nu_ref=np.inf):
     """
     Positive values of phase and DM rotate to earlier phase.
     """
@@ -872,7 +874,7 @@ def make_fake_pulsar(modelfile, ephemfile, outfile, nsub, npol, nchan, nbin,
         nu0, bw, tsub, start_MJD=None, mask=None, noise_std=1.0, bw_scint=None,
         state="Coherence", obs="1", quiet=False):
     """
-    Thanks to PBD.
+    Mostly written by PBD.
     """
     chanwidth = bw / nchan
     lofreq = nu0 - (bw/2)
@@ -1156,4 +1158,3 @@ def plot_gamma(alpha, beta, lo=0.0, hi=5.0, npts=500, plot=1, show=0):
     if show:
         plt.show()
     return xs, pts
-
