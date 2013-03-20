@@ -58,8 +58,8 @@ class GetTOAs:
             if self.source is None: self.source = "noname"
             del(data)
 
-    def get_toas(self, datafile=None, show_plot=False, safe=False,
-            quiet=False):
+    def get_toas(self, datafile=None, bounds=[(None, None), (None, None)],
+            show_plot=False, safe=False, quiet=False):
         """
         """
         start = time.time()
@@ -158,7 +158,7 @@ class GetTOAs:
                 phi, DM, nfeval, rc, scalex, param_errs, red_chi2, duration = \
                         fit_portrait(portx, modelx,
                             np.array([phaseguess, DMguess]), P, freqsx,
-                            nu_ref, scales=True, quiet=quiet)
+                            nu_ref, scales=True, bounds=bounds, quiet=quiet)
                 fit_duration += duration
                 phis[nn] = phi
                 phi_errs[nn] = param_errs[0]

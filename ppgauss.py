@@ -232,7 +232,7 @@ class GaussianSelector:
     def __init__(self, ax, profile, errs, minspanx=None,
                  minspany=None, useblit=True):
         """
-        Ripped and tweaked from SMR's pygaussfit.py
+        Ripped and altered from SMR's pygaussfit.py
         """
         print ""
         print "============================================="

@@ -499,7 +499,7 @@ def fit_gaussian_portrait(data, errs, init_params, fit_flags, phases, freqs,
     return fitted_params, chi_sq, dof
 
 def fit_portrait(data, model, init_params, P=None, freqs=None, nu_ref=np.inf,
-        scales=True, quiet=True):
+        scales=True, bounds=[(None, None), (None, None)], quiet=True):
     """
     """
     #tau = precision = 1/variance
@@ -523,8 +523,8 @@ def fit_portrait(data, model, init_params, P=None, freqs=None, nu_ref=np.inf,
     minimize = opt.minimize
     #fmin_tnc seems to work best, fastest
     method = 'TNC'
-    #Bounds on phase, DM
-    bounds = [(None,None),(None,None)]
+    #Bounds on phase, DM; in principle allows you to fix phase and/or DM
+    bounds = [(None, None), (None, None)]
     start = time.time()
     results = minimize(fit_portrait_function, init_params, args=other_args,
             method=method, jac=fit_portrait_function_deriv, bounds=bounds,
@@ -839,6 +839,8 @@ def read_model(modelfile, phases=None, freqs=None, quiet=False):
     """
     if phases is None and freqs is None:
         read_only = True
+    else:
+        read_only = False
     modeldata = open(modelfile, "r").readlines()
     ngauss = len(modeldata) - 3
     params = np.zeros(ngauss*6 + 1)
@@ -951,6 +953,8 @@ def make_fake_pulsar(modelfile, ephemfile, outfile, nsub, npol, nchan, nbin,
     arch.dededisperse()
     arch.unload(outfile)
     if not quiet: print "\nUnloaded %s.\n"%outfile
+
+#def add_archs(metafile);
 
 def write_princeton_toa(toa_MJDi, toa_MJDf, toaerr, freq, DM, obs='@',
         name=' ' * 13):
