@@ -123,12 +123,13 @@ class GetTOAs:
                 #This is the frequency used in the fit for DM and phase, which
                 #hopefully minimizes the covariance
                 nu_fit = find_DM_freq(freqsx, channel_SNRs)
+                nu_fits[nn] = nu_fit
                 ####################
                 #DOPPLER CORRECTION#
                 ####################
-                #In principle, we should be able to correct the frequencies, but
-                #since this is a messy business, it is easier to correct the DM
-                #itself (below).
+                #In principle, we should be able to correct the frequencies,
+                #but since this is a messy business, it is easier to correct
+                #the DM itself (below).
                 #df = arch.get_Integration(isub).get_doppler_factor()
                 #freqsx = doppler_correct_freqs(freqsx, df)
                 #nu0 = doppler_correct_freqs(nu0, df)
@@ -136,7 +137,10 @@ class GetTOAs:
                 if nn == 0:
                     rot_port = rotate_portrait(subints.mean(axis=0)[0], 0.0,
                             DM0, P, freqs, nu_fit)
-                    #PSRCHIVE Dedisperses w.r.t. center of band...?
+                    #PSRCHIVE Dedisperses w.r.t. center of band, which is
+                    #different, in general, from nu_fit; this results in an
+                    #(appropriate) phase offset w.r.t to what would be seen
+                    #in the PSRCHIVE dedispersed portrait.
                     #Currently, first_guess ranges between +/- 0.5
                     phaseguess = first_guess(rot_port, model, nguess=1000)
                     DMguess = DM0
@@ -207,7 +211,7 @@ class GetTOAs:
             self.epochs.append(np.take(epochs, ok_sub_inds))
             self.MJDs.append(np.take(MJDs, ok_sub_inds))
             self.Ps.append(np.take(Ps, ok_sub_inds))
-            #NB: phis and DMs are w.r.t nu_fit!!!
+            #NB: phis are w.r.t nu_fit!!!
             self.phis.append(phis)
             self.phi_errs.append(phi_errs)
             self.DM0s.append(DM0)
@@ -233,7 +237,7 @@ class GetTOAs:
                 self.show_results(datafile)
                 start = time.time()
             if safe:
-                self.write_toas(datafile, "pptoas_toas.bak", self.nu_ref)
+                self.write_toas(datafile, "pptoas_toas.bak")
                 self.write_dm_errs(datafile, "pptoas_dmerrs.bak")
         if not show_plot:
             tot_duration = time.time() - start
@@ -256,32 +260,41 @@ class GetTOAs:
             sys.stdout = open(outfile,"a")
         for datafile in datafiles:
             dfi = datafiles.index(datafile)
-            try:
-                obs_code = obs_codes["%s"%self.obs[dfi].lower()]
-            except(KeyError):
-                obs_code = obs_codes["%s"%self.obs[dfi].upper()]
-            if nu_ref is None:
-                nu_ref = self.nu_refs[dfi]
-            ###NEED TO CONVERT TOAS###
-            #if nu_ref != nu_fit
             nsubx = self.nsubs[dfi]
+            nu_fits = self.nu_fits[dfi]
+            if nu_ref is None:
+                nu_refs = np.ones(nsubx) * self.nu0s[dfi]
+            elif nu_ref == "nu_fit":
+                nu_refs = nu_fits
+            else:
+                nu_refs = np.ones(nsubx) * nu_ref
             epochs = self.epochs[dfi]
             Ps = self.Ps[dfi]
             phis = self.phis[dfi]
             phi_errs = self.phi_errs[dfi]
+            DMs = self.DMs[dfi]
+            #Phase conversion (hopefully, the signs are correct):
+            phis += DM_delay_offset(DMs, Ps, nu_fits, nu_refs)
             toas = np.array([epochs[nn] + pr.MJD((phis[nn] *
                 Ps[nn]) / (3600 * 24.)) for nn in xrange(nsubx)])
+            #Do errors change, like above?
             toa_errs = phi_errs * Ps * 1e6
+            try:
+                obs_code = obs_codes["%s"%self.obs[dfi].lower()]
+            except(KeyError):
+                obs_code = obs_codes["%s"%self.obs[dfi].upper()]
             #Currently writes topocentric frequencies
             for nn in range(nsubx):
                 if self.one_DM:
                     DeltaDM_mean = self.DeltaDM_means[dfi]
                     write_princeton_toa(toas[nn].intday(), toas[nn].fracday(),
-                            toa_errs[nn], nu_ref, DeltaDM_mean, obs=obs_code)
+                            toa_errs[nn], nu_refs[nn], DeltaDM_mean,
+                            obs=obs_code)
                 else:
                     DeltaDMs = self.DMs[dfi] - self.DM0s[dfi]
                     write_princeton_toa(toas[nn].intday(), toas[nn].fracday(),
-                            toa_errs[nn], nu_ref, DeltaDMs[nn], obs=obs_code)
+                            toa_errs[nn], nu_refs[nn], DeltaDMs[nn],
+                            obs=obs_code)
         sys.stdout = sys.__stdout__
         if retrn: return toas, toa_errs
 
@@ -546,7 +559,7 @@ if __name__ == "__main__":
     parser.add_option("--nu_ref",
                       action="store", metavar="nu_ref", dest="nu_ref",
                       default=None,
-                      help="Frequency [MHz] to which the fitted TOAs/DMs are referenced, i.e. the frequency that has zero delay from a non-zero DM.  [default=nu0 (center of band)]")
+                      help="Frequency [MHz] to which the fitted TOAs/DMs are referenced, i.e. the frequency that has zero delay from a non-zero DM. If the special string 'nu_fit' is used, the TOAs will be referenced to the frequency used in the fit. [default=nu0 (center of band)]")
     parser.add_option("--DM",
                       action="store", metavar="DM", dest="DM0", default=None,
                       help="Nominal DM [pc cm**-3] (float) from which to measure offset.  If unspecified, will use the DM stored in the archive.")
@@ -586,7 +599,11 @@ if __name__ == "__main__":
     metafile = options.metafile
     modelfile = options.modelfile
     nu_ref = options.nu_ref
-    if nu_ref: nu_ref = float(nu_ref)
+    if nu_ref:
+        if nu_ref == "nu_fit":
+            pass
+        else:
+            nu_ref = float(nu_ref)
     DM0 = options.DM0
     if DM0: DM0 = float(DM0)
     bary_DM = options.bary_DM

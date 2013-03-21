@@ -642,7 +642,7 @@ def get_scales(data, model, phase, DM, P, freqs, nu_ref=np.inf):
     dFFT = fft.rfft(data, axis=1)
     mFFT = fft.rfft(model, axis=1)
     p = np.real(np.sum(mFFT * np.conj(mFFT), axis=1))
-    D = DM * Dconst / P
+    D = Dconst * DM / P
     #FIX vectorize
     for kk in range(len(mFFT[0])):
         scales += np.real(dFFT[:,kk] * np.conj(mFFT[:,kk]) * np.exp(2j *
@@ -662,7 +662,7 @@ def rotate_portrait(port, phase=0.0, DM=None, P=None, freqs=None,
             pFFT[nn,:] *= np.exp(np.arange(len(pFFT[nn])) * 2.0j * np.pi *
                     phase)
         else:
-            D = DM * Dconst / P
+            D = Dconst * DM / P
             freq = freqs[nn]
             phasor = np.exp(np.arange(len(pFFT[nn])) * 2.0j * np.pi * (phase +
                 (D * (freq**-2.0 - nu_ref**-2.0))))
@@ -694,6 +694,18 @@ def DM_delay(DM, freq, freq2=np.inf, P=None):
         return delay / P
     else:
         return delay
+
+def DM_delay_offset(DM, P=None, nu_ref1=np.inf, nu_ref2=np.inf):
+    """
+    Caculates the (constant) relative delay between a signal dedispersed with
+    respect to nu_ref1 and nu_ref2.
+    If P [sec] is provided, the offset is returned in phase units [rot],
+    other wise units of [sec] are returned.
+    DM should be in [cm**-3 pc]; nu_refs are [MHz].
+    Default is no conversion.
+    """
+    diff = Dconst * DM * P**-1 * (nu_ref1**-2 - nu_ref2**-2)
+    return diff
 
 def find_DM_freq(freqs, SNRs=None):
     """
@@ -890,7 +902,7 @@ def read_model(modelfile, phases=None, freqs=None, quiet=False):
 
 def make_fake_pulsar(modelfile, ephemfile, outfile, nsub, npol, nchan, nbin,
         nu0, bw, tsub, start_MJD=None, weights=None, noise_std=1.0,
-        bw_scint=None, state="Coherence", obs="1", quiet=False):
+        bw_scint=None, state="Coherence", obs="GBT", quiet=False):
     """
     Mostly written by PBD.
     """
