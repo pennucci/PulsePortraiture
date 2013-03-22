@@ -500,7 +500,7 @@ def fit_gaussian_portrait(data, errs, init_params, fit_flags, phases, freqs,
     return fitted_params, chi_sq, dof
 
 def fit_portrait(data, model, init_params, P=None, freqs=None, nu_ref=np.inf,
-        scales=True, bounds=[(None, None), (None, None)], quiet=True):
+        scales=True, bounds=[(None, None), (None, None)], id=None, quiet=True):
     """
     """
     #tau = precision = 1/variance
@@ -538,8 +538,8 @@ def fit_portrait(data, model, init_params, P=None, freqs=None, nu_ref=np.inf,
     rcstring = RCSTRINGS["%s"%str(return_code)]
     #If the fit fails...????
     if results.success is not True:
-        sys.stderr.write("Fit failed with return code %d -- %s\n"
-                %(results.status, rcstring))
+        sys.stderr.write("Fit failed with return code %d -- %s; TOA is %s\n"
+                %(results.status, rcstring, id))
     if not quiet and results.success is True:
         sys.stderr.write("Fit suceeded with return code %d -- %s\n"
                 %(results.status, rcstring))

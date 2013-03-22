@@ -124,6 +124,7 @@ class GetTOAs:
             ok_sub_inds = map(int, np.compress(map(len,
                 np.array(subintsxs)[:,0]), np.arange(nsub)))
             for nn in range(nsubx):
+                id = datafile + "_%d"%nn
                 isub = ok_sub_inds[nn]
                 MJD = MJDs[isub]
                 P = Ps[isub]
@@ -184,7 +185,8 @@ class GetTOAs:
                 phi, DM, nfeval, rc, scalex, param_errs, red_chi2, duration = \
                         fit_portrait(portx, modelx,
                             np.array([phaseguess, DMguess]), P, freqsx,
-                            nu_fit, scales=True, bounds=bounds, quiet=quiet)
+                            nu_fit, scales=True, bounds=bounds, id = id,
+                            quiet=quiet)
                 fit_duration += duration
                 phis[nn] = phi
                 phi_errs[nn] = param_errs[0]
