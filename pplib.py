@@ -789,7 +789,7 @@ def load_data(filenm, dedisperse=False, dededisperse=False, tscrunch=False,
     masks = np.einsum('ij,k', weights_norm, np.ones(nbin))
     masks = np.einsum('j,ikl', np.ones(npol), masks)
     #These are the data free of zapped channels and subints
-    subintsx = [np.compress(weights_norm[ii], subints[ii], axis=1) for ii in
+    subintsxs = [np.compress(weights_norm[ii], subints[ii], axis=1) for ii in
             xrange(nsub)]
     #The channel center frequencies for the non-zapped subints
     freqsxs = [np.compress(weights_norm[ii], freqs) for ii in xrange(nsub)]
@@ -813,9 +813,9 @@ def load_data(filenm, dedisperse=False, dededisperse=False, tscrunch=False,
     arch.fscrunch()
     prof = arch.get_data()[0,0,0]
     #Number unzapped channels, subints
-    nchanx = int(round(np.mean([subintsx[ii].shape[1] for ii in
+    nchanx = int(round(np.mean([subintsxs[ii].shape[1] for ii in
         xrange(nsub)])))
-    nsubx = int(np.compress([subintsx[ii].shape[1] for ii in xrange(nsub)],
+    nsubx = int(np.compress([subintsxs[ii].shape[1] for ii in xrange(nsub)],
             np.ones(nsub)).sum())
     if not quiet:
         print "\tDM/P_ms            = %.1f\n\
@@ -836,7 +836,7 @@ def load_data(filenm, dedisperse=False, dededisperse=False, tscrunch=False,
             masks=masks, epochs=epochs, nbin=nbin, nchan=nchan,
             nchanx=nchanx, noise_std=noise_std, nsub=nsub, nsubx=nsubx,
             nu0=nu0, phases=phases, prof=prof, Ps=Ps, source=source,
-            subints=subints, subintsx=subintsx, weights=weights_norm)
+            subints=subints, subintsxs=subintsxs, weights=weights_norm)
     return data
 
 def unpack_dict(data):
@@ -921,7 +921,7 @@ def check_modelfile(modelfile):
 def make_fake_pulsar(modelfile, ephemfile, outfile="fake_pulsar.port", nsub=1,
         npol=1, nchan=512, nbin=1048, nu0=1500.0, bw=800.0, tsub=300.0,
         phase = 0.0, dDM = 0.0, start_MJD=None, weights=None, noise_std=1.0,
-        bw_scint=None, state="Coherence", obs="GBT", quiet=False):
+        t_scat=None, bw_scint=None, state="Coherence", obs="GBT", quiet=False):
     """
     Mostly written by PBD.
     'phase' [rot] is an arbitrary rotation to all subints.
@@ -1013,17 +1013,17 @@ def make_fake_pulsar(modelfile, ephemfile, outfile="fake_pulsar.port", nsub=1,
     if not quiet: print "\nUnloaded %s.\n"%outfile
 
 def quick_add_archs(metafile, outfile, rotate=False, fiducial=0.5,
-        concat=False, quiet=False):
+        quiet=False):
     """
     """
     from os import system
     archs = open(metafile, "r").readlines()
-    for aa in range(len(archs)):
-        datafile = archs[aa].split()[0]
+    for iarch in range(len(archs)):
+        datafile = archs[iarch].split()[0]
         data = load_data(datafile, dedisperse=True, dededisperse=False,
                 tscrunch=True, pscrunch=True, rm_baseline=True,
                 flux_prof=False, quiet=True)
-        if aa == 0:
+        if iarch == 0:
             nchan = data.nchan
             nbin = data.nbin
             cmd = "cp %s %s"%(datafile, outfile)
@@ -1052,6 +1052,81 @@ def quick_add_archs(metafile, outfile, rotate=False, fiducial=0.5,
     arch.dedisperse()
     arch.unload()
     print "\nUnloaded %s"%outfile
+
+def concatenate_ports(metafile, quiet=True):
+    """
+    """
+    all_data = []
+    all_datax = []
+    nchan = 0
+    nchanx = 0
+    lofreq = np.inf
+    hifreq = 0.0
+    P = 0.0
+    datafiles = open(metafile, "r").readlines()
+    datafiles = [datafiles[xx][:-1] for xx in xrange(len(datafiles))]
+    for idata in range(len(datafiles)):
+        datafile = datafiles[idata]
+        data = load_data(datafile, dedisperse=True, dededisperse=False,
+                tscrunch=True, pscrunch=True, rm_baseline=True,
+                flux_prof=True, quiet=quiet)
+        if idata == 0:
+            nbin = data.nbin
+            phases = data.phases
+            if data.source is None:
+                source = "noname"
+            else:
+                source = data.source
+        lf = data.freqs.min() - (abs(data.bw) / (2*data.nchan))
+        if lf < lofreq: lofreq = lf
+        hf = data.freqs.max() + (abs(data.bw) / (2*data.nchan))
+        if hf > hifreq: hifreq = hf
+        nchan += data.nchan
+        nchanx += data.nchanx
+        P += data.Ps[0]
+        port = (data.masks * data.subints)[0,0]
+        portx = data.subintsxs[0][0]
+        for ichan in range(data.nchan):
+            all_data.append((data.freqs[ichan], port[ichan],
+                    data.weights[0,ichan], data.flux_prof[ichan]))
+        for ichan in range(data.nchanx):
+            all_datax.append((data.freqsxs[0][ichan], portx[ichan],
+                    data.flux_profx[ichan]))
+    dtype = [("freqs", np.float), ("port", np.ndarray), ("weights",
+        np.float), ("flux_prof", np.float)]
+    dtypex = [("freqsx", np.float), ("portx", np.ndarray),
+            ("flux_profx", np.float)]
+    data = np.array(all_data, dtype=dtype)
+    datax = np.array(all_datax, dtype=dtypex)
+    data = np.sort(data, order=["freqs", "flux_prof"])
+    datax = np.sort(datax, order=["freqsx", "flux_profx"])
+    freqs = np.empty(nchan)
+    freqsx = np.empty(nchanx)
+    port = np.empty([nchan, nbin])
+    portx = np.empty([nchanx, nbin])
+    flux_prof = np.empty(nchan)
+    flux_profx = np.empty(nchanx)
+    weights = np.empty(nchan)
+    for ichan in range(nchan):
+        freqs[ichan] = data[ichan][0]
+        port[ichan] = data[ichan][1]
+        weights[ichan] = data[ichan][2]
+        flux_prof[ichan] = data[ichan][3]
+    for ichan in range(nchanx):
+        freqsx[ichan] = datax[ichan][0]
+        portx[ichan] = datax[ichan][1]
+        flux_profx[ichan] = datax[ichan][2]
+    bw = hifreq - lofreq
+    nu0 = (hifreq + lofreq) / 2.0
+    noise_std = get_noise(portx)
+    prof = portx.mean(axis=0)
+    P /= len(datafiles)        #P not Ps, port/x, not subintsx/s
+    #Return getitem/attribute-accessible class!
+    data = DataBunch(bw=bw, flux_prof=flux_prof, flux_profx=flux_profx,
+        freqs=freqs, freqsx=freqsx, nbin=nbin, nchan=nchan, nchanx=nchanx,
+        noise_std=noise_std, nu0=nu0, phases=phases, prof=prof, P=P,
+        port=port, portx=portx, source=source, weights=weights)
+    return data
 
 def write_princeton_toa(toa_MJDi, toa_MJDf, toa_err, nu_ref, dDM, obs='@',
         name=' ' * 13):

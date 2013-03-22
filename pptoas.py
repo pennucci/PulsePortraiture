@@ -122,14 +122,14 @@ class GetTOAs:
                 print "Doing Fourier-domain least-squares fit..."
             #These are the subintegration indices that haven't been zapped
             ok_sub_inds = map(int, np.compress(map(len,
-                np.array(subintsx)[:,0]), np.arange(nsub)))
+                np.array(subintsxs)[:,0]), np.arange(nsub)))
             for nn in range(nsubx):
                 isub = ok_sub_inds[nn]
                 MJD = MJDs[isub]
                 P = Ps[isub]
                 if self.is_gauss_model:
                     freqsx = freqsxs[isub]
-                    portx = subintsx[isub][0]
+                    portx = subintsxs[isub][0]
                     modelx = np.compress(weights[isub], model, axis=0)
                 else:
                     tot_weights = weights[isub] + self.model_weights
@@ -577,13 +577,13 @@ if __name__ == "__main__":
     #                  help="Show this help message and exit.")
     parser.add_option("-d", "--datafile",
                       action="store", metavar="archive", dest="datafile",
-                      help="PSRCHIVE archive from which to generate TOAs.")
+                      help="PSRCHIVE archive from which to measure TOAs/DMs.")
     parser.add_option("-M", "--metafile",
                       action="store",metavar="metafile", dest="metafile",
-                      help="List of archive filenames in metafile.")
+                      help="File containing list of archive filenames from which to measure TOAs/DMs.")
     parser.add_option("-m", "--modelfile",
                       action="store", metavar="model", dest="modelfile",
-                      help="Model file from ppgauss.py, or PSRCHIVE FITS file that has same nu0, bw, nchan, nbin as datafile(s) (i.e. cannot be used with --uncommon).")
+                      help="Model file from ppgauss.py, or PSRCHIVE FITS file that has same channel frequencies, nchan, nbin as datafile(s) (i.e. cannot be used with --uncommon).")
     parser.add_option("-o", "--outfile",
                       action="store", metavar="timfile", dest="outfile",
                       default=None,
