@@ -30,7 +30,8 @@ cols = ['b','g','r','c','m','y','b','g','r','c','m','y','b','g','r','c','m',
         'y','b','g','r','c','m','y','b','g','r','c','m','y']
 
 #List of observatory codes; not sure what "0" corresponds to.
-obs_codes = {"bary":"@", "inf":"0", "gbt":"1", "atca":"2", "ao":"3",
+#Cross-check against TEMPO's obsys.dat; need TEMPO2 codes
+obs_codes = {"bary":"@", "???":"0", "gbt":"1", "atca":"2", "ao":"3",
              "nanshan":"5", "tid43":"6", "pks":"7", "jb":"8", "vla":"c",
              "ncy":"f", "eff":"g", "jbdfb":"q", "wsrt":"i"}
 
@@ -47,11 +48,11 @@ RCSTRINGS = {"-1":"INFEASIBLE: Infeasible (low > up).",
 
 #Exact dispersion constant (e**2/(2*pi*m_e*c))
 #used by PRESTO
-Dconst_exact = 4.148808e3  #[MHz**2 pc**-1 cm**3 s]
+Dconst_exact = 4.148808e3  #[MHz**2 cm**3 pc**-1 s]
 
 #"Traditional" dispersion constant
 #used by PSRCHIVE
-Dconst_trad = 0.000241**-1 #[MHz**2 pc**-1 cm**3 s]
+Dconst_trad = 0.000241**-1 #[MHz**2 cm**3 pc**-1 s]
 
 #Choose wisely.
 Dconst = Dconst_trad
@@ -600,7 +601,7 @@ def get_noise(data, frac=4, tau=False, chans=False, fd=False):
                 return (np.mean(pows[-len(pows)/frac:]))**-1
             else:
                 return np.sqrt(np.mean(pows[-len(pows)/frac:]))
-    except(NameError):
+    except NameError:
         noise = np.zeros(len(data))
         if fd:
             for nn in range(len(noise)):
@@ -652,7 +653,7 @@ def get_scales(data, model, phase, DM, P, freqs, nu_ref=np.inf):
 def rotate_portrait(port, phase=0.0, DM=None, P=None, freqs=None,
         nu_ref=np.inf):
     """
-    Positive values of phase and DM rotate to earlier phase.
+    Positive values of phase and DM rotate to earlier phase ("dedisperses").
     When used to dediserpse, rotate_portrait is virtually identical to
     arch.dedisperse() in PSRCHIVE.
     """
@@ -741,7 +742,7 @@ def load_data(filenm, dedisperse=False, dededisperse=False, tscrunch=False,
     source = arch.get_source()
     if not quiet:
         print "\nReading data from %s on source %s..."%(filenm, source)
-    #Center of the band
+    #Nominal "center" of the band, but not necessarily
     nu0 = arch.get_centre_frequency()
     #For the negative BW cases.  Good fix
     #bw = abs(arch.get_bandwidth())
@@ -900,11 +901,31 @@ def read_model(modelfile, phases=None, freqs=None, quiet=False):
     else:
         return name, ngauss, model
 
-def make_fake_pulsar(modelfile, ephemfile, outfile, nsub, npol, nchan, nbin,
-        nu0, bw, tsub, start_MJD=None, weights=None, noise_std=1.0,
+def check_modelfile(modelfile):
+    """
+    """
+    from os import popen4
+    cmd = "file %s"%modelfile
+    i,o = popen4(cmd)
+    line = o.readline().split()
+    try:
+        line.index("ASCII")
+        return True
+    except ValueError:
+        try:
+            line.index("FITS")
+            return False
+        except ValueError:
+            pass
+
+def make_fake_pulsar(modelfile, ephemfile, outfile="fake_pulsar.port", nsub=1,
+        npol=1, nchan=512, nbin=1048, nu0=1500.0, bw=800.0, tsub=300.0,
+        phase = 0.0, dDM = 0.0, start_MJD=None, weights=None, noise_std=1.0,
         bw_scint=None, state="Coherence", obs="GBT", quiet=False):
     """
     Mostly written by PBD.
+    'phase' [rot] is an arbitrary rotation to all subints.
+    'dDM' [cm**-3 pc] is an additional DM to what is given in ephemfile.
     """
     chanwidth = bw / nchan
     lofreq = nu0 - (bw/2)
@@ -928,7 +949,7 @@ def make_fake_pulsar(modelfile, ephemfile, outfile, nsub, npol, nchan, nbin,
         DECJ = par.DECJ
         RAJ = par.RAJ
         DM = par.DM
-    except(ImportError):
+    except ImportError:
         parfile = open(ephemfile,"r").readlines()
         for xx in xrange(len(parfile)):
             param = parfile[xx].split()
@@ -979,7 +1000,7 @@ def make_fake_pulsar(modelfile, ephemfile, outfile, nsub, npol, nchan, nbin,
     for subint in arch:
         P = subint.get_folding_period()
         for ipol in range(npol):
-            rotmodel = rotate_portrait(model, 0.0, -DM, P, freqs, nu0)
+            rotmodel = rotate_portrait(model, -phase, -(DM+dDM), P, freqs, nu0)
             #rotmodel = model
             for ichan in range(nchan):
                 subint.set_weight(ichan, weights[isub, ichan])
@@ -1032,7 +1053,7 @@ def quick_add_archs(metafile, outfile, rotate=False, fiducial=0.5,
     arch.unload()
     print "\nUnloaded %s"%outfile
 
-def write_princeton_toa(toa_MJDi, toa_MJDf, toaerr, nu_ref, DM, obs='@',
+def write_princeton_toa(toa_MJDi, toa_MJDf, toa_err, nu_ref, dDM, obs='@',
         name=' ' * 13):
     """
     Ripped and altered from PRESTO
@@ -1042,18 +1063,19 @@ def write_princeton_toa(toa_MJDi, toa_MJDf, toaerr, nu_ref, DM, obs='@',
     columns     item
     1-1     Observatory (one-character code) '@' is barycenter
     2-2     must be blank
-    16-24   Reference (not necessarily observing) frequency (MHz)
-    25-44   TOA (decimal point must be in column 30 or column 31)
-    45-53   TOA uncertainty (microseconds)
-    69-78   DM correction (pc cm^-3)
+    16-24   Reference (not necessarily observing) frequency [MHz]
+    25-44   TOA [MJD] (decimal point must be in column 30 or column 31)
+    45-53   TOA uncertainty [us]
+    69-78   DM correction [cm**-3 pc]
     """
+    if nu_ref == np.inf: nu_ref = 0.0
     #Splice together the fractional and integer MJDs
     toa = "%5d"%int(toa_MJDi) + ("%.13f"%toa_MJDf)[1:]
-    if DM != 0.0:
+    if dDM != 0.0:
         print obs + " %13s %8.3f %s %8.3f              %9.5f"%(name, nu_ref,
-                toa, toaerr, DM)
+                toa, toa_err, dDM)
     else:
-        print obs + " %13s %8.3f %s %8.3f"%(name, nu_ref, toa, toaerr)
+        print obs + " %13s %8.3f %s %8.3f"%(name, nu_ref, toa, toa_err)
 
 def show_port(port, phases=None, freqs=None, title=None, prof=True,
         fluxprof=True, rvrsd=False, colorbar=True, savefig=False,

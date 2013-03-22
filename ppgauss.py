@@ -122,6 +122,8 @@ class DataPortrait:
         #The noise...
         self.portx_noise = np.outer(get_noise(self.portx, chans=True),
                 np.ones(self.nbin))
+        channel_SNRs = self.portx.std(axis=1) / self.portx_noise[:, 0]
+        self.nu_fit = find_DM_freq(self.freqsxs[0], channel_SNRs)
         #Here's the loop
         if niter < 0: niter = 0
         self.niter = niter
@@ -141,9 +143,9 @@ class DataPortrait:
                     print "\nRotating data portrait for iteration %d."%(
                             self.itern - self.niter + 1)
                 self.port = rotate_portrait(self.port, self.phi, self.DM,
-                        self.Ps[0], self.freqs, self.nu0)
+                        self.Ps[0], self.freqs, self.nu_fit)
                 self.portx = rotate_portrait(self.portx, self. phi, self.DM,
-                        self.Ps[0], self.freqsxs[0], self.nu0)
+                        self.Ps[0], self.freqsxs[0], self.nu_fit)
             if not quiet:
                 print "Fitting gaussian model portrait..."
             iterator.next()
@@ -187,7 +189,7 @@ class DataPortrait:
                     self.red_chi2, self.fit_duration) = (
                         fit_portrait(self.portx, self.modelx,
                             np.array([phaseguess, DMguess]), self.Ps[0],
-                            self.freqsxs[0], self.nu0, scales=True,
+                            self.freqsxs[0], self.nu_fit, scales=True,
                             quiet=quiet))
             self.phierr = param_errs[0]
             self.DMerr = param_errs[1]
@@ -201,7 +203,7 @@ class DataPortrait:
             print " duration of %.2f min"%(self.duration /  60.)
             print " phase offset of %.2e +/- %.2e [rot]"%(self.phi,
                 self.phierr)
-            print " DM of %.2e +/- %.2e [pc cm**-3]"%(self.DM, self.DMerr)
+            print " DM of %.2e +/- %.2e [cm**-3 pc]"%(self.DM, self.DMerr)
             print " red. chi**2 of %.2f."%self.red_chi2
         else:
             if self.niter and (self.itern - self.niter) != 0:

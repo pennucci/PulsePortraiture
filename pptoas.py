@@ -12,6 +12,7 @@ class GetTOAs:
         self.datafiles = datafiles
         if type(self.datafiles) is str:
             self.datafiles = [self.datafiles]
+        self.is_gauss_model = check_modelfile(modelfile)
         self.modelfile = modelfile
         self.nu_ref = nu_ref
         self.DM0 = DM0
@@ -45,8 +46,19 @@ class GetTOAs:
             data = load_data(self.datafiles[0], dedisperse=False,
                     dededisperse=False, tscrunch=True, pscrunch=True,
                     rm_baseline=True, flux_prof=False, quiet=True)
-            self.model_name, self.ngauss, self.model = read_model(
-                    self.modelfile, data.phases, data.freqs, self.quiet)
+            if self.is_gauss_model:
+                self.model_name, self.ngauss, self.model = read_model(
+                        self.modelfile, data.phases, data.freqs, self.quiet)
+            else:
+                self.model_data = load_data(self.modelfile, dedisperse=True,
+                        dededisperse=False, tscrunch=True, pscrunch=True,
+                        rm_baseline=True, flux_prof=False, quiet=True)
+                self.model_name = self.model_data.source
+                self.ngauss = 0
+                self.model_weights = self.model_data.weights[0]
+                self.model = self.model_data.subints[0,0]
+                #self.model = np.transpose(self.model_weights * np.transpose(
+                #    self.model_data.subints[0,0]))
             self.source = data.source
             self.nchan = data.nchan
             self.nbin = data.nbin
@@ -84,7 +96,7 @@ class GetTOAs:
                 self.model_name, self.ngauss, model = read_model(
                         self.modelfile, phases, freqs, quiet=quiet)
             else:
-                ngauss, model = self.ngauss, self.model
+                model = self.model
             nu_fits = np.empty(nsubx, dtype=np.float)
             phis = np.empty(nsubx, dtype=np.double)
             phi_errs = np.empty(nsubx, dtype=np.double)
@@ -115,9 +127,15 @@ class GetTOAs:
                 isub = ok_sub_inds[nn]
                 MJD = MJDs[isub]
                 P = Ps[isub]
-                freqsx = freqsxs[isub]
-                portx = subintsx[isub][0]
-                modelx = np.compress(weights[isub], model, axis=0)
+                if self.is_gauss_model:
+                    freqsx = freqsxs[isub]
+                    portx = subintsx[isub][0]
+                    modelx = np.compress(weights[isub], model, axis=0)
+                else:
+                    tot_weights = weights[isub] + self.model_weights
+                    freqsx = np.compress(tot_weights, freqs)
+                    portx = np.compress(tot_weights, subints[isub][0], axis=0)
+                    modelx = np.compress(tot_weights, model, axis=0)
                 #A proxy for SNR, hopefully proportional:
                 channel_SNRs = portx.std(axis=1) / get_noise(portx, chans=True)
                 #This is the frequency used in the fit for DM and phase, which
@@ -159,6 +177,9 @@ class GetTOAs:
                 #       DM guess:    %.5f"""%(phaseguess, DMguess)
                 #
                 #Need a status bar?
+                #########
+                #THE FIT#
+                #########
                 if not quiet: print "Fitting for TOA %d"%(nn)
                 phi, DM, nfeval, rc, scalex, param_errs, red_chi2, duration = \
                         fit_portrait(portx, modelx,
@@ -228,6 +249,7 @@ class GetTOAs:
             self.fit_durations.append(fit_duration)
             if not quiet:
                 print "--------------------------"
+                print datafile
                 print "~%.2f min/TOA"%(fit_duration / (60. * nsubx))
                 print "Avg. TOA error is %.3f us"%(phi_errs.mean() *
                         Ps.mean() * 1e6)
@@ -281,7 +303,7 @@ class GetTOAs:
             toa_errs = phi_errs * Ps * 1e6
             try:
                 obs_code = obs_codes["%s"%self.obs[dfi].lower()]
-            except(KeyError):
+            except KeyError:
                 obs_code = obs_codes["%s"%self.obs[dfi].upper()]
             #Currently writes topocentric frequencies
             for nn in range(nsubx):
@@ -346,13 +368,13 @@ class GetTOAs:
                 DeltaDM_mean + DM0, datafile))
         if outfile is not None: of.close()
 
-    def show_subint(self, datafile, isub, dedisperse=True, quiet=False):
+    def show_subint(self, datafile, isub, quiet=False):
         """
         subint 0 = python index 0
         """
         dfi = self.datafiles.index(datafile)
-        data = load_data(datafile, dedisperse=dedisperse,
-                dededisperse=bool(not dedisperse), tscrunch=False,
+        data = load_data(datafile, dedisperse=True,
+                dededisperse=False, tscrunch=False,
                 pscrunch=True, rm_baseline=True, flux_prof=False, quiet=quiet)
         title = "%s ; subint %d"%(datafile, isub)
         port = np.transpose(data.weights[isub] * np.transpose(
@@ -360,33 +382,42 @@ class GetTOAs:
         show_port(port=port, phases=data.phases, freqs=data.freqs, title=title,
                 prof=True, fluxprof=True, rvrsd=bool(data.bw < 0))
 
-    def show_fit(self, datafile=None, isub=0, dedisperse=True, quiet=False):
+    def show_fit(self, datafile=None, isub=0, quiet=False):
         """
         subint 0 = python index 0
+        This may not be *exactly* correct in the display of the fit,
+        but close...
         """
         if datafile is None:
             datafile = self.datafiles[0]
         dfi = self.datafiles.index(datafile)
-        data = load_data(datafile, dedisperse=dedisperse,
-                dededisperse=bool(not dedisperse), tscrunch=False,
+        data = load_data(datafile, dedisperse=False,
+                dededisperse=False, tscrunch=False,
                 pscrunch=True, rm_baseline=True, flux_prof=False, quiet=quiet)
         phi = self.phis[dfi][isub]
-        DM = self.DMs[dfi][isub] - self.DM0s[dfi]
+        #Pre-corrected DM, if corrected
+        if self.bary_DM:
+            DM = (self.DMs[dfi][isub] /
+                    data.arch.get_Integration(0).get_doppler_factor())
         scales = self.scales[dfi][isub]
         freqs = data.freqs
         nu_fit = self.nu_fits[dfi][isub]
         P = data.Ps[isub]
         phases = data.phases
-        port = data.subints[isub,0]
         weights = data.weights[isub]
+        if not self.is_gauss_model:
+            weights += self.model_weights
+            model_name = self.model_name
+            model = np.transpose(weights * np.transpose(self.model))
+        else:
+            model_name, ngauss, model = read_model(self.modelfile, phases,
+                    freqs, quiet=quiet)
+        port = rotate_portrait(data.subints[isub,0], phi, DM, P, freqs, nu_fit)
         port = np.transpose(weights * np.transpose(port))
-        model_name, ngauss, model = read_model(self.modelfile, phases, freqs,
-                quiet=quiet)
-        model_fitted = np.transpose(scales * np.transpose(rotate_portrait(
-            model, -phi, -DM, P, freqs, nu_fit)))
-        titles = ("%s ; subint %d"%(datafile, isub),
+        model_scaled = np.transpose(scales * np.transpose(model))
+        titles = ("%s\nSubintegration %d"%(datafile, isub),
                 "Fitted Model %s"%(model_name), "Residuals")
-        show_residual_plot(port=port, model=model_fitted, resids=None,
+        show_residual_plot(port=port, model=model_scaled, resids=None,
                 phases=phases, freqs=freqs, titles=titles,
                 rvrsd=bool(data.bw < 0))
 
@@ -402,6 +433,7 @@ class GetTOAs:
         Ps = self.Ps[dfi]
         phis = self.phis[dfi]
         phi_errs = self.phi_errs[dfi]
+        #These are the 'barycentric' DMs, if they were corrected (default yes)
         DMs = self.DMs[dfi]
         DM_errs = self.DM_errs[dfi]
         DM0 = self.DM0s[dfi]
@@ -461,7 +493,7 @@ class GetTOAs:
                   DeltaDM_mean + DM0 - DeltaDM_err]
         plt.fill(xverts, yverts, "m", alpha=0.25, ec='none')
         plt.xlabel("MJD")
-        plt.ylabel(r"DM [pc cm$^{3}$]")
+        plt.ylabel(r"DM [cm$^{3}$ pc]")
         ax3.text(0.15, 0.9, r"$\Delta$ DM = %.2e $\pm$ %.2e"%(DeltaDM_mean,
             DeltaDM_err), ha='center',
                 va='center', transform=ax3.transAxes)
@@ -551,7 +583,7 @@ if __name__ == "__main__":
                       help="List of archive filenames in metafile.")
     parser.add_option("-m", "--modelfile",
                       action="store", metavar="model", dest="modelfile",
-                      help=".model file from ppgauss.py (more general models coming soon).")
+                      help="Model file from ppgauss.py, or PSRCHIVE FITS file that has same nu0, bw, nchan, nbin as datafile(s) (i.e. cannot be used with --uncommon).")
     parser.add_option("-o", "--outfile",
                       action="store", metavar="timfile", dest="outfile",
                       default=None,
@@ -559,10 +591,10 @@ if __name__ == "__main__":
     parser.add_option("--nu_ref",
                       action="store", metavar="nu_ref", dest="nu_ref",
                       default=None,
-                      help="Frequency [MHz] to which the fitted TOAs/DMs are referenced, i.e. the frequency that has zero delay from a non-zero DM. If the special string 'nu_fit' is used, the TOAs will be referenced to the frequency used in the fit. [default=nu0 (center of band)]")
+                      help="Frequency [MHz] to which the fitted TOAs/DMs are referenced, i.e. the frequency that has zero delay from a non-zero DM. 'inf' is used for inifite frequency.  If the special string 'nu_fit' is used, the TOAs will be referenced to the frequency used in the fit. [default=nu0 (PSRCHIVE's 'center' of band)]")
     parser.add_option("--DM",
                       action="store", metavar="DM", dest="DM0", default=None,
-                      help="Nominal DM [pc cm**-3] (float) from which to measure offset.  If unspecified, will use the DM stored in the archive.")
+                      help="Nominal DM [cm**-3 pc] (float) from which to measure offset.  If unspecified, will use the DM stored in the archive.")
     parser.add_option("--no_bary_DM",
                       action="store_false", dest="bary_DM", default=True,
                       help='Do not Doppler-correct the fitted DM to make "barycentric DM".')
@@ -578,7 +610,7 @@ if __name__ == "__main__":
                       help='Append pam commands to file "pam_cmd."')
     parser.add_option("--uncommon",
                       action="store_true", dest="uncommon", default=False,
-                      help="If supplying a metafile, use this flag if the data are not homogenous (i.e. have different nchan, nbin, nu0)")
+                      help="If supplying a metafile, use this flag if the data are not homogenous (i.e. have different nu0, bw, nchan, nbin)")
     parser.add_option("--showplot",
                       action="store_true", dest="showplot", default=False,
                       help="Plot fit results for each epoch. Only useful if nsubint > 1.")
@@ -600,7 +632,9 @@ if __name__ == "__main__":
     modelfile = options.modelfile
     nu_ref = options.nu_ref
     if nu_ref:
-        if nu_ref == "nu_fit":
+        if nu_ref == "inf":
+            nu_ref = np.inf
+        elif nu_ref == "nu_fit":
             pass
         else:
             nu_ref = float(nu_ref)
