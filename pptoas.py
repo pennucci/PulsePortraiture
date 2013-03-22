@@ -153,8 +153,12 @@ class GetTOAs:
                 #freqsx = doppler_correct_freqs(freqsx, df)
                 #nu0 = doppler_correct_freqs(nu0, df)
                 ####################
+                #Initial guess; have to be careful, since the subints are 
+                #dedispersed at different nu_fit
                 if nn == 0:
-                    rot_port = rotate_portrait(subints.mean(axis=0)[0], 0.0,
+                    mean_port = np.transpose(weights.mean(axis=0) *
+                            np.transpose(subints.mean(axis=0)[0]))
+                    rot_port = rotate_portrait(mean_port, 0.0,
                             DM0, P, freqs, nu_fit)
                     #PSRCHIVE Dedisperses w.r.t. center of band, which is
                     #different, in general, from nu_fit; this results in an
@@ -163,6 +167,11 @@ class GetTOAs:
                     #Currently, first_guess ranges between +/- 0.5
                     phaseguess = first_guess(rot_port, model, nguess=1000)
                     DMguess = DM0
+                    phaseguess_0 = phaseguess
+                #I have to subtract the DM_delay_offset, by empirical trials...
+                phaseguess = phaseguess_0 - DM_delay_offset(DMguess, P,
+                        nu_fits[0], nu_fit)
+                #show_residual(rot_port)
                 #    if not quiet: print "Phase guess: %.8f ; DM guess: %.5f"%(
                 #            phaseguess, DMguess)
                 #The below else clause might not be a good idea if RFI or
@@ -297,8 +306,9 @@ class GetTOAs:
             phis = self.phis[dfi]
             phi_errs = self.phi_errs[dfi]
             DMs = self.DMs[dfi]
-            #Phase conversion (hopefully, the signs are correct):
-            phis += DM_delay_offset(DMs, Ps, nu_fits, nu_refs)
+            #Phase conversion (hopefully, the signs are correct)...
+            #...I have to subtract the DM_delay_offset, by empirical trials...
+            phis -= DM_delay_offset(DMs, Ps, nu_fits, nu_refs)
             toas = np.array([epochs[nn] + pr.MJD((phis[nn] *
                 Ps[nn]) / (3600 * 24.)) for nn in xrange(nsubx)])
             #Do errors change, like above?

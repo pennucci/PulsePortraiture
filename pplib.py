@@ -533,13 +533,17 @@ def fit_portrait(data, model, init_params, P=None, freqs=None, nu_ref=np.inf,
     duration = time.time() - start
     phi = results.x[0]
     DM = results.x[1]
+    print phi, DM, id
     nfeval = results.nfev
     return_code = results.status
     rcstring = RCSTRINGS["%s"%str(return_code)]
-    #If the fit fails...????
+    #If the fit fails...????  These don't seem to be great indicators of the
+    #fit failing
     if results.success is not True:
-        sys.stderr.write("Fit failed with return code %d -- %s; TOA is %s\n"
-                %(results.status, rcstring, id))
+        filenm = id[:-id[::-1].index("_")-1]
+        subint = id[-id[::-1].index("_"):]
+        sys.stderr.write("Fit failed with return code %d -- %s; %s subint %s\n"
+                %(results.status, rcstring, filenm, subint))
     if not quiet and results.success is True:
         sys.stderr.write("Fit succeeded with return code %d -- %s\n"
                 %(results.status, rcstring))
@@ -699,12 +703,13 @@ def DM_delay(DM, freq, freq2=np.inf, P=None):
 def DM_delay_offset(DM, P=None, nu_ref1=np.inf, nu_ref2=np.inf):
     """
     Caculates the (constant) relative delay between a signal dedispersed with
-    respect to nu_ref1 and nu_ref2.
+    respect to nu_ref1 and nu_ref2 (returns delay(nu_ref2) - delay(nu_ref1)).
     If P [sec] is provided, the offset is returned in phase units [rot],
     other wise units of [sec] are returned.
     DM should be in [cm**-3 pc]; nu_refs are [MHz].
     Default is no conversion.
     """
+    if P is None: P = 1.0
     diff = Dconst * DM * P**-1 * (nu_ref1**-2 - nu_ref2**-2)
     return diff
 
