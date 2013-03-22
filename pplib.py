@@ -533,7 +533,6 @@ def fit_portrait(data, model, init_params, P=None, freqs=None, nu_ref=np.inf,
     duration = time.time() - start
     phi = results.x[0]
     DM = results.x[1]
-    print phi, DM, id
     nfeval = results.nfev
     return_code = results.status
     rcstring = RCSTRINGS["%s"%str(return_code)]
