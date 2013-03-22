@@ -8,7 +8,7 @@ from pplib import *
 class DataPortrait:
     """
     """
-    def __init__(self, datafile, metafile=None, quiet=False):
+    def __init__(self, datafile=None, metafile=None, quiet=False):
         ""
         ""
         self.init_params = []
