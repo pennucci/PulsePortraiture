@@ -33,6 +33,7 @@ class GetTOAs:
         self.DM_errs = []
         self.DeltaDM_means = []
         self.DeltaDM_errs = []
+        if bary_DM: self.doppler_fs = []
         self.scales = []
         self.scalesx = []
         self.scale_errs = []
@@ -102,6 +103,7 @@ class GetTOAs:
             phi_errs = np.empty(nsubx, dtype=np.double)
             DMs = np.empty(nsubx, dtype=np.float)
             DM_errs = np.empty(nsubx, dtype=np.float)
+            if bary_DM: doppler_fs = np.empty(nsubx, dtype=np.float)
             nfevals = np.empty(nsubx, dtype='int')
             rcs = np.empty(nsubx, dtype='int')
             scales = np.empty([nsubx, nchan], dtype=np.float)
@@ -207,6 +209,7 @@ class GetTOAs:
                     #the inverse of the convention nu_source/nu_observed
                     df = arch.get_Integration(isub).get_doppler_factor()
                     DM *= df
+                    doppler_fs[nn] = df
                 DMs[nn] = DM
                 DM_errs[nn] = param_errs[1]
                 nfevals[nn] = nfeval
@@ -251,6 +254,7 @@ class GetTOAs:
             self.DM_errs.append(DM_errs)
             self.DeltaDM_means.append(DeltaDM_mean)
             self.DeltaDM_errs.append(DeltaDM_err)
+            if bary_DM: self.doppler_fs.append(doppler_Fs)
             self.scales.append(scales)
             self.scalesx.append(scalesx)
             self.scale_errs.append(scale_errs)
@@ -308,7 +312,12 @@ class GetTOAs:
             DMs = self.DMs[dfi]
             #Phase conversion (hopefully, the signs are correct)...
             #...I have to subtract the DM_delay_offset, by empirical trials...
-            phis -= DM_delay_offset(DMs, Ps, nu_fits, nu_refs)
+            if bary_DM:
+                doppler_fs = self.doppler_fs[dfi]
+                fitted_DMs = DMs / doppler_fs
+            else:
+                fitted_DMs = DMs
+            phis -= DM_delay_offset(fitted_DMs, Ps, nu_fits, nu_refs)
             toas = np.array([epochs[nn] + pr.MJD((phis[nn] *
                 Ps[nn]) / (3600 * 24.)) for nn in xrange(nsubx)])
             #Do errors change, like above?
@@ -383,6 +392,7 @@ class GetTOAs:
     def show_subint(self, datafile, isub, quiet=False):
         """
         subint 0 = python index 0
+        ***isub is currently NOT the pure subint index, but subintx index***
         """
         dfi = self.datafiles.index(datafile)
         data = load_data(datafile, dedisperse=True,
@@ -397,6 +407,7 @@ class GetTOAs:
     def show_fit(self, datafile=None, isub=0, quiet=False):
         """
         subint 0 = python index 0
+        ***isub is currently NOT the pure subint index, but subintx index***
         This may not be *exactly* correct in the display of the fit,
         but close...
         """
@@ -409,8 +420,9 @@ class GetTOAs:
         phi = self.phis[dfi][isub]
         #Pre-corrected DM, if corrected
         if self.bary_DM:
-            DM = (self.DMs[dfi][isub] /
-                    data.arch.get_Integration(0).get_doppler_factor())
+            fitted_DM = self.DMs[dfi][isub] / self.doppler_fs[dfi][isub]
+        else:
+            fitted_DM = self.DMs[dfi][isub]
         scales = self.scales[dfi][isub]
         freqs = data.freqs
         nu_fit = self.nu_fits[dfi][isub]
@@ -424,7 +436,8 @@ class GetTOAs:
         else:
             model_name, ngauss, model = read_model(self.modelfile, phases,
                     freqs, quiet=quiet)
-        port = rotate_portrait(data.subints[isub,0], phi, DM, P, freqs, nu_fit)
+        port = rotate_portrait(data.subints[isub,0], phi, fitted_DM, P, freqs,
+                nu_fit)
         port = np.transpose(weights * np.transpose(port))
         model_scaled = np.transpose(scales * np.transpose(model))
         titles = ("%s\nSubintegration %d"%(datafile, isub),
