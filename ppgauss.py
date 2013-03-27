@@ -452,7 +452,7 @@ if __name__ == "__main__":
                       help="PSRCHIVE archive from which to generate gaussian model.")
     parser.add_option("-M", "--metafile",
                       action="store",metavar="metafile", dest="metafile",
-                      help="File containing list of archive file names, each of which represents a unique band, and all of which are concatenated, without rotation, for the fit.  nbin must not differ.")
+                      help="File containing list of archive file names, each of which represents a unique band; these files are concatenated, without rotation, for the fit.  nbin must not differ.")
     parser.add_option("-o", "--outfile",
                       action="store", metavar="outfile", dest="outfile",
                       help="Name of output model file name. [default=archive.model or metafile.model]")

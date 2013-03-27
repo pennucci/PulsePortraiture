@@ -33,7 +33,7 @@ class GetTOAs:
         self.DM_errs = []
         self.DeltaDM_means = []
         self.DeltaDM_errs = []
-        if bary_DM: self.doppler_fs = []
+        if self.bary_DM: self.doppler_fs = []
         self.scales = []
         self.scalesx = []
         self.scale_errs = []
@@ -103,7 +103,7 @@ class GetTOAs:
             phi_errs = np.empty(nsubx, dtype=np.double)
             DMs = np.empty(nsubx, dtype=np.float)
             DM_errs = np.empty(nsubx, dtype=np.float)
-            if bary_DM: doppler_fs = np.empty(nsubx, dtype=np.float)
+            if self.bary_DM: doppler_fs = np.empty(nsubx, dtype=np.float)
             nfevals = np.empty(nsubx, dtype='int')
             rcs = np.empty(nsubx, dtype='int')
             scales = np.empty([nsubx, nchan], dtype=np.float)
@@ -254,7 +254,7 @@ class GetTOAs:
             self.DM_errs.append(DM_errs)
             self.DeltaDM_means.append(DeltaDM_mean)
             self.DeltaDM_errs.append(DeltaDM_err)
-            if bary_DM: self.doppler_fs.append(doppler_Fs)
+            if self.bary_DM: self.doppler_fs.append(doppler_fs)
             self.scales.append(scales)
             self.scalesx.append(scalesx)
             self.scale_errs.append(scale_errs)
@@ -312,7 +312,7 @@ class GetTOAs:
             DMs = self.DMs[dfi]
             #Phase conversion (hopefully, the signs are correct)...
             #...I have to subtract the DM_delay_offset, by empirical trials...
-            if bary_DM:
+            if self.bary_DM:
                 doppler_fs = self.doppler_fs[dfi]
                 fitted_DMs = DMs / doppler_fs
             else:
