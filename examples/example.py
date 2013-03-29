@@ -10,7 +10,8 @@ ephemfile = "example.par"
 #Generate some fake datafiles
 #These files will be homogenous, even though they don't need to be
 
-nfiles = 5      #Number of datafiles
+nfiles = 5      #Number of datafiles/epochs
+days = 20.0     #Days between epochs
 nsub = 20       #Number of subintegrations
 npol = 1        #Number of polarization (can be 4, but will only use total I)
 nchan = 64      #Number of frequency channels
@@ -18,7 +19,7 @@ nbin = 512      #Number of phase bins
 nu0 = 1500.0    #Center of the band [MHz]
 bw = 800.0      #Bandwidth [MHz]
 tsub = 120.0    #Length of subintegration [s]
-noise_std = 2.77#Noise level of the band [flux units]
+noise_std = 2.77#Noise level of the band, per subintegration [flux units]
 dDM_mean = 3e-4 #Add in random dispersion measure offsets with this mean value
 dDM_std = 2e-4  #Add in random dispersion measure offsets with this std
 dDMs = np.random.normal(dDM_mean, dDM_std, nfiles)
@@ -31,6 +32,7 @@ print "Making fake data..."
 for nn in range(nfiles):
     if nn == 0: quiet=False
     else: quiet = True
+    start_MJD = 50000.00 + nn*days
     make_fake_pulsar(modelfile, ephemfile, outfile="example-%d.fits"%(nn+1),
             nsub=nsub, npol=npol, nchan=nchan, nbin=nbin, nu0=nu0, bw=bw,
             tsub=tsub, phase=0.0, dDM=dDMs[nn], start_MJD=None,
