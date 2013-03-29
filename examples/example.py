@@ -81,11 +81,12 @@ gt = pt.GetTOAs(metafile, "example-fit.gmodel", nu_ref=nu_ref, DM0=DM0)
 gt.get_toas()
 #Show results from first datafile
 gt.show_results()
-#Show typical fit
+#Show typical fit; the fake data TOAs look very scattered for some reason
 gt.show_fit()
 #Write toas
 gt.write_toas(outfile="example.tim", nu_ref=nu_ref)
 #See fitted versus injected DMs
+print ""
 print "Injected DMs, mean, std:"
 print dDMs, dDM_mean, dDM_std
 print "Measured average DM offsets, mean, std:"
@@ -93,4 +94,4 @@ dDM_fit = pt.np.array(gt.DeltaDM_means)
 print dDM_fit, dDM_fit.mean(), dDM_fit.std()
 diff = dDMs - dDM_fit
 print "Difference, mean, std:"
-diff, diff.mean(), diff.std()
+print diff, diff.mean(), diff.std()
