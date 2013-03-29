@@ -6,3 +6,6 @@ misc/
 lmtest/
 notes
 PPprofile/
+examples/*.pyc
+examples/*.swp
+examples/*~
