@@ -401,7 +401,7 @@ class GaussianSelector:
             plt.draw()
         # Middle mouse button = fit the gaussians
         elif event1.button == event2.button == 2:
-            print "Fitting reference gaussian profile..."
+            print "Fitting gaussian profile..."
             fitted_params, chi_sq, dof, residuals = fit_gaussian_profile(
                     self.profile, self.init_params, np.zeros(self.proflen) +
                     self.errs, quiet=True)
