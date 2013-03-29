@@ -9,10 +9,14 @@ class GetTOAs:
             one_DM=False, bary_DM=True, common=True, quiet=False):
         """
         """
-        self.datafiles = datafiles
-        if type(self.datafiles) is str:
-            self.datafiles = [self.datafiles]
-        self.is_gauss_model = check_modelfile(modelfile)
+        if check_file(datafiles):
+            self.metafile = datafiles
+            self.datafiles = open(datafiles, "r").readlines()
+            self.datafiles = [self.datafiles[xx][:-1] for xx in xrange(len(
+                self.datafiles))]
+        else:
+            self.datafiles = [datafiles]
+        self.is_gauss_model = check_file(modelfile)
         self.modelfile = modelfile
         self.nu_ref = nu_ref
         self.DM0 = DM0
@@ -675,10 +679,12 @@ if __name__ == "__main__":
     quiet = options.quiet
 
     if metafile is None:
-        datafiles = [datafile]
+#        datafiles = [datafile]
+        datafiles = datafile
     else:
-        datafiles = open(metafile, "r").readlines()
-        datafiles = [datafiles[xx][:-1] for xx in xrange(len(datafiles))]
+#        datafiles = open(metafile, "r").readlines()
+#        datafiles = [datafiles[xx][:-1] for xx in xrange(len(datafiles))]
+        datafiles = metafile
     gt = GetTOAs(datafiles=datafiles, modelfile=modelfile, nu_ref=nu_ref,
             DM0=DM0, one_DM=one_DM, bary_DM=bary_DM, common=common,
             quiet=quiet)

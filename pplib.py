@@ -855,15 +855,15 @@ def write_model(filenm, name, nu_ref, model_params, fit_flags):
     """
     """
     outfile = open(filenm, "a")
-    outfile.write("%s\n"%name)
-    outfile.write("%.4f\n"%nu_ref)
-    outfile.write("%.8f  %d\n"%(model_params[0], fit_flags[0]))
+    outfile.write("MODEL  %s\n"%name)
+    outfile.write("FREQ   %.4f\n"%nu_ref)
+    outfile.write("DC     %.8f  %d\n"%(model_params[0], fit_flags[0]))
     ngauss = (len(model_params) - 1) / 6
     for nn in xrange(ngauss):
         comp = model_params[(1 + nn*6):(7 + nn*6)]
         fit_comp = fit_flags[(1 + nn*6):(7 + nn*6)]
-        line = tuple(np.array(zip(comp, fit_comp)).ravel())
-        outfile.write("%1.8f  %d  % 10.8f  %d  % 10.8f  %d  % 10.8f  %d  % 12.8f  %d  % 12.8f  %d\n"%line)
+        line = (nn+1,) + tuple(np.array(zip(comp, fit_comp)).ravel())
+        outfile.write("COMP%02d %1.8f  %d  % 10.8f  %d  % 10.8f  %d  % 10.8f  %d  % 12.8f  %d  % 12.8f  %d\n"%line)
     outfile.close()
     print "%s written."%filenm
 
@@ -874,20 +874,41 @@ def read_model(modelfile, phases=None, freqs=None, quiet=False):
         read_only = True
     else:
         read_only = False
+    ngauss = 0
+    comps = []
     modeldata = open(modelfile, "r").readlines()
-    ngauss = len(modeldata) - 3
+    for line in modeldata:
+        info = line.split()
+        try:
+            if info[0] == "MODEL":
+                name = info[1]
+            elif info[0] == "FREQ":
+                nu_ref = float(info[1])
+            elif info[0] == "DC":
+                dc = float(info[1])
+                fit_dc = int(info[2])
+            elif info[0][:4] == "COMP":
+                comps.append(line)
+                ngauss += 1
+            else:
+                pass
+        except IndexError:
+            pass
+    #ngauss = len(modeldata) - 3
     params = np.zeros(ngauss*6 + 1)
     fit_flags = np.zeros(len(params))
-    name = modeldata.pop(0)[:-1]
-    nu_ref = float(modeldata.pop(0))
-    dc_line = modeldata.pop(0)
-    dc = float(dc_line.split()[0])
-    fit_dc = int(dc_line.split()[1])
+    #name = modeldata.pop(0)[:-1]
+    #nu_ref = float(modeldata.pop(0))
+    #dc_line = modeldata.pop(0)
+    #dc = float(dc_line.split()[0])
+    #fit_dc = int(dc_line.split()[1])
     params[0] = dc
     fit_flags[0] = fit_dc
     for gg in xrange(ngauss):
-        comp = map(float, modeldata[gg].split()[::2])
-        fit_comp = map(int, modeldata[gg].split()[1::2])
+        #comp = map(float, modeldata[gg].split()[::2])
+        comp = map(float, comps[gg].split()[1::2])
+        #fit_comp = map(int, modeldata[gg].split()[1::2])
+        fit_comp = map(int, comps[gg].split()[2::2])
         params[1 + gg*6 : 7 + (gg*6)] = comp
         fit_flags[1 + gg*6 : 7 + (gg*6)] = fit_comp
     if not read_only:
@@ -905,11 +926,11 @@ def read_model(modelfile, phases=None, freqs=None, quiet=False):
     else:
         return name, ngauss, model
 
-def check_modelfile(modelfile):
+def check_file(filename):
     """
     """
     from os import popen4
-    cmd = "file %s"%modelfile
+    cmd = "file %s"%filename
     i,o = popen4(cmd)
     line = o.readline().split()
     try:
@@ -922,9 +943,9 @@ def check_modelfile(modelfile):
         except ValueError:
             pass
 
-def make_fake_pulsar(modelfile, ephemfile, outfile="fake_pulsar.port", nsub=1,
+def make_fake_pulsar(modelfile, ephemfile, outfile="fake_pulsar.fits", nsub=1,
         npol=1, nchan=512, nbin=1048, nu0=1500.0, bw=800.0, tsub=300.0,
-        phase = 0.0, dDM = 0.0, start_MJD=None, weights=None, noise_std=1.0,
+        phase=0.0, dDM=0.0, start_MJD=None, weights=None, noise_std=1.0,
         t_scat=None, bw_scint=None, state="Coherence", obs="GBT", quiet=False):
     """
     Mostly written by PBD.

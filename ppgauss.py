@@ -86,7 +86,7 @@ class DataPortrait:
             self.spect_index = params[1]
 
 
-    def make_gaussian_model_portrait(self, modelfile=None,
+    def make_gaussian_model(self, modelfile=None,
             ref_prof=(None, None), fixloc=False, fixwid=False, fixamp=False,
             niter=0, writemodel=False, outfile=None, model_name=None,
             residplot=None, quiet=False):
@@ -170,9 +170,9 @@ class DataPortrait:
         if writemodel:
             if outfile is None:
                 if self.metafile is not None:
-                    outfile = self.metafile + ".model"
+                    outfile = self.metafile + ".gmodel"
                 else:
-                    outfile = self.datafile + ".model"
+                    outfile = self.datafile + ".gmodel"
             write_model(outfile, self.model_name, self.nu_ref,
                     self.model_params, self.fit_flags)
         if residplot:
@@ -198,12 +198,14 @@ class DataPortrait:
             self.modelx = np.compress(self.weights[0], self.model, axis=0)
             phaseguess = first_guess(self.portx, self.modelx, nguess=1000)
             DMguess = 0.0
+            id = "model_iteration"
             (self.phi, self.DM, self.nfeval, self.rc, self.scalesx, param_errs,
                     self.red_chi2, self.fit_duration) = (
                         fit_portrait(self.portx, self.modelx,
                             np.array([phaseguess, DMguess]), self.Ps[0],
                             self.freqsxs[0], self.nu_fit, scales=True,
-                            quiet=quiet))
+                            bounds=[(None, None), (None, None)],
+                            id=id, quiet=quiet))
             self.phierr = param_errs[0]
             self.DMerr = param_errs[1]
             self.duration = time.time() - start
@@ -452,10 +454,10 @@ if __name__ == "__main__":
                       help="PSRCHIVE archive from which to generate gaussian model.")
     parser.add_option("-M", "--metafile",
                       action="store",metavar="metafile", dest="metafile",
-                      help="File containing list of archive file names, each of which represents a unique band; these files are concatenated, without rotation, for the fit.  nbin must not differ.")
+                      help="File containing list of archive file names, each of which represents a unique band; these files are concatenated, without rotation, for the fit. nbin must not differ. This does not yet work right.")
     parser.add_option("-o", "--outfile",
                       action="store", metavar="outfile", dest="outfile",
-                      help="Name of output model file name. [default=archive.model or metafile.model]")
+                      help="Name of output model file name. [default=archive.gmodel or metafile.gmodel]")
     parser.add_option("-m", "--model_name",
                       action="store", metavar="model_name", dest="model_name",
                       help="Name given to model. [default=PSRCHIVE Source name]")
@@ -509,7 +511,7 @@ if __name__ == "__main__":
     quiet = not options.verbose
 
     dp = DataPortrait(datafile=datafile, metafile=metafile, quiet=quiet)
-    dp.make_gaussian_model_portrait(modelfile = None,
+    dp.make_gaussian_model(modelfile = None,
             ref_prof=(nu_ref, bw_ref), fixloc=fixloc, fixwid=fixwid,
             fixamp=fixamp, niter=niter, writemodel=True, outfile=outfile,
             model_name=model_name, residplot=figure, quiet=quiet)
