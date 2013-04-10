@@ -117,11 +117,11 @@ class DataPortrait:
             #All slopes, spectral indices start at 0.0
             locparams = widparams = ampparams = np.zeros(self.ngauss)
             self.init_model_params = np.empty([self.ngauss, 6])
-            for nn in range(self.ngauss):
-                self.init_model_params[nn] = np.array(
-                        [self.init_params[1::3][nn], locparams[nn],
-                            self.init_params[2::3][nn], widparams[nn],
-                            self.init_params[3::3][nn], ampparams[nn]])
+            for igauss in xrange(self.ngauss):
+                self.init_model_params[igauss] = np.array(
+                        [self.init_params[1::3][igauss], locparams[igauss],
+                            self.init_params[2::3][igauss], widparams[igauss],
+                            self.init_params[3::3][igauss], ampparams[igauss]])
             self.init_model_params = np.array([self.init_params[0]] +
                 list(np.ravel(self.init_model_params)))
             self.fit_flags = np.ones(len(self.init_model_params))
@@ -379,10 +379,10 @@ class GaussianSelector:
         plt.ylabel('Pulse Amplitude')
         DC = params[0]
         # Plot the individual gaussians
-        for ii in xrange(self.ngauss):
-            loc, wid, amp = params[(1 + ii*3):(4 + ii*3)]
+        for igauss in xrange(self.ngauss):
+            loc, wid, amp = params[(1 + igauss*3):(4 + igauss*3)]
             plt.plot(self.phases, DC + amp*gaussian_profile(self.proflen, loc,
-                wid), '%s'%cols[ii])
+                wid), '%s'%cols[igauss])
 
     def onselect(self):
         event1 = self.eventpress
@@ -465,7 +465,7 @@ if __name__ == "__main__":
     parser.add_option("--nu_ref",
                       action="store", metavar="nu_ref", dest="nu_ref",
                       default=None,
-                      help="Reference frequency [MHz] for the gaussian model; the initial profile to fit will be centered on this freq. [default=PSRCHIVE weighted center frequency]")
+                      help="Reference frequency [MHz] for the gaussian model; the initial profile to fit will be centered on this freq. [default=PSRCHIVE center frequency]")
     parser.add_option("--bw",
                       action="store", metavar="bw", dest="bw_ref", default=None,
                       help="Used with --freq; amount of bandwidth [MHz] centered on nu_ref to average for the initial profile fit. [default=Full bandwidth]")

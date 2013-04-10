@@ -133,8 +133,8 @@ def gen_gaussian_profile(params, N):
     """
     ngauss = (len(params) - 1) / 3
     model = np.zeros(N, dtype='d') + params[0]
-    for ii in xrange(ngauss):
-        loc, wid, amp = params[(1 + ii*3):(4 + ii*3)]
+    for igauss in xrange(ngauss):
+        loc, wid, amp = params[(1 + igauss*3):(4 + igauss*3)]
         model += amp * gaussian_profile(N, loc, wid)
     return model
 
@@ -164,10 +164,10 @@ def gen_gaussian_portrait(params, phases, freqs, nu_ref):
     #Amps; I am unsure why I needed this fix at some point
     #gparams[:, 0::3][:, 1:] = np.exp(np.outer(np.log(freqs) - np.log(nu_ref),
     #    ampparams) + np.outer(np.ones(nchan), np.log(refparams[0::3][1:])))
-    for nn in range(nchan):
+    for ichan in xrange(nchan):
         #Need to contrain so values don't go negative, etc., which is currently
         #done in gaussian_profile
-        gport[nn] = gen_gaussian_profile(gparams[nn], nbin)
+        gport[ichan] = gen_gaussian_profile(gparams[ichan], nbin)
     return gport
 
 def powlaw(nu, nu_ref, A, alpha):
@@ -207,13 +207,13 @@ def powlaw_freqs(lo, hi, N, alpha, mid=False):
         nus = np.power(np.linspace(lo**(1+alpha), hi**(1+alpha), N+1),
                 (1+alpha)**-1)
         #Equivalently:
-        #for nn in xrange(N+1):
-        #    nus[nn] = ((nn / np.float(N)) * (hi**(1+alpha)) + (1 - (nn /
+        #for ii in xrange(N+1):
+        #    nus[ii] = ((ii / np.float(N)) * (hi**(1+alpha)) + (1 - (ii /
         #        np.float(N))) * (lo**(1+alpha)))**(1 / (1+alpha))
     if mid:
         midnus = np.zeros(N)
-        for nn in xrange(N):
-            midnus[nn] = 0.5 * (nus[nn] + nus[nn+1])
+        for ii in xrange(N):
+            midnus[ii] = 0.5 * (nus[ii] + nus[ii+1])
         nus = midnus
     return nus
 
@@ -541,7 +541,8 @@ def fit_portrait(data, model, init_params, P=None, freqs=None, nu_ref=np.inf,
     if results.success is not True:
         filenm = id[:-id[::-1].index("_")-1]
         subint = id[-id[::-1].index("_"):]
-        sys.stderr.write("Fit failed with return code %d -- %s; %s subint %s\n"
+        sys.stderr.write(
+                "Fit failed with return code %d -- %s; %s subint %s\n"
                 %(results.status, rcstring, filenm, subint))
     if not quiet and results.success is True:
         sys.stderr.write("Fit succeeded with return code %d -- %s\n"
@@ -565,7 +566,7 @@ def first_guess(data, model, nguess=1000):
     crosscorr = np.empty(nguess)
     #phaseguess = np.linspace(0, 1.0, nguess)
     phaseguess = np.linspace(-0.5, 0.5, nguess)
-    for ii in range(nguess):
+    for ii in xrange(nguess):
         phase = phaseguess[ii]
         crosscorr[ii] = np.correlate(fft_rotate(np.sum(data, axis=0),
             phase * len(np.sum(data, axis=0))), np.sum(model, axis=0))
@@ -607,10 +608,10 @@ def get_noise(data, frac=4, tau=False, chans=False, fd=False):
     except NameError:
         noise = np.zeros(len(data))
         if fd:
-            for nn in range(len(noise)):
-                    prof = data[nn]
+            for ichan in xrange(len(noise)):
+                    prof = data[ichan]
                     FFT = fft.rfft(prof)
-                    noise[nn] = np.std(np.real(FFT)[-len(FFT)/frac:])
+                    noise[ichan] = np.std(np.real(FFT)[-len(FFT)/frac:])
             if chans:
                 if tau: return noise**-2
                 else: return noise
@@ -621,12 +622,12 @@ def get_noise(data, frac=4, tau=False, chans=False, fd=False):
                 else:
                     return np.median(noise)
         else:
-            for nn in range(len(noise)):
-                prof = data[nn]
+            for ichan in xrange(len(noise)):
+                prof = data[ichan]
                 FFT = fft.rfft(prof)
                 #!!!CHECK NORMALIZATION BELOW
                 pows = np.real(FFT * np.conj(FFT)) / len(prof)
-                noise[nn] = np.sqrt(np.mean(pows[-len(pows)/frac:]))
+                noise[ichan] = np.sqrt(np.mean(pows[-len(pows)/frac:]))
             if chans:
                 if tau:
                     return noise**-2
@@ -648,7 +649,7 @@ def get_scales(data, model, phase, DM, P, freqs, nu_ref=np.inf):
     p = np.real(np.sum(mFFT * np.conj(mFFT), axis=1))
     D = Dconst * DM / P
     #FIX vectorize
-    for kk in range(len(mFFT[0])):
+    for kk in xrange(len(mFFT[0])):
         scales += np.real(dFFT[:,kk] * np.conj(mFFT[:,kk]) * np.exp(2j *
             np.pi * kk * (phase + (D * (pow(freqs,-2) - pow(nu_ref,-2)))))) / p
     return scales
@@ -753,8 +754,8 @@ def load_data(filenm, dedisperse=False, dededisperse=False, tscrunch=False,
     bw = arch.get_bandwidth()
     nchan = arch.get_nchan()
     #Centers of frequency channels
-    freqs = np.array([arch.get_Integration(0).get_centre_frequency(ii) for ii
-        in range(nchan)])
+    freqs = np.array([arch.get_Integration(0).get_centre_frequency(ichan) for
+        ichan in xrange(nchan)])
     #Again, for the negative BW cases.  Good fix?
     #freqs.sort()
     #By-hand frequency calculation, equivalent to above from PSRCHIVE
@@ -782,9 +783,9 @@ def load_data(filenm, dedisperse=False, dededisperse=False, tscrunch=False,
     #PSRCHIVE indices [subint:pol:chan:bin]
     subints = arch.get_data()[:,:,:,:]
     npol = arch.get_npol()
-    Ps = np.array([arch.get_Integration(ii).get_folding_period() for ii in
+    Ps = np.array([arch.get_Integration(isub).get_folding_period() for isub in
         xrange(nsub)],dtype=np.double)
-    epochs = [arch.get_Integration(ii).get_epoch() for ii in xrange(nsub)]
+    epochs = [arch.get_Integration(isub).get_epoch() for isub in xrange(nsub)]
     #Get weights
     weights = arch.get_weights()
     weights_norm = np.where(weights == 0.0, np.zeros(weights.shape),
@@ -793,14 +794,14 @@ def load_data(filenm, dedisperse=False, dededisperse=False, tscrunch=False,
     masks = np.einsum('ij,k', weights_norm, np.ones(nbin))
     masks = np.einsum('j,ikl', np.ones(npol), masks)
     #These are the data free of zapped channels and subints
-    subintsxs = [np.compress(weights_norm[ii], subints[ii], axis=1) for ii in
-            xrange(nsub)]
+    subintsxs = [np.compress(weights_norm[isub], subints[isub], axis=1) for
+            isub in xrange(nsub)]
     #The channel center frequencies for the non-zapped subints
-    freqsxs = [np.compress(weights_norm[ii], freqs) for ii in xrange(nsub)]
+    freqsxs = [np.compress(weights_norm[isub], freqs) for isub in xrange(nsub)]
     #The rest is now ignoring npol...
     arch.pscrunch()
     #Estimate noise -- FIX needs improvement
-    noise_std = np.array([get_noise(subints[ii,0]) for ii in xrange(nsub)])
+    noise_std = np.array([get_noise(subints[isub,0]) for isub in xrange(nsub)])
     if flux_prof:
         #Flux profile
         #The below is about equal to bscrunch to ~6 places
@@ -817,10 +818,10 @@ def load_data(filenm, dedisperse=False, dededisperse=False, tscrunch=False,
     arch.fscrunch()
     prof = arch.get_data()[0,0,0]
     #Number unzapped channels, subints
-    nchanx = int(round(np.mean([subintsxs[ii].shape[1] for ii in
+    nchanx = int(round(np.mean([subintsxs[isub].shape[1] for isub in
         xrange(nsub)])))
-    nsubx = int(np.compress([subintsxs[ii].shape[1] for ii in xrange(nsub)],
-            np.ones(nsub)).sum())
+    nsubx = int(np.compress([subintsxs[isub].shape[1] for isub in
+        xrange(nsub)], np.ones(nsub)).sum())
     if not quiet:
         print "\tDM/P_ms            = %.1f\n\
         center freq. [MHz] = %.4f\n\
@@ -859,10 +860,10 @@ def write_model(filenm, name, nu_ref, model_params, fit_flags):
     outfile.write("FREQ   %.4f\n"%nu_ref)
     outfile.write("DC     %.8f  %d\n"%(model_params[0], fit_flags[0]))
     ngauss = (len(model_params) - 1) / 6
-    for nn in xrange(ngauss):
-        comp = model_params[(1 + nn*6):(7 + nn*6)]
-        fit_comp = fit_flags[(1 + nn*6):(7 + nn*6)]
-        line = (nn+1,) + tuple(np.array(zip(comp, fit_comp)).ravel())
+    for igauss in xrange(ngauss):
+        comp = model_params[(1 + igauss*6):(7 + igauss*6)]
+        fit_comp = fit_flags[(1 + igauss*6):(7 + igauss*6)]
+        line = (igauss+1,) + tuple(np.array(zip(comp, fit_comp)).ravel())
         outfile.write("COMP%02d %1.8f  %d  % 10.8f  %d  % 10.8f  %d  % 10.8f  %d  % 12.8f  %d  % 12.8f  %d\n"%line)
     outfile.close()
     print "%s written."%filenm
@@ -904,21 +905,20 @@ def read_model(modelfile, phases=None, freqs=None, quiet=False):
     #fit_dc = int(dc_line.split()[1])
     params[0] = dc
     fit_flags[0] = fit_dc
-    for gg in xrange(ngauss):
-        #comp = map(float, modeldata[gg].split()[::2])
-        comp = map(float, comps[gg].split()[1::2])
-        #fit_comp = map(int, modeldata[gg].split()[1::2])
-        fit_comp = map(int, comps[gg].split()[2::2])
-        params[1 + gg*6 : 7 + (gg*6)] = comp
-        fit_flags[1 + gg*6 : 7 + (gg*6)] = fit_comp
+    for igauss in xrange(ngauss):
+        #comp = map(float, modeldata[igauss].split()[::2])
+        comp = map(float, comps[igauss].split()[1::2])
+        #fit_comp = map(int, modeldata[igauss].split()[1::2])
+        fit_comp = map(int, comps[igauss].split()[2::2])
+        params[1 + igauss*6 : 7 + (igauss*6)] = comp
+        fit_flags[1 + igauss*6 : 7 + (igauss*6)] = fit_comp
     if not read_only:
         nbin = len(phases)
         nchan = len(freqs)
         model = gen_gaussian_portrait(params, phases, freqs, nu_ref)
     if not quiet and not read_only:
         print "Model Name: %s"%name
-        print "Made %d component model with %d profile bins,"%(
-                ngauss, nbin)
+        print "Made %d component model with %d profile bins,"%(ngauss, nbin)
         print "%d frequency channels, %.0f MHz bandwidth, centered near %.3f MHz,"%(nchan, (freqs[-1] - freqs[0]) + ((freqs[-1] - freqs[-2])), freqs.mean())
         print "with model parameters referenced at %.3f MHz."%nu_ref
     if read_only:
@@ -959,7 +959,13 @@ def make_fake_pulsar(modelfile, ephemfile, outfile="fake_pulsar.fits", nsub=1,
             (chanwidth/2.0), nchan)
     #Phase bin centers
     phases = np.linspace(0.0 + (nbin*2)**-1, 1.0 - (nbin*2)**-1, nbin)
-
+    #Channel noise
+    try:
+        if len(noise_std) != nchan:
+            print "\nlen(noise_std) != nchan\n"
+            return 0
+    except TypeError:
+        noise_std = noise_std * np.ones(nchan)
     #Create the Archive instance.
     #This is kind of a weird hack, if we create a PSRFITS
     #Archive directly, some header info does not get filled
@@ -1009,7 +1015,7 @@ def make_fake_pulsar(modelfile, ephemfile, outfile="fake_pulsar.fits", nsub=1,
         subint.set_epoch(epoch)
         subint.set_duration(tsub)
         epoch += tsub
-        for ichan in range(nchan):
+        for ichan in xrange(nchan):
             subint.set_centre_frequency(ichan, freqs[ichan])
     #Fill in polycos
     arch.set_ephemeris(ephemfile)
@@ -1024,14 +1030,14 @@ def make_fake_pulsar(modelfile, ephemfile, outfile="fake_pulsar.fits", nsub=1,
     isub = 0
     for subint in arch:
         P = subint.get_folding_period()
-        for ipol in range(npol):
+        for ipol in xrange(npol):
             rotmodel = rotate_portrait(model, -phase, -(DM+dDM), P, freqs, nu0)
             #rotmodel = model
-            for ichan in range(nchan):
+            for ichan in xrange(nchan):
                 subint.set_weight(ichan, weights[isub, ichan])
                 prof = subint.get_Profile(ipol,ichan)
                 prof.get_amps()[:] = rotmodel[ichan] + np.random.normal(0.0,
-                        noise_std, nbin)
+                        noise_std[ichan], nbin)
         isub += 1
     #arch.dededisperse()
     arch.unload(outfile)
@@ -1043,7 +1049,7 @@ def quick_add_archs(metafile, outfile, rotate=False, fiducial=0.5,
     """
     from os import system
     archs = open(metafile, "r").readlines()
-    for iarch in range(len(archs)):
+    for iarch in xrange(len(archs)):
         datafile = archs[iarch].split()[0]
         data = load_data(datafile, dedisperse=True, dededisperse=False,
                 tscrunch=True, pscrunch=True, rm_baseline=True,
@@ -1071,9 +1077,9 @@ def quick_add_archs(metafile, outfile, rotate=False, fiducial=0.5,
     totweights = np.where(totweights==0, 1, totweights)
     totport = np.transpose((totweights**-1) * np.transpose(totport))
     I = arch.get_Integration(0)
-    for nn in range(nchan):
-        prof = I.get_Profile(0,nn)
-        prof.get_amps()[:] = totport[nn]
+    for ichan in xrange(nchan):
+        prof = I.get_Profile(0,ichan)
+        prof.get_amps()[:] = totport[ichan]
     arch.dedisperse()
     arch.unload()
     print "\nUnloaded %s"%outfile
@@ -1089,13 +1095,13 @@ def concatenate_ports(metafile, quiet=True):
     hifreq = 0.0
     P = 0.0
     datafiles = open(metafile, "r").readlines()
-    datafiles = [datafiles[xx][:-1] for xx in xrange(len(datafiles))]
-    for idata in range(len(datafiles)):
-        datafile = datafiles[idata]
+    datafiles = [datafiles[ifile][:-1] for ifile in xrange(len(datafiles))]
+    for ifile in xrange(len(datafiles)):
+        datafile = datafiles[ifile]
         data = load_data(datafile, dedisperse=True, dededisperse=False,
                 tscrunch=True, pscrunch=True, rm_baseline=True,
                 flux_prof=True, quiet=quiet)
-        if idata == 0:
+        if ifile == 0:
             nbin = data.nbin
             phases = data.phases
             if data.source is None:
@@ -1111,12 +1117,12 @@ def concatenate_ports(metafile, quiet=True):
         P += data.Ps[0]
         port = (data.masks * data.subints)[0,0]
         portx = data.subintsxs[0][0]
-        for ichan in range(data.nchan):
+        for ichan in xrange(data.nchan):
             all_data.append((data.freqs[ichan], port[ichan],
                     data.weights[0,ichan], data.flux_prof[ichan]))
-        for ichan in range(data.nchanx):
-            all_datax.append((data.freqsxs[0][ichan], portx[ichan],
-                    data.flux_profx[ichan]))
+        for ichanx in xrange(data.nchanx):
+            all_datax.append((data.freqsxs[0][ichanx], portx[ichanx],
+                    data.flux_profx[ichanx]))
     dtype = [("freqs", np.float), ("port", np.ndarray), ("weights",
         np.float), ("flux_prof", np.float)]
     dtypex = [("freqsx", np.float), ("portx", np.ndarray),
@@ -1132,15 +1138,15 @@ def concatenate_ports(metafile, quiet=True):
     flux_prof = np.empty(nchan)
     flux_profx = np.empty(nchanx)
     weights = np.empty(nchan)
-    for ichan in range(nchan):
+    for ichan in xrange(nchan):
         freqs[ichan] = data[ichan][0]
         port[ichan] = data[ichan][1]
         weights[ichan] = data[ichan][2]
         flux_prof[ichan] = data[ichan][3]
-    for ichan in range(nchanx):
-        freqsx[ichan] = datax[ichan][0]
-        portx[ichan] = datax[ichan][1]
-        flux_profx[ichan] = datax[ichan][2]
+    for ichanx in xrange(nchanx):
+        freqsx[ichanx] = datax[ichanx][0]
+        portx[ichanx] = datax[ichanx][1]
+        flux_profx[ichanx] = datax[ichanx][2]
     bw = hifreq - lofreq
     nu0 = (hifreq + lofreq) / 2.0
     noise_std = get_noise(portx)
@@ -1153,7 +1159,7 @@ def concatenate_ports(metafile, quiet=True):
         port=port, portx=portx, source=source, weights=weights)
     return data
 
-def write_princeton_toa(toa_MJDi, toa_MJDf, toa_err, nu_ref, dDM, obs='@',
+def write_princeton_TOA(TOA_MJDi, TOA_MJDf, TOA_err, nu_ref, dDM, obs='@',
         name=' ' * 13):
     """
     Ripped and altered from PRESTO
@@ -1170,12 +1176,12 @@ def write_princeton_toa(toa_MJDi, toa_MJDf, toa_err, nu_ref, dDM, obs='@',
     """
     if nu_ref == np.inf: nu_ref = 0.0
     #Splice together the fractional and integer MJDs
-    toa = "%5d"%int(toa_MJDi) + ("%.13f"%toa_MJDf)[1:]
+    TOA = "%5d"%int(TOA_MJDi) + ("%.13f"%TOA_MJDf)[1:]
     if dDM != 0.0:
         print obs + " %13s %8.3f %s %8.3f              %9.5f"%(name, nu_ref,
-                toa, toa_err, dDM)
+                TOA, TOA_err, dDM)
     else:
-        print obs + " %13s %8.3f %s %8.3f"%(name, nu_ref, toa, toa_err)
+        print obs + " %13s %8.3f %s %8.3f"%(name, nu_ref, TOA, TOA_err)
 
 def show_port(port, phases=None, freqs=None, title=None, prof=True,
         fluxprof=True, rvrsd=False, colorbar=True, savefig=False,

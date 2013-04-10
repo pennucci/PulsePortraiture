@@ -29,13 +29,13 @@ weights = np.ones([nsub, nchan]) #Change if you want to have an "RFI" mask
                                  #eg. first and last subints zapped:
                                  #weights[0] = 0 ; weights[-1] = 0
 print "Making fake data..."
-for nn in range(nfiles):
-    if nn == 0: quiet=False
+for ifile in range(nfiles):
+    if ifile == 0: quiet=False
     else: quiet = True
-    start_MJD = 50000.00 + nn*days
-    make_fake_pulsar(modelfile, ephemfile, outfile="example-%d.fits"%(nn+1),
+    start_MJD = 50000.00 + ifile*days
+    make_fake_pulsar(modelfile, ephemfile, outfile="example-%d.fits"%(ifile+1),
             nsub=nsub, npol=npol, nchan=nchan, nbin=nbin, nu0=nu0, bw=bw,
-            tsub=tsub, phase=0.0, dDM=dDMs[nn], start_MJD=None,
+            tsub=tsub, phase=0.0, dDM=dDMs[ifile], start_MJD=None,
             weights=weights, noise_std=noise_std, t_scat=None, bw_scint=None,
             state="Coherence", obs="GBT", quiet=quiet)
     #NB: t_scat, bw_scint not yet implemented
