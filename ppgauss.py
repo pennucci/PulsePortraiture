@@ -205,7 +205,7 @@ class DataPortrait:
                             np.array([phaseguess, DMguess]), self.Ps[0],
                             self.freqsxs[0], self.nu_fit, scales=True,
                             bounds=[(None, None), (None, None)],
-                            id=id, quiet=quiet))
+                            id=id, quiet=True))
             self.phierr = param_errs[0]
             self.DMerr = param_errs[1]
             self.duration = time.time() - start

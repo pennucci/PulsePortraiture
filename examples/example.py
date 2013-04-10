@@ -10,7 +10,7 @@ ephemfile = "example.par"
 #Generate some fake datafiles
 #These files will be homogenous, even though they don't need to be
 
-nfiles = 5      #Number of datafiles/epochs
+nfiles = 3      #Number of datafiles/epochs
 days = 20.0     #Days between epochs
 nsub = 20       #Number of subintegrations
 npol = 1        #Number of polarization (can be 4, but will only use total I)
@@ -51,7 +51,7 @@ outfile = "example.port"
 quick_add_archs(metafile, outfile, quiet=False)
 
 #Now we want to "build" our gaussian model from the data
-print "Running ppgauss to fit a gaussian model..."
+print "Running ppgauss.py to fit a gaussian model..."
 import ppgauss as pg
 datafile = "example.port"
 #Initiate Class instance
@@ -63,14 +63,14 @@ dp.make_gaussian_model(ref_prof=(nu0, bw/4), niter=5, writemodel=True,
         outfile="example-fit.gmodel", model_name="Example_Fit",
         residplot="example.png", quiet=False)
 #You can always then continue iterations using:
-#niter = 
+#niter = # 
 #modefile = example-fit.gmodel
 #dp.make_gaussian_model(modelfile, niter=niter)
 #You can check this fitted model against the "input" true model example.gauss,
 #assuming the reference frequencies are the same.
 
 #Now we would measure TOAs and DMs
-print "Running pptoas to fit TOAs and DMs..."
+print "Running pptoas.py to fit TOAs and DMs..."
 import pptoas as pt
 #Set the frequency that your TOAs reference
 nu_ref = nu0
@@ -80,13 +80,13 @@ DM0 = float(o.readline().split()[1])
 #Initiate Class instance; one could also use a smoothed average of the data
 #as a model instead of the analytic gaussian model
 gt = pt.GetTOAs(metafile, "example-fit.gmodel", nu_ref=nu_ref, DM0=DM0)
-gt.get_toas()
+gt.get_TOAs()
 #Show results from first datafile
 gt.show_results()
-#Show typical fit; the fake data TOAs look very scattered for some reason
+#Show typical fit
 gt.show_fit()
-#Write toas
-gt.write_toas(outfile="example.tim", nu_ref=nu_ref)
+#Write TOAs
+gt.write_TOAs(outfile="example.tim", nu_ref=nu_ref)
 #See fitted versus injected DMs
 print ""
 print "Injected DMs, mean, std:"

@@ -930,7 +930,7 @@ def check_file(filename):
     """
     """
     from os import popen4
-    cmd = "file %s"%filename
+    cmd = "file -L %s"%filename
     i,o = popen4(cmd)
     line = o.readline().split()
     try:

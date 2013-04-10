@@ -124,8 +124,9 @@ class GetTOAs:
             red_chi2s = np.empty(nsubx)
             MJDs = np.array([epochs[isub].in_days()
                 for isub in xrange(nsub)], dtype=np.double)
+            DM_stored = arch.get_dispersion_measure()
             if self.DM0 is None:
-                DM0 = arch.get_dispersion_measure()
+                DM0 = DM_stored
             else:
                 DM0 = self.DM0
             if not quiet:
@@ -174,14 +175,14 @@ class GetTOAs:
                     mean_port = np.transpose(weights.mean(axis=0) *
                             np.transpose(subints.mean(axis=0)[0]))
                     rot_port = rotate_portrait(mean_port, 0.0,
-                            DM0, P, freqs, nu_fit)
+                            DM_stored, P, freqs, nu_fit)
                     #PSRCHIVE Dedisperses w.r.t. center of band, which is
                     #different, in general, from nu_fit; this results in an
                     #(appropriate) phase offset w.r.t to what would be seen
                     #in the PSRCHIVE dedispersed portrait.
                     #Currently, first_guess ranges between +/- 0.5
                     phaseguess = first_guess(rot_port, model, nguess=1000)
-                    DMguess = DM0
+                    DMguess = DM_stored
                     phaseguess_0 = phaseguess
                 #I have to subtract the DM_delay_offset, by empirical trials...
                 phaseguess = phaseguess_0 - DM_delay_offset(DMguess, P,
@@ -208,9 +209,8 @@ class GetTOAs:
                 if not quiet: print "Fitting for TOA %d"%(isubx)
                 phi, DM, nfeval, rc, scalex, param_errs, red_chi2, duration = \
                         fit_portrait(portx, modelx,
-                            np.array([phaseguess, DMguess]), P, freqsx,
-                            nu_fit, scales=True, bounds=bounds, id = id,
-                            quiet=quiet)
+                            np.array([phaseguess, DMguess]), P, freqsx, nu_fit,
+                            scales=True, bounds=bounds, id = id, quiet=quiet)
                 phi_err, DM_err = param_errs[0], param_errs[1]
                 fit_duration += duration
 
@@ -279,7 +279,7 @@ class GetTOAs:
             self.epochs.append(np.take(epochs, ok_isubs))
             self.MJDs.append(np.take(MJDs, ok_isubs))
             self.Ps.append(np.take(Ps, ok_isubs))
-            #NB: phis are w.r.t. nu_fit, which is not necessarily nu_ref!!!
+            #NB: phis are w.r.t. nu_fit!!!
             self.phis.append(phis)
             self.phi_errs.append(phi_errs)
             self.offsets.append(offsets)
@@ -343,23 +343,6 @@ class GetTOAs:
                 nu_refs = np.ones(nsubx) * nu_ref
             TOAs = self.TOAs[ifile]
             TOA_errs  = self.TOA_errs[ifile]
-            #epochs = self.epochs[ifile]
-            #Ps = self.Ps[ifile]
-            #phis = self.phis[ifile]
-            #phi_errs = self.phi_errs[ifile]
-            #DMs = self.DMs[ifile]
-            #Phase conversion (hopefully, the signs are correct)...
-            #...I have to subtract the DM_delay_offset, by empirical trials...
-            #if self.bary_DM:
-            #    doppler_fs = self.doppler_fs[ifile]
-            #    fitted_DMs = DMs / doppler_fs
-            #else:
-            #    fitted_DMs = DMs
-            ##phis -= DM_delay_offset(fitted_DMs, Ps, nu_fits, nu_refs)
-            #toas = np.array([epochs[isubx] + pr.MJD((phis[isubx] *
-            #    Ps[isubx]) / (3600 * 24.)) for isubx in xrange(nsubx)])
-            #Do errors change, like above?
-            #toa_errs = phi_errs * Ps * 1e6
             try:
                 obs_code = obs_codes["%s"%self.obs[ifile].lower()]
             except KeyError:
@@ -377,7 +360,6 @@ class GetTOAs:
                             TOAs[isubx].fracday(), TOA_errs[isubx],
                             nu_refs[isubx], DeltaDMs[isubx], obs=obs_code)
         sys.stdout = sys.__stdout__
-        #if retrn: return toas, toa_errs
 
     def write_dm_errs(self, datafile=None, outfile=None):
         if datafile is None:
@@ -427,15 +409,17 @@ class GetTOAs:
                 DeltaDM_mean + DM0, datafile))
         if outfile is not None: of.close()
 
-    def show_subint(self, datafile, isubx, quiet=False):
+    def show_subint(self, datafile=None, isubx=0, quiet=False):
         """
-        subint 0 = python index 0
+        subintx 0 = python index 0
         """
+        if datafile is None:
+            datafile = self.datafiles[0]
         ifile = self.datafiles.index(datafile)
         data = load_data(datafile, dedisperse=True,
                 dededisperse=False, tscrunch=False,
                 pscrunch=True, rm_baseline=True, flux_prof=False, quiet=quiet)
-        title = "%s ; subint %d"%(datafile, isubx)
+        title = "%s ; subintx %d"%(datafile, isubx)
         port = np.transpose(data.weights[isubx] * np.transpose(
             data.subints[isubx,0]))
         show_port(port=port, phases=data.phases, freqs=data.freqs, title=title,
@@ -443,7 +427,7 @@ class GetTOAs:
 
     def show_fit(self, datafile=None, isubx=0, quiet=False):
         """
-        subint 0 = python index 0
+        subintx 0 = python index 0
         This may not be *exactly* correct in the display of the fit,
         but close...
         """
@@ -456,9 +440,9 @@ class GetTOAs:
         phi = self.phis[ifile][isubx]
         #Pre-corrected DM, if corrected
         if self.bary_DM:
-            fitted_DM = self.DMs[ifile][isubx] / self.doppler_fs[ifile][isubx]
+            DM_fitted = self.DMs[ifile][isubx] / self.doppler_fs[ifile][isubx]
         else:
-            fitted_DM = self.DMs[ifile][isubx]
+            DM_fitted = self.DMs[ifile][isubx]
         scales = self.scales[ifile][isubx]
         freqs = data.freqs
         nu_fit = self.nu_fits[ifile][isubx]
@@ -472,11 +456,12 @@ class GetTOAs:
         else:
             model_name, ngauss, model = read_model(self.modelfile, phases,
                     freqs, quiet=quiet)
-        port = rotate_portrait(data.subints[isubx,0], phi, fitted_DM, P, freqs,
+        print phi,DM_fitted,P,nu_fit
+        port = rotate_portrait(data.subints[isubx,0], phi, DM_fitted, P, freqs,
                 nu_fit)
         port = np.transpose(weights * np.transpose(port))
         model_scaled = np.transpose(scales * np.transpose(model))
-        titles = ("%s\nSubintegration %d"%(datafile, isubx),
+        titles = ("%s\nSubintegrationx %d"%(datafile, isubx),
                 "Fitted Model %s"%(model_name), "Residuals")
         show_residual_plot(port=port, model=model_scaled, resids=None,
                 phases=phases, freqs=freqs, titles=titles,
@@ -495,8 +480,6 @@ class GetTOAs:
         phis = self.phis[ifile]
         phi_errs = self.phi_errs[ifile]
         offsets = self.offsets[ifile]
-        #This is to obtain the TOA phase offsets w.r.t. nu_ref
-        phis -= offsets
         #These are the 'barycentric' DMs, if they were corrected (default yes)
         DMs = self.DMs[ifile]
         DM_errs = self.DM_errs[ifile]
@@ -507,7 +490,9 @@ class GetTOAs:
         cols = ['b','k','g','b','r']
         fig = plt.figure()
         pf = np.polynomial.polynomial.polyfit
-        milli_sec_shift = phis * Ps * 1e3
+        #This is to obtain the TOA phase offsets w.r.t. nu_ref
+        #Apparently, changing phis in place changes self.phis ???
+        milli_sec_shift = (phis-offsets) * Ps * 1e3
         #Not sure weighting works...
         fit_results = pf(MJDs, milli_sec_shift, 1, full=True, w=phi_errs**-2)
         resids = (milli_sec_shift) - (fit_results[0][0] + (fit_results[0][1] *
@@ -522,7 +507,7 @@ class GetTOAs:
         RMS = resids_err
         ax1 = fig.add_subplot(311)
         for isubx in xrange(nsubx):
-            ax1.errorbar(MJDs[isubx], phis[isubx] * Ps[isubx] * 1e6,
+            ax1.errorbar(MJDs[isubx], (phis-offsets)[isubx] * Ps[isubx] * 1e6,
                     phi_errs[isubx] * Ps[isubx] * 1e6, color='%s'
                     %cols[rcs[isubx]], fmt='+')
         plt.plot(MJDs, (fit_results[0][0] + (fit_results[0][1] * MJDs)) * 1e3,
