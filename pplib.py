@@ -736,6 +736,21 @@ def doppler_correct_freqs(freqs, doppler_factor):
     """
     return doppler_factor * freqs
 
+def calculate_TOA(epoch, P, phi, DM=0.0, nu_ref1=np.inf, nu_ref2=np.inf):
+    """
+    Calculates TOA given epoch [PSRCHIVE MJD], period P [sec], and phase
+    offset phi [rot].  If phi was measured w.r.t. nu_ref1 [MHZ], providing
+    DM [cm**-3 pc], nu_ref1 and nu_ref2 [MHz] will calculate the TOA w.r.t
+    nu_ref2.
+    """
+    #Phase conversion (hopefully, the signs are correct)...
+    #The pre-Doppler corrected DM must be used
+    #...I have to subtract the DM_delay_offset, by empirica trial-and-error...
+    offset = DM_delay_offset(DM, P, nu_ref1, nu_ref2)
+    phi_prime = phi - offset
+    TOA = epoch + pr.MJD((phi_prime * P) / (3600 * 24.))
+    return TOA
+
 def load_data(filenm, dedisperse=False, dededisperse=False, tscrunch=False,
         pscrunch=False, rm_baseline=True, flux_prof=False, quiet=False):
     """

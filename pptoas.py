@@ -40,7 +40,7 @@ class GetTOAs:
         self.DM_errs = []
         self.DeltaDM_means = []
         self.DeltaDM_errs = []
-        if self.bary_DM: self.doppler_fs = []
+        self.doppler_fs = []
         self.scales = []
         self.scalesx = []
         self.scale_errs = []
@@ -109,13 +109,13 @@ class GetTOAs:
             phis = np.empty(nsubx, dtype=np.double)
             phi_errs = np.empty(nsubx, dtype=np.double)
             offsets = np.empty(nsubx, dtype=np.double)
-            TOAs = np.empty(nsubx, dtype='object')
-            TOA_errs = np.empty(nsubx, dtype='object')
+            TOAs = np.empty(nsubx, dtype="object")
+            TOA_errs = np.empty(nsubx, dtype="object")
             DMs = np.empty(nsubx, dtype=np.float)
             DM_errs = np.empty(nsubx, dtype=np.float)
-            if self.bary_DM: doppler_fs = np.empty(nsubx, dtype=np.float)
-            nfevals = np.empty(nsubx, dtype='int')
-            rcs = np.empty(nsubx, dtype='int')
+            doppler_fs = np.empty(nsubx, dtype=np.float)
+            nfevals = np.empty(nsubx, dtype="int")
+            rcs = np.empty(nsubx, dtype="int")
             scales = np.empty([nsubx, nchan], dtype=np.float)
             #These next two are lists because in principle,
             #the subints could have different numbers of zapped channels.
@@ -217,17 +217,23 @@ class GetTOAs:
                 ####################
                 #  CALCULATE  TOA  #
                 ####################
-                #Phase conversion (hopefully, the signs are correct)...
+                if self.nu_ref is None:
+                    nu_ref = nu0
+                elif self.nu_ref == "nu_fit":
+                    nu_ref = nu_fit
+                else:
+                    nu_ref = self.nu_ref
+                #Phase conversion
                 #The pre-Doppler corrected DM must be used
                 #...I have to subtract the DM_delay_offset, by empirical
                 #trial-and-error...
-                #phi_prime = phi - DM_delay_offset(DM, P, nu_fit, self.nu_ref)
-                offset = DM_delay_offset(DM, P, nu_fit, self.nu_ref)
+                #See calculate_TOA; I avoid the external function call here.
+                #TOA = calculate_TOA(epochs[isubx], P, phi, DM, nu_fit, nu_ref)
+                offset = DM_delay_offset(DM, P, nu_fit, nu_ref)
                 phi_prime = phi - offset
                 TOA = epochs[isubx] + pr.MJD((phi_prime * P) / (3600 * 24.))
                 #Do errors change?
                 TOA_err = phi_err * P * 1e6 # [us]
-
                 ####################
                 #DOPPLER CORRECTION#
                 ####################
@@ -237,6 +243,8 @@ class GetTOAs:
                     df = arch.get_Integration(isub).get_doppler_factor()
                     DM *= df    #NB: No longer the *fitted* value!
                     doppler_fs[isubx] = df
+                else:
+                    doppler_fs[isubx] = 1.0
 
                 phis[isubx] = phi
                 phi_errs[isubx] = phi_err
@@ -291,7 +299,7 @@ class GetTOAs:
             self.DM_errs.append(DM_errs)
             self.DeltaDM_means.append(DeltaDM_mean)
             self.DeltaDM_errs.append(DeltaDM_err)
-            if self.bary_DM: self.doppler_fs.append(doppler_fs)
+            self.doppler_fs.append(doppler_fs)
             self.scales.append(scales)
             self.scalesx.append(scalesx)
             self.scale_errs.append(scale_errs)
@@ -334,15 +342,34 @@ class GetTOAs:
         for datafile in datafiles:
             ifile = datafiles.index(datafile)
             nsubx = self.nsubs[ifile]
-            nu_fits = self.nu_fits[ifile]
             if nu_ref is None:
-                nu_refs = np.ones(nsubx) * self.nu0s[ifile]
-            elif nu_ref == "nu_fit":
-                nu_refs = nu_fits
+                #Default to self.nu_ref
+                if self.nu_ref is None:
+                    nu_refs = self.nu0s[ifile] * np.ones(nsubx)
+                elif self.nu_ref == "nu_fit":
+                    nu_refs = self.nu_fits[ifile]
+                else:
+                    nu_refs = self.nu_ref * np.ones(nsubx)
+                TOAs = self.TOAs[ifile]
+                TOA_errs = self.TOA_errs[ifile]
             else:
-                nu_refs = np.ones(nsubx) * nu_ref
-            TOAs = self.TOAs[ifile]
-            TOA_errs  = self.TOA_errs[ifile]
+                if nu_ref == "nu_fit":
+                    nu_refs = self.nu_fits[ifile]
+                else:
+                    nu_refs = nu_ref * np.ones(nsubx)
+                nu_fits = self.nu_fits[ifile]
+                epochs = self.epochs[ifile]
+                Ps = self.Ps[ifile]
+                phis = self.phis[ifile]
+                TOAs = np.empty(nsubx, dtype="object")
+                TOA_errs = self.TOA_errs[ifile]
+                DMs = self.DMs[ifile]
+                DMs_fitted = DMs / self.doppler_fs[ifile]
+                isubx=0
+                for isubx in range(nsubx):
+                    TOAs[isubx] = calculate_TOA(epochs[isubx], Ps[isubx],
+                            phis[isubx], DMs_fitted[isubx], nu_fits[isubx],
+                            nu_refs[isubx])
             try:
                 obs_code = obs_codes["%s"%self.obs[ifile].lower()]
             except KeyError:
@@ -439,10 +466,7 @@ class GetTOAs:
                 pscrunch=True, rm_baseline=True, flux_prof=False, quiet=quiet)
         phi = self.phis[ifile][isubx]
         #Pre-corrected DM, if corrected
-        if self.bary_DM:
-            DM_fitted = self.DMs[ifile][isubx] / self.doppler_fs[ifile][isubx]
-        else:
-            DM_fitted = self.DMs[ifile][isubx]
+        DM_fitted = self.DMs[ifile][isubx] / self.doppler_fs[ifile][isubx]
         scales = self.scales[ifile][isubx]
         freqs = data.freqs
         nu_fit = self.nu_fits[ifile][isubx]
@@ -709,6 +733,6 @@ if __name__ == "__main__":
             DM0=DM0, one_DM=one_DM, bary_DM=bary_DM, common=common,
             quiet=quiet)
     gt.get_TOAs(show_plot=showplot, safe=False, quiet=quiet)
-    gt.write_TOAs(outfile=outfile, nu_ref=nu_ref)
+    gt.write_TOAs(outfile=outfile)
     if errfile is not None: gt.write_dm_errs(outfile=errfile)
     if pam_cmd: gt.write_pam_cmds()
