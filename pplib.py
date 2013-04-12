@@ -1051,8 +1051,12 @@ def make_fake_pulsar(modelfile, ephemfile, outfile="fake_pulsar.fits", nsub=1,
             for ichan in xrange(nchan):
                 subint.set_weight(ichan, weights[isub, ichan])
                 prof = subint.get_Profile(ipol,ichan)
-                prof.get_amps()[:] = rotmodel[ichan] + np.random.normal(0.0,
-                        noise_std[ichan], nbin)
+                noise = noise_std[ichan]
+                if noise:
+                    prof.get_amps()[:] = rotmodel[ichan] + np.random.normal(
+                            0.0, noise, nbin)
+                else:
+                    prof.get_amps()[:] = rotmodel[ichan]
         isub += 1
     #arch.dededisperse()
     arch.unload(outfile)

@@ -480,7 +480,6 @@ class GetTOAs:
         else:
             model_name, ngauss, model = read_model(self.modelfile, phases,
                     freqs, quiet=quiet)
-        print phi,DM_fitted,P,nu_fit
         port = rotate_portrait(data.subints[isubx,0], phi, DM_fitted, P, freqs,
                 nu_fit)
         port = np.transpose(weights * np.transpose(port))
