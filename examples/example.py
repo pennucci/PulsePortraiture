@@ -11,6 +11,7 @@ ephemfile = "example.par"
 #These files will be homogenous, even though they don't need to be
 
 nfiles = 3      #Number of datafiles/epochs
+MJD0 = 50000.00 #Start day [MJD]
 days = 20.0     #Days between epochs
 nsub = 20       #Number of subintegrations
 npol = 1        #Number of polarization (can be 4, but will only use total I)
@@ -23,6 +24,7 @@ noise_std = 2.77#Noise level of the band, per subintegration [flux units]
 dDM_mean = 3e-4 #Add in random dispersion measure offsets with this mean value
 dDM_std = 2e-4  #Add in random dispersion measure offsets with this std
 dDMs = np.random.normal(dDM_mean, dDM_std, nfiles)
+#dDMs = np.zeros(nfiles) #Uncomment and set dDM_mean and dDM_std to zero for no injected dDMs
 weights = np.ones([nsub, nchan]) #Change if you want to have an "RFI" mask
                                  #eg. band edges zapped:
                                  #weights[:,:10] = 0 ; weights[:,-10:] = 0
@@ -32,7 +34,7 @@ print "Making fake data..."
 for ifile in range(nfiles):
     if ifile == 0: quiet=False
     else: quiet = True
-    start_MJD = 50000.00 + ifile*days
+    start_MJD = MJD0 + ifile*days
     make_fake_pulsar(modelfile, ephemfile, outfile="example-%d.fits"%(ifile+1),
             nsub=nsub, npol=npol, nchan=nchan, nbin=nbin, nu0=nu0, bw=bw,
             tsub=tsub, phase=0.0, dDM=dDMs[ifile], start_MJD=None,
@@ -64,9 +66,9 @@ dp.make_gaussian_model(ref_prof=(nu0, bw/4), niter=5, writemodel=True,
         residplot="example.png", quiet=False)
 #You can always then continue iterations using:
 #niter = # 
-#modefile = example-fit.gmodel
+#modelfile = example-fit.gmodel
 #dp.make_gaussian_model(modelfile, niter=niter)
-#You can check this fitted model against the "input" true model example.gauss,
+#You can check this fitted model against the "input" true model example.gmodel,
 #assuming the reference frequencies are the same.
 
 #Now we would measure TOAs and DMs

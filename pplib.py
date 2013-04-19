@@ -253,6 +253,7 @@ def fit_gaussian_portrait_function(params, phases, freqs, nu_ref, data=None,
 def fit_portrait_function(params, model=None, p=None, data=None, d=None,
         errs=None, P=None, freqs=None, nu_ref=np.inf):
     """
+    This amounts to the chi**2 value.
     """
     phase = params[0]
     m = 0.0
@@ -273,6 +274,8 @@ def fit_portrait_function(params, model=None, p=None, data=None, d=None,
 def fit_portrait_function_deriv(params, model=None, p=None, data=None, d=None,
         errs=None, P=None, freqs=None, nu_ref=np.inf):
     """
+    This is the Jacobian of the fit_portrait_function with respect to the two
+    parameters.
     """
     phase = params[0]
     D = Dconst * params[1] / P
@@ -294,12 +297,13 @@ def fit_portrait_function_deriv(params, model=None, p=None, data=None, d=None,
 
 def fit_portrait_function_2deriv(params, model=None, p=None, data=None, d=None,
         errs=None, P=None, freqs=None, nu_ref=np.inf):
-    #Need Covariance matrix...
     """
+    This returns the three unique values in the Hessian, which is a 2x2
+    symmetric matrix.
     """
     phase = params[0]
     D = Dconst * params[1] / P
-    d2_phi, d2_DM = 0.0, 0.0
+    d2_phi, d2_DM, d2_cross = 0.0, 0.0, 0.0
     for nn in xrange(len(freqs)):
         err = errs[nn]
         freq = freqs[nn]
@@ -316,9 +320,11 @@ def fit_portrait_function_2deriv(params, model=None, p=None, data=None, d=None,
         gd3 = np.real(pow(2.0j * np.pi * harmind *
             (freq**-2.0 - nu_ref**-2.0) * (Dconst/P), 2.0) * data[nn,:] *
             np.conj(model[nn,:]) * phasor).sum()
+        gc = (freq**-2.0 - nu_ref**-2.0) * (Dconst/P) * gp3
         d2_phi += -2.0 * err * (pow(gp2, 2.0) + (g1 * gp3)) / p[nn]
         d2_DM += -2.0 * err * (pow(gd2, 2.0) + (g1 * gd3)) / p[nn]
-    return np.array([d2_phi, d2_DM])
+        d2_cross += -2.0 * err * ((gp2 * gd2) + (g1 * gc))/ p[nn]
+    return np.array([d2_phi, d2_DM, d2_cross])
 
 def estimate_portrait(phase, DM, data, scales, P, freqs, nu_ref=np.inf):
     #here, all vars have additional epoch-index except nu_ref
@@ -524,8 +530,6 @@ def fit_portrait(data, model, init_params, P=None, freqs=None, nu_ref=np.inf,
     minimize = opt.minimize
     #fmin_tnc seems to work best, fastest
     method = 'TNC'
-    #Bounds on phase, DM; in principle allows you to fix phase and/or DM
-    bounds = [(None, None), (None, None)]
     start = time.time()
     results = minimize(fit_portrait_function, init_params, args=other_args,
             method=method, jac=fit_portrait_function_deriv, bounds=bounds,
@@ -547,8 +551,10 @@ def fit_portrait(data, model, init_params, P=None, freqs=None, nu_ref=np.inf,
     if not quiet and results.success is True:
         sys.stderr.write("Fit succeeded with return code %d -- %s\n"
                 %(results.status, rcstring))
-    param_errs = list(pow(fit_portrait_function_2deriv(np.array([phi, DM]),
-        mFFT, p, dFFT, d, errs, P, freqs, nu_ref), -0.5))
+    #Curvature matrix = 1/2 2deriv of chi2 = 2 hessian (cf. gregory sect 11.5)
+    hessian = fit_portrait_function_2deriv(np.array([phi, DM]),
+        mFFT, p, dFFT, d, errs, P, freqs, nu_ref)
+    param_errs = list(pow(hessian[:2], -0.5))
     DoF = len(data.ravel()) - (len(freqs) + 2)
     red_chi2 = results.fun / DoF
     if scales:
