@@ -851,16 +851,17 @@ def load_data(filenm, dedisperse=False, dededisperse=False, tscrunch=False,
     nsubx = int(np.compress([subintsxs[isub].shape[1] for isub in
         xrange(nsub)], np.ones(nsub)).sum())
     if not quiet:
-        print "\tDM/P_ms            = %.1f\n\
+        P = arch.get_Integration(0).get_folding_period()*1000.0
+        print "\tP [ms]             = %.1f\n\
+        DM [cm**-3 pc]     = %.1f\n\
         center freq. [MHz] = %.4f\n\
         bandwidth [MHz]    = %.1f\n\
         # bins in prof     = %d\n\
         # channels         = %d\n\
         # chan (mean)      = %d\n\
         # subints          = %d\n\
-        # unzapped subint  = %d\n"%(DM /
-                (arch.get_Integration(0).get_folding_period()*1000.0), nu0, bw,
-                nbin, nchan, nchanx, nsub, nsubx)
+        # unzapped subint  = %d\n"%(P, DM, nu0, bw, nbin, nchan, nchanx, nsub,
+                nsubx)
     #Returns refreshed arch; could be changed...
     arch.refresh()
     #Return getitem/attribute-accessible class!
