@@ -155,7 +155,8 @@ class GetTOAs:
                 channel_SNRs = portx.std(axis=1) / get_noise(portx, chans=True)
                 #This is the frequency used in the fit for DM and phase, which
                 #hopefully minimizes the covariance
-                nu_fit = find_DM_freq(freqsx, channel_SNRs)
+                nu_fit = find_fit_freq(freqsx, channel_SNRs)
+                #nu_fit = 1450.85442044
                 nu_fits[isubx] = nu_fit
 
                 ####################

@@ -250,10 +250,87 @@ def fit_gaussian_portrait_function(params, phases, freqs, nu_ref, data=None,
         nu_ref)) / errs)
     return deviates
 
-def fit_portrait_function(params, model=None, p=None, data=None, d=None,
-        errs=None, P=None, freqs=None, nu_ref=np.inf):
+#def fit_portrait_function(params, model=None, p=None, data=None, d=None,
+#        errs=None, P=None, freqs=None, nu_ref=np.inf):
+#    """
+#    This amounts to the chi**2 value.
+#    """
+#    phase = params[0]
+#    m = 0.0
+#    if P == None or freqs == None:
+#        D = 0.0
+#        freqs = np.inf * np.ones(len(model))
+#    else: D = Dconst * params[1] / P
+#    for nn in xrange(len(freqs)):
+#        err = errs[nn]
+#        freq = freqs[nn]
+#        harmind = np.arange(len(model[nn]))
+#        phasor = np.exp(harmind * 2.0j * np.pi * (phase + (D * (freq**-2.0 -
+#            nu_ref**-2.0))))
+#        mm = np.real(data[nn,:] * np.conj(model[nn,:]) * phasor).sum()
+#        m += (mm**2.0) * err / p[nn]
+#    return d - m
+
+#def fit_portrait_function_deriv(params, model=None, p=None, data=None, d=None,
+#        errs=None, P=None, freqs=None, nu_ref=np.inf):
+#    """
+#    This is the Jacobian of the fit_portrait_function with respect to the two
+#    parameters.
+#    """
+#    phase = params[0]
+#    D = Dconst * params[1] / P
+#    d_phi,d_DM = 0.0, 0.0
+#    for nn in xrange(len(freqs)):
+#        err = errs[nn]
+#        freq = freqs[nn]
+#        harmind = np.arange(len(model[nn]))
+#        phasor = np.exp(harmind * 2.0j * np.pi * (phase + (D * (freq**-2.0 -
+#            nu_ref**-2.0))))
+#        g1 = np.real(data[nn,:] * np.conj(model[nn,:]) * phasor).sum()
+#        gp2 = np.real(2j * np.pi * harmind * data[nn,:] *
+#                np.conj(model[nn,:]) * phasor).sum()
+#        gd2 = np.real(2j * np.pi * harmind * (freq**-2.0 - nu_ref**-2.0) *
+#                (Dconst/P) * data[nn,:] * np.conj(model[nn,:]) * phasor).sum()
+#        d_phi += -2 * g1 * gp2 * err / p[nn]
+#        d_DM += -2 * g1 * gd2 * err / p[nn]
+#    return np.array([d_phi, d_DM])
+
+#def fit_portrait_function_2deriv(params, model=None, p=None, data=None,
+#        errs=None, P=None, freqs=None, nu_ref=np.inf):
+#    """
+#    This returns the three unique values in the Hessian, which is a 2x2
+#    symmetric matrix.
+#    """
+#    phase = params[0]
+#    D = Dconst * params[1] / P
+#    d2_phi, d2_DM, d2_cross = 0.0, 0.0, 0.0
+#    for nn in xrange(len(freqs)):
+#        err = errs[nn]
+#        freq = freqs[nn]
+#        harmind = np.arange(len(model[nn]))
+#        phasor = np.exp(harmind * 2.0j * np.pi * (phase + (D * (freq**-2.0 -
+#            nu_ref**-2.0))))
+#        g1 = np.real(data[nn,:] * np.conj(model[nn,:]) * phasor).sum()
+#        gp2 = np.real(2.0j * np.pi * harmind * data[nn,:] *
+#                np.conj(model[nn,:]) * phasor).sum()
+#        gd2 = np.real(2.0j * np.pi * harmind * (freq**-2.0 - nu_ref**-2.0) *
+#                (Dconst/P) * data[nn,:] * np.conj(model[nn,:]) * phasor).sum()
+#        gp3 = np.real(pow(2.0j * np.pi * harmind, 2.0) * data[nn,:] *
+#                np.conj(model[nn,:]) * phasor).sum()
+#        gd3 = np.real(pow(2.0j * np.pi * harmind *
+#            (freq**-2.0 - nu_ref**-2.0) * (Dconst/P), 2.0) * data[nn,:] *
+#            np.conj(model[nn,:]) * phasor).sum()
+#        gc = (freq**-2.0 - nu_ref**-2.0) * (Dconst/P) * gp3
+#        d2_phi += -2.0 * err * (pow(gp2, 2.0) + (g1 * gp3)) / p[nn]
+#        d2_DM += -2.0 * err * (pow(gd2, 2.0) + (g1 * gd3)) / p[nn]
+#        d2_cross += -2.0 * err * ((gp2 * gd2) + (g1 * gc))/ p[nn]
+#    return np.array([d2_phi, d2_DM, d2_cross])
+
+def fit_portrait_function(params, model=None, p_n=None, data=None, errs=None,
+        P=None, freqs=None, nu_ref=np.inf):
     """
-    This amounts to the chi**2 value.
+    This amounts to the chi**2 value, differing by a constant depending on a
+    weighted sum of the data.
     """
     phase = params[0]
     m = 0.0
@@ -262,16 +339,18 @@ def fit_portrait_function(params, model=None, p=None, data=None, d=None,
         freqs = np.inf * np.ones(len(model))
     else: D = Dconst * params[1] / P
     for nn in xrange(len(freqs)):
-        err = errs[nn]
         freq = freqs[nn]
+        p = p_n[nn]
+        err = errs[nn]
         harmind = np.arange(len(model[nn]))
         phasor = np.exp(harmind * 2.0j * np.pi * (phase + (D * (freq**-2.0 -
             nu_ref**-2.0))))
-        mm = np.real(data[nn,:] * np.conj(model[nn,:]) * phasor).sum()
-        m += (mm**2.0) * err / p[nn]
-    return d - m
+        #Cdp is related to the inverse DFT of the cross-correlation 
+        Cdp = np.real(data[nn,:] * np.conj(model[nn,:]) * phasor).sum()
+        m += (Cdp**2.0) / (err**2.0 * p)
+    return -m
 
-def fit_portrait_function_deriv(params, model=None, p=None, data=None, d=None,
+def fit_portrait_function_deriv(params, model=None, p_n=None, data=None,
         errs=None, P=None, freqs=None, nu_ref=np.inf):
     """
     This is the Jacobian of the fit_portrait_function with respect to the two
@@ -279,52 +358,64 @@ def fit_portrait_function_deriv(params, model=None, p=None, data=None, d=None,
     """
     phase = params[0]
     D = Dconst * params[1] / P
-    d_phi,d_DM = 0.0, 0.0
+    d_phi, d_DM = 0.0, 0.0
     for nn in xrange(len(freqs)):
-        err = errs[nn]
         freq = freqs[nn]
+        p = p_n[nn]
+        err = errs[nn]
         harmind = np.arange(len(model[nn]))
         phasor = np.exp(harmind * 2.0j * np.pi * (phase + (D * (freq**-2.0 -
             nu_ref**-2.0))))
-        g1 = np.real(data[nn,:] * np.conj(model[nn,:]) * phasor).sum()
-        gp2 = np.real(2j * np.pi * harmind * data[nn,:] *
+        Cdp = np.real(data[nn,:] * np.conj(model[nn,:]) * phasor).sum()
+        dCdp1 = np.real(2.0j * np.pi * harmind * data[nn,:] *
                 np.conj(model[nn,:]) * phasor).sum()
-        gd2 = np.real(2j * np.pi * harmind * (freq**-2.0 - nu_ref**-2.0) *
-                (Dconst/P) * data[nn,:] * np.conj(model[nn,:]) * phasor).sum()
-        d_phi += -2 * g1 * gp2 * err / p[nn]
-        d_DM += -2 * g1 * gd2 * err / p[nn]
+        dDM = (freq**-2.0 - nu_ref**-2.0) * (Dconst/P)
+        d_phi += -2 * Cdp * dCdp1 / (err**2.0 * p)
+        d_DM += -2 * Cdp * dCdp1 * dDM / (err**2.0 * p)
     return np.array([d_phi, d_DM])
 
-def fit_portrait_function_2deriv(params, model=None, p=None, data=None, d=None,
-        errs=None, P=None, freqs=None, nu_ref=np.inf):
+def fit_portrait_function_2deriv(params, model=None, p_n=None, data=None,
+        errs=None, P=None, freqs=None, nu_ref=np.inf, transform=False):
     """
     This returns the three unique values in the Hessian, which is a 2x2
     symmetric matrix.
     """
     phase = params[0]
     D = Dconst * params[1] / P
-    d2_phi, d2_DM, d2_cross = 0.0, 0.0, 0.0
-    for nn in xrange(len(freqs)):
-        err = errs[nn]
-        freq = freqs[nn]
-        harmind = np.arange(len(model[nn]))
-        phasor = np.exp(harmind * 2.0j * np.pi * (phase + (D * (freq**-2.0 -
-            nu_ref**-2.0))))
-        g1 = np.real(data[nn,:] * np.conj(model[nn,:]) * phasor).sum()
-        gp2 = np.real(2.0j * np.pi * harmind * data[nn,:] *
-                np.conj(model[nn,:]) * phasor).sum()
-        gd2 = np.real(2.0j * np.pi * harmind * (freq**-2.0 - nu_ref**-2.0) *
-                (Dconst/P) * data[nn,:] * np.conj(model[nn,:]) * phasor).sum()
-        gp3 = np.real(pow(2.0j * np.pi * harmind, 2.0) * data[nn,:] *
-                np.conj(model[nn,:]) * phasor).sum()
-        gd3 = np.real(pow(2.0j * np.pi * harmind *
-            (freq**-2.0 - nu_ref**-2.0) * (Dconst/P), 2.0) * data[nn,:] *
-            np.conj(model[nn,:]) * phasor).sum()
-        gc = (freq**-2.0 - nu_ref**-2.0) * (Dconst/P) * gp3
-        d2_phi += -2.0 * err * (pow(gp2, 2.0) + (g1 * gp3)) / p[nn]
-        d2_DM += -2.0 * err * (pow(gd2, 2.0) + (g1 * gd3)) / p[nn]
-        d2_cross += -2.0 * err * ((gp2 * gd2) + (g1 * gc))/ p[nn]
-    return np.array([d2_phi, d2_DM, d2_cross])
+    if transform:
+        ii = 2
+    else:
+        ii = 1
+    while(ii):
+        d2_phi, d2_DM, d2_cross = 0.0, 0.0, 0.0
+        W_n = np.empty(len(freqs))
+        for nn in xrange(len(freqs)):
+            freq = freqs[nn]
+            p = p_n[nn]
+            err = errs[nn]
+            harmind = np.arange(len(model[nn]))
+            phasor = np.exp(harmind * 2.0j * np.pi * (phase + (D *
+                (freq**-2.0 - nu_ref**-2.0))))
+            Cdp = np.real(data[nn,:] * np.conj(model[nn,:]) * phasor).sum()
+            dCdp1 = np.real(2.0j * np.pi * harmind * data[nn,:] *
+                    np.conj(model[nn,:]) * phasor).sum()
+            dCdp2 = np.real(pow(2.0j * np.pi * harmind, 2.0) * data[nn,:] *
+                    np.conj(model[nn,:]) * phasor).sum()
+            dDM = (freq**-2.0 - nu_ref**-2.0) * (Dconst/P)
+            W = (pow(dCdp1, 2.0) + (Cdp * dCdp2))
+            W_n[nn] = W / (err**2.0 * p)
+            d2_phi += -2.0 * W / (err**2.0 * p)
+            d2_DM += -2.0 * W * dDM**2.0 / (err**2.0 * p)
+            d2_cross += -2.0 * W * dDM / (err**2.0 * p)
+        ii -= 1
+        if ii:
+            nu_zero = (W_n.sum() / np.sum(W_n * freqs**-2))**0.5
+            phase -= DM_delay_offset(params[1], P, nu_ref, nu_zero)
+            nu_ref = nu_zero
+    if transform:
+        return (np.array([d2_phi, d2_DM, d2_cross]), nu_zero)
+    else:
+        return np.array([d2_phi, d2_DM, d2_cross])
 
 def estimate_portrait(phase, DM, data, scales, P, freqs, nu_ref=np.inf):
     #here, all vars have additional epoch-index except nu_ref
@@ -505,7 +596,7 @@ def fit_gaussian_portrait(data, errs, init_params, fit_flags, phases, freqs,
         print "---------------------------------------------------------------"
     return fitted_params, chi_sq, dof
 
-def fit_portrait(data, model, init_params, P=None, freqs=None, nu_ref=np.inf,
+def fit_portrait(data, model, init_params, P, freqs, nu_ref=np.inf,
         scales=True, bounds=[(None, None), (None, None)], id=None, quiet=True):
     """
     """
@@ -516,17 +607,24 @@ def fit_portrait(data, model, init_params, P=None, freqs=None, nu_ref=np.inf,
     dFFT = fft.rfft(data, axis=1)
     mFFT = fft.rfft(model, axis=1)
     #Precision FIX
-    unnorm_errs = np.real(dFFT[:, -len(dFFT[0])/4:]).std(axis=1)**-2.0
-    norm_dFFT = np.transpose((unnorm_errs**0.5) * np.transpose(dFFT))
-    norm_errs = np.real(norm_dFFT[:, -len(norm_dFFT[0])/4:]).std(axis=1)**-2.0
+    ##unnorm_errs = np.real(dFFT[:, -len(dFFT[0])/4:]).std(axis=1)**-2.0
+    unnorm_errs = np.real(dFFT[:, -len(dFFT[0])/4:]).std(axis=1)
+    ##norm_dFFT = np.transpose((unnorm_errs**0.5) * np.transpose(dFFT))
+    norm_dFFT = np.transpose(unnorm_errs * np.transpose(dFFT))
+    ##norm_errs = np.real(norm_dFFT[:, -len(norm_dFFT[0])/4:]).std(axis=1)**-2.0
+    norm_errs = np.real(norm_dFFT[:, -len(norm_dFFT[0])/4:]).std(axis=1)
     errs = unnorm_errs
-    d = np.real(np.sum(np.transpose(errs * np.transpose(dFFT *
+    ##d = np.real(np.sum(np.transpose(errs * np.transpose(dFFT *
+    ##    np.conj(dFFT)))))
+    d = np.real(np.sum(np.transpose(errs**-2.0 * np.transpose(dFFT *
         np.conj(dFFT)))))
-    p = np.real(np.sum(mFFT * np.conj(mFFT), axis=1))
+    ##p = np.real(np.sum(mFFT * np.conj(mFFT), axis=1))
+    p_n = np.real(np.sum(mFFT * np.conj(mFFT), axis=1))
     #other_args = {'model':mFFT, 'p':p, 'data':dFFT, 'd':d, 'errs':errs, 'P':P,
     #        'freqs':freqs, 'nu_ref':nu_ref}
     #BEWARE BELOW! Order matters!
-    other_args = (mFFT, p, dFFT, d, errs, P, freqs, nu_ref)
+    ##other_args = (mFFT, p, dFFT, d, errs, P, freqs, nu_ref)
+    other_args = (mFFT, p_n, dFFT, errs, P, freqs, nu_ref)
     minimize = opt.minimize
     #fmin_tnc seems to work best, fastest
     method = 'TNC'
@@ -551,16 +649,20 @@ def fit_portrait(data, model, init_params, P=None, freqs=None, nu_ref=np.inf,
     if not quiet and results.success is True:
         sys.stderr.write("Fit succeeded with return code %d -- %s\n"
                 %(results.status, rcstring))
-    #Curvature matrix = 1/2 2deriv of chi2 = 2 hessian (cf. gregory sect 11.5)
-    hessian = fit_portrait_function_2deriv(np.array([phi, DM]),
-        mFFT, p, dFFT, d, errs, P, freqs, nu_ref)
-    param_errs = list(pow(hessian[:2], -0.5))
+    #Curvature matrix = 1/2 2deriv of chi2 (cf. gregory sect 11.5)
+    #Parameter errors are related to curvature matrix by **-0.5 
+    hessian, nu_zero = fit_portrait_function_2deriv(np.array([phi, DM]),
+        mFFT, p_n, dFFT, errs, P, freqs, nu_ref, True)
+    ##    mFFT, p, dFFT, d, errs, P, freqs, nu_ref)
+    param_errs = list(pow(0.5*hessian[:2], -0.5))
     DoF = len(data.ravel()) - (len(freqs) + 2)
-    red_chi2 = results.fun / DoF
+    ##red_chi2 = results.fun / DoF
+    red_chi2 = (d + results.fun) / DoF
     if scales:
         scales = get_scales(data, model, phi, DM, P, freqs, nu_ref)
         #Errors on scales, if ever needed
-        param_errs += list(pow(2 * p * errs, -0.5))
+        ##param_errs += list(pow(2 * p * errs, -0.5))
+        param_errs += list(pow(p_n / errs**2, -0.5))
         return (phi, DM, nfeval, return_code, scales, np.array(param_errs),
                 red_chi2, duration)
     else: return (phi, DM, nfeval, return_code, np.array(param_errs), red_chi2,
@@ -719,9 +821,9 @@ def DM_delay_offset(DM, P=None, nu_ref1=np.inf, nu_ref2=np.inf):
     diff = Dconst * DM * P**-1 * (nu_ref1**-2 - nu_ref2**-2)
     return diff
 
-def find_DM_freq(freqs, SNRs=None):
+def find_fit_freq(freqs, SNRs=None):
     """
-    Returns "optimal" frequency for fitting DM and phase
+    Returns an estimate of an "optimal" frequency for fitting DM and phase
     in the sense that it minimizes the covariance.
     Intuited: "center of mass" where the weight in a given channel is given by:
     SNR/freq**2
