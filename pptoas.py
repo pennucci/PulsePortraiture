@@ -26,13 +26,13 @@ class GetTOAs:
         self.obs = []
         self.nu0s = []
         self.nu_fits = []
-        self.nsubs = []
+        self.nu_zeros = []
+        self.nsubxs = []
         self.epochs = []
         self.MJDs = []
         self.Ps = []
         self.phis = []
         self.phi_errs = []
-        self.offsets = []
         self.TOAs = []
         self.TOA_errs = []
         self.DM0s = []
@@ -44,6 +44,7 @@ class GetTOAs:
         self.scales = []
         self.scalesx = []
         self.scale_errs = []
+        self.covariances = []
         self.red_chi2s = []
         self.nfevals = []
         self.rcs = []
@@ -106,9 +107,9 @@ class GetTOAs:
             else:
                 model = self.model
             nu_fits = np.empty(nsubx, dtype=np.float)
+            nu_zeros = np.empty(nsubx, dtype=np.float)
             phis = np.empty(nsubx, dtype=np.double)
             phi_errs = np.empty(nsubx, dtype=np.double)
-            offsets = np.empty(nsubx, dtype=np.double)
             TOAs = np.empty(nsubx, dtype="object")
             TOA_errs = np.empty(nsubx, dtype="object")
             DMs = np.empty(nsubx, dtype=np.float)
@@ -122,6 +123,7 @@ class GetTOAs:
             scalesx = []
             scale_errs = []
             red_chi2s = np.empty(nsubx)
+            covariances = np.empty(nsubx)
             MJDs = np.array([epochs[isub].in_days()
                 for isub in xrange(nsub)], dtype=np.double)
             DM_stored = arch.get_dispersion_measure()
@@ -138,7 +140,7 @@ class GetTOAs:
                 np.array(subintsxs)[:,0]), np.arange(nsub)))
             for isubx in xrange(nsubx):
                 isub = ok_isubs[isubx]
-                id = datafile + "_%d"%isub
+                id = datafile + "_%d_%d"%(isub, isubx)
                 epoch = epochs[isub]
                 MJD = MJDs[isub]
                 P = Ps[isub]
@@ -154,9 +156,9 @@ class GetTOAs:
                 #A proxy for SNR, hopefully proportional:
                 channel_SNRs = portx.std(axis=1) / get_noise(portx, chans=True)
                 #This is the frequency used in the fit for DM and phase, which
-                #hopefully minimizes the covariance
-                nu_fit = find_fit_freq(freqsx, channel_SNRs)
-                #nu_fit = 1450.85442044
+                #minimizes the covariance.  The zero-covariance frequency,
+                #nu_zero is calculated after.
+                nu_fit = guess_fit_freq(freqsx, channel_SNRs)
                 nu_fits[isubx] = nu_fit
 
                 ####################
@@ -185,9 +187,8 @@ class GetTOAs:
                     phaseguess = first_guess(rot_port, model, nguess=1000)
                     DMguess = DM_stored
                     phaseguess_0 = phaseguess
-                #I have to subtract the DM_delay_offset, by empirical trials...
-                phaseguess = phaseguess_0 - DM_delay_offset(DMguess, P,
-                        nu_fits[0], nu_fit)
+                phaseguess = phase_transform(phaseguess_0, DMguess, nu_fits[0],
+                        nu_fit, P)
                 #    if not quiet: print "Phase guess: %.8f ; DM guess: %.5f"%(
                 #            phaseguess, DMguess)
                 #The below else clause might not be a good idea if RFI or
@@ -208,10 +209,10 @@ class GetTOAs:
                 #      THE FIT     #
                 ####################
                 if not quiet: print "Fitting for TOA %d"%(isubx)
-                phi, DM, nfeval, rc, scalex, param_errs, red_chi2, duration = \
-                        fit_portrait(portx, modelx,
-                            np.array([phaseguess, DMguess]), P, freqsx, nu_fit,
-                            scales=True, bounds=bounds, id = id, quiet=quiet)
+                (phi, DM, scalex, param_errs, nu_zero, covariance, red_chi2,
+                        duration, nfeval, rc) = fit_portrait(portx, modelx,
+                                np.array([phaseguess, DMguess]), P, freqsx,
+                                nu_fit, bounds=bounds, id = id, quiet=quiet)
                 phi_err, DM_err = param_errs[0], param_errs[1]
                 fit_duration += duration
 
@@ -226,12 +227,9 @@ class GetTOAs:
                     nu_ref = self.nu_ref
                 #Phase conversion
                 #The pre-Doppler corrected DM must be used
-                #...I have to subtract the DM_delay_offset, by empirical
-                #trial-and-error...
                 #See calculate_TOA; I avoid the external function call here.
                 #TOA = calculate_TOA(epochs[isubx], P, phi, DM, nu_fit, nu_ref)
-                offset = DM_delay_offset(DM, P, nu_fit, nu_ref)
-                phi_prime = phi - offset
+                phi_prime = phase_transform(phi, DM, nu_fit, nu_ref, P)
                 TOA = epochs[isubx] + pr.MJD((phi_prime * P) / (3600 * 24.))
                 #Do errors change?
                 TOA_err = phi_err * P * 1e6 # [us]
@@ -247,9 +245,9 @@ class GetTOAs:
                 else:
                     doppler_fs[isubx] = 1.0
 
+                nu_zeros[isubx] = nu_zero
                 phis[isubx] = phi
                 phi_errs[isubx] = phi_err
-                offsets[isubx] = offset
                 TOAs[isubx] = TOA
                 TOA_errs[isubx] = TOA_err
                 DMs[isubx] = DM
@@ -266,6 +264,7 @@ class GetTOAs:
                         iscalex += 1
                     else: pass
                 scales[isubx] = scale
+                covariances[isubx] = covariance
                 red_chi2s[isubx] = red_chi2
             DeltaDMs = DMs - DM0
             #The below returns the weighted mean and the sum of the weights,
@@ -284,14 +283,14 @@ class GetTOAs:
             self.obs.append(arch.get_telescope())
             self.nu0s.append(nu0)
             self.nu_fits.append(nu_fits)
-            self.nsubs.append(nsubx)
+            self.nu_zeros.append(nu_zeros)
+            self.nsubxs.append(nsubx)
             self.epochs.append(np.take(epochs, ok_isubs))
             self.MJDs.append(np.take(MJDs, ok_isubs))
             self.Ps.append(np.take(Ps, ok_isubs))
             #NB: phis are w.r.t. nu_fit!!!
             self.phis.append(phis)
             self.phi_errs.append(phi_errs)
-            self.offsets.append(offsets)
             self.TOAs.append(TOAs)
             self.TOA_errs.append(TOA_errs)
             #NB: DMs are Doppler corrected, if bary_DM is set!!!
@@ -327,7 +326,7 @@ class GetTOAs:
         if not quiet:
             print "--------------------------"
             print "Total time: %.2f, ~%.2f min/TOA"%(tot_duration / 60,
-                    tot_duration / (60 * np.sum(np.array(self.nsubs))))
+                    tot_duration / (60 * np.sum(np.array(self.nsubxs))))
 
     def write_TOAs(self, datafile=None, outfile=None, nu_ref=None):
         """
@@ -342,7 +341,7 @@ class GetTOAs:
             sys.stdout = open(outfile,"a")
         for datafile in datafiles:
             ifile = datafiles.index(datafile)
-            nsubx = self.nsubs[ifile]
+            nsubx = self.nsubxs[ifile]
             if nu_ref is None:
                 #Default to self.nu_ref
                 if self.nu_ref is None:
@@ -400,7 +399,7 @@ class GetTOAs:
             of = sys.__stdout__
         for datafile in datafiles:
             ifile = datafiles.index(datafile)
-            nsubx = self.nsubs[ifile]
+            nsubx = self.nsubxs[ifile]
             if self.one_DM:
                 DeltaDM_err = self.DeltaDM_errs[ifile]
                 for isubx in xrange(nsubx):
@@ -456,8 +455,6 @@ class GetTOAs:
     def show_fit(self, datafile=None, isubx=0, quiet=False):
         """
         subintx 0 = python index 0
-        This may not be *exactly* correct in the display of the fit,
-        but close...
         """
         if datafile is None:
             datafile = self.datafiles[0]
@@ -498,15 +495,16 @@ class GetTOAs:
             ifile = self.datafiles.index(datafile)
         else:
             ifile = 0
-        nsubx = self.nsubs[ifile]
+        nsubx = self.nsubxs[ifile]
+        nu_fits = self.nu_fits[ifile]
         MJDs = self.MJDs[ifile]
         Ps = self.Ps[ifile]
         phis = self.phis[ifile]
         phi_errs = self.phi_errs[ifile]
-        offsets = self.offsets[ifile]
         #These are the 'barycentric' DMs, if they were corrected (default yes)
         DMs = self.DMs[ifile]
         DM_errs = self.DM_errs[ifile]
+        DMs_fitted = DMs / self.doppler_fs[ifile]
         DM0 = self.DM0s[ifile]
         DeltaDM_mean = self.DeltaDM_means[ifile]
         DeltaDM_err = self.DeltaDM_errs[ifile]
@@ -516,10 +514,12 @@ class GetTOAs:
         pf = np.polynomial.polynomial.polyfit
         #This is to obtain the TOA phase offsets w.r.t. nu_ref
         #Apparently, changing phis in place changes self.phis ???
-        milli_sec_shift = (phis-offsets) * Ps * 1e3
+        phi_primes = phase_transform(phis, DMs_fitted, nu_fits, self.nu_ref,
+                Ps)
+        milli_sec_shifts = (phi_primes) * Ps * 1e3
         #Not sure weighting works...
-        fit_results = pf(MJDs, milli_sec_shift, 1, full=True, w=phi_errs**-2)
-        resids = (milli_sec_shift) - (fit_results[0][0] + (fit_results[0][1] *
+        fit_results = pf(MJDs, milli_sec_shifts, 1, full=True, w=phi_errs**-2)
+        resids = (milli_sec_shifts) - (fit_results[0][0] + (fit_results[0][1] *
             MJDs))
         resids_mean,resids_var = np.average(resids, weights=phi_errs**-2,
                 returned=True)
@@ -531,7 +531,7 @@ class GetTOAs:
         RMS = resids_err
         ax1 = fig.add_subplot(311)
         for isubx in xrange(nsubx):
-            ax1.errorbar(MJDs[isubx], (phis-offsets)[isubx] * Ps[isubx] * 1e6,
+            ax1.errorbar(MJDs[isubx], milli_sec_shifts[isubx] * 1e3,
                     phi_errs[isubx] * Ps[isubx] * 1e6, color='%s'
                     %cols[rcs[isubx]], fmt='+')
         plt.plot(MJDs, (fit_results[0][0] + (fit_results[0][1] * MJDs)) * 1e3,
@@ -580,7 +580,7 @@ class GetTOAs:
         if datafile is None:
             nfevals = []
             rcs = []
-            nsubx = np.array(self.nsubs).sum()
+            nsubx = np.array(self.nsubxs).sum()
             for ifile in xrange(len(self.datafiles)):
                 nfevals += list(self.nfevals[ifile])
                 rcs += list(self.rcs[ifile])
@@ -590,7 +590,7 @@ class GetTOAs:
             ifile = self.datafiles.index(datafile)
             nfevals = self.nfevals[ifile]
             rcs = self.rcs[ifile]
-            nsubx = self.nsubs[ifile]
+            nsubx = self.nsubxs[ifile]
         cols = ['b','k','g','b','r']
         bins = nfevals.max()
         binmin = nfevals.min()
