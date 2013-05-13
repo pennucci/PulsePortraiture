@@ -184,7 +184,8 @@ class GetTOAs:
                     #(appropriate) phase offset w.r.t to what would be seen
                     #in the PSRCHIVE dedispersed portrait.
                     #Currently, first_guess ranges between +/- 0.5
-                    phaseguess = first_guess(rot_port, model, nguess=1000)
+                    phaseguess = first_guess(rot_port.mean(axis=0),
+                            model.mean(axis=0), nguess=1000)
                     DMguess = DM_stored
                     phaseguess_0 = phaseguess
                 phaseguess = phase_transform(phaseguess_0, DMguess, nu_fits[0],

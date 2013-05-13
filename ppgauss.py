@@ -198,14 +198,13 @@ class DataPortrait:
             self.modelx = np.compress(self.weights[0], self.model, axis=0)
             phaseguess = first_guess(self.portx, self.modelx, nguess=1000)
             DMguess = 0.0
-            id = "model_iteration"
-            (self.phi, self.DM, self.nfeval, self.rc, self.scalesx, param_errs,
-                    self.red_chi2, self.fit_duration) = (
+            (self.phi, self.DM, self.scalesx, param_errs, nu_zero, covar,
+                    self.red_chi2, self.fit_duration, self.nfeval, self.rc) = (
                         fit_portrait(self.portx, self.modelx,
                             np.array([phaseguess, DMguess]), self.Ps[0],
-                            self.freqsxs[0], self.nu_fit, scales=True,
-                            bounds=[(None, None), (None, None)],
-                            id=id, quiet=True))
+                            self.freqsxs[0], self.nu_fit,
+                            bounds=[(None, None), (None, None)], id=None,
+                            quiet=True))
             self.phierr = param_errs[0]
             self.DMerr = param_errs[1]
             self.duration = time.time() - start

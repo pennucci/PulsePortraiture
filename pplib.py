@@ -556,15 +556,18 @@ def fit_portrait(data, model, init_params, P, freqs, nu_ref=np.inf,
     #If the fit fails...????  These don't seem to be great indicators of the
     #fit failing
     if results.success is not True:
-        ii = id[::-1].index("_")
-        isubx = id[-ii:]
-        ii += 1
-        jj = ii + id[:-ii][::-1].index("_")
-        isub = id[-jj:-ii]
-        filenm = id[:-jj-1]
-        sys.stderr.write(
-                "Fit failed with return code %d -- %s; %s subint %s subintx %s\n"
-                %(results.status, rcstring, filenm, isub, isubx))
+        if id is not None:
+            ii = id[::-1].index("_")
+            isubx = id[-ii:]
+            ii += 1
+            jj = ii + id[:-ii][::-1].index("_")
+            isub = id[-jj:-ii]
+            filenm = id[:-jj-1]
+            sys.stderr.write(
+                    "Fit failed with return code %d -- %s; %s subint %s subintx %s\n"%(results.status, rcstring, filenm, isub, isubx))
+        else:
+            sys.stderr.write(
+                    "Fit failed with return code %d -- %s"%(results.status, rcstring))
     if not quiet and results.success is True:
         sys.stderr.write("Fit succeeded with return code %d -- %s\n"
                 %(results.status, rcstring))
@@ -589,8 +592,8 @@ def first_guess(data, model, nguess=1000):
     phaseguess = np.linspace(-0.5, 0.5, nguess)
     for ii in xrange(nguess):
         phase = phaseguess[ii]
-        crosscorr[ii] = np.correlate(fft_rotate(np.sum(data, axis=0),
-            phase * len(np.sum(data, axis=0))), np.sum(model, axis=0))
+        crosscorr[ii] = np.correlate(fft_rotate(data, phase * len(data)),
+                model)
     phaseguess = phaseguess[crosscorr.argmax()]
     return phaseguess
 
