@@ -55,10 +55,9 @@ class DataPortrait:
         will show obvious scintles.
         """
         if fit:
-            params, param_errs, chi2,dof, residuals = fit_powlaw(
-                    self.flux_profx, self.freqsxs[0], self.nu0,
-                    np.ones(len(self.flux_profx)),
-                    np.array([guessA,guessalpha]),self.noise_std)
+            params, param_errs, chi2, dof, residuals = fit_powlaw(
+                    self.flux_profx, np.array([guessA,guessalpha]),
+                    self.noise_std, self.freqsxs[0], self.nu0)
             if not quiet:
                 print ""
                 print "Flux-density power-law fit"
@@ -140,7 +139,9 @@ class DataPortrait:
         self.model_params = self.init_model_params
         self.total_time = 0.0
         self.start = time.time()
-        if not quiet: print "Fitting gaussian model portrait..."
+        #if not quiet:
+        #    print "Fitting gaussian model portrait..."
+        print "Fitting gaussian model portrait..."
         iterator = self.model_iteration(quiet)
         iterator.next()
         self.cnvrgnc = self.check_convergence(efac=1.0, quiet=quiet)
@@ -187,8 +188,8 @@ class DataPortrait:
         while (1):
             start = time.time()
             self.fitted_params, self.chi_sq, self.dof = (
-                    fit_gaussian_portrait(self.portx, self.portx_noise,
-                        self.model_params, self.fit_flags, self.phases,
+                    fit_gaussian_portrait(self.portx, self.model_params,
+                        self.portx_noise, self.fit_flags, self.phases,
                         self.freqsxs[0], self.nu_ref, quiet=quiet))
             self.model_params = self.fitted_params
             self.model = gen_gaussian_portrait(self.model_params,
@@ -196,7 +197,8 @@ class DataPortrait:
             self.model_masked = np.transpose(self.weights[0] *
                     np.transpose(self.model))
             self.modelx = np.compress(self.weights[0], self.model, axis=0)
-            phaseguess = first_guess(self.portx, self.modelx, nguess=1000)
+            phaseguess = first_guess(self.portx.mean(axis=0),
+                    self.modelx.mean(axis=0), nguess=1000)
             DMguess = 0.0
             (self.phi, self.DM, self.scalesx, param_errs, nu_zero, covar,
                     self.red_chi2, self.fit_duration, self.nfeval, self.rc) = (
@@ -400,7 +402,7 @@ class GaussianSelector:
             plt.draw()
         # Middle mouse button = fit the gaussians
         elif event1.button == event2.button == 2:
-            print "Fitting gaussian profile..."
+            print "Fitting reference gaussian profile..."
             fitted_params, chi_sq, dof, residuals = fit_gaussian_profile(
                     self.profile, self.init_params, np.zeros(self.proflen) +
                     self.errs, quiet=True)
