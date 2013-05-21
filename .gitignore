@@ -9,3 +9,4 @@ PPprofile/
 examples/*.pyc
 examples/*.swp
 examples/*~
+pplib_dist.py

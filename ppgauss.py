@@ -197,13 +197,13 @@ class DataPortrait:
             self.model_masked = np.transpose(self.weights[0] *
                     np.transpose(self.model))
             self.modelx = np.compress(self.weights[0], self.model, axis=0)
-            phaseguess = first_guess(self.portx.mean(axis=0),
+            phase_guess = first_guess(self.portx.mean(axis=0),
                     self.modelx.mean(axis=0), nguess=1000)
-            DMguess = 0.0
+            DM_guess = 0.0
             (self.phi, self.DM, self.scalesx, param_errs, nu_zero, covar,
                     self.red_chi2, self.fit_duration, self.nfeval, self.rc) = (
                         fit_portrait(self.portx, self.modelx,
-                            np.array([phaseguess, DMguess]), self.Ps[0],
+                            np.array([phase_guess, DM_guess]), self.Ps[0],
                             self.freqsxs[0], self.nu_fit,
                             bounds=[(None, None), (None, None)], id=None,
                             quiet=True))

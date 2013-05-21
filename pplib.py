@@ -24,8 +24,9 @@ import psrchive as pr
 #plt.copper()
 #plt.gray()
 #plt.bone()
+#plt.summer()
 plt.pink()
-plt.close("all")
+#plt.close("all")
 
 #List of colors
 cols = ['b', 'g', 'r', 'c', 'm', 'y',
@@ -717,7 +718,8 @@ def fit_portrait(data, model, init_params, P, freqs, nu_ref=np.inf,
     rcstring = RCSTRINGS["%s"%str(return_code)]
     #If the fit fails...????  These don't seem to be great indicators of the
     #fit failing
-    if results.success is not True:
+    #if results.success is not True:
+    if not quiet and results.success is not True:
         if id is not None:
             ii = id[::-1].index("_")
             isubx = id[-ii:]
@@ -750,14 +752,14 @@ def first_guess(data, model, nguess=1000):
     """
     """
     crosscorr = np.empty(nguess)
-    #phaseguess = np.linspace(0, 1.0, nguess)
-    phaseguess = np.linspace(-0.5, 0.5, nguess)
+    #phase_guess = np.linspace(0, 1.0, nguess)
+    phase_guess = np.linspace(-0.5, 0.5, nguess)
     for ii in xrange(nguess):
-        phase = phaseguess[ii]
+        phase = phase_guess[ii]
         crosscorr[ii] = np.correlate(fft_rotate(data, phase * len(data)),
                 model)
-    phaseguess = phaseguess[crosscorr.argmax()]
-    return phaseguess
+    phase_guess = phase_guess[crosscorr.argmax()]
+    return phase_guess
 
 def get_noise(data, frac=4, tau=False, chans=False, fd=False):
     #FIX: Make sure to use on portraits w/o zapped freq. channels

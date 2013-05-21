@@ -184,25 +184,25 @@ class GetTOAs:
                     #(appropriate) phase offset w.r.t to what would be seen
                     #in the PSRCHIVE dedispersed portrait.
                     #Currently, first_guess ranges between +/- 0.5
-                    phaseguess = first_guess(rot_port.mean(axis=0),
+                    phase_guess = first_guess(rot_port.mean(axis=0),
                             model.mean(axis=0), nguess=1000)
-                    DMguess = DM_stored
-                    phaseguess_0 = phaseguess
-                phaseguess = phase_transform(phaseguess_0, DMguess, nu_fits[0],
-                        nu_fit, P)
+                    DM_guess = DM_stored
+                    phase_guess_0 = phase_guess
+                phase_guess = phase_transform(phase_guess_0, DM_guess,
+                        nu_fits[0], nu_fit, P)
                 #    if not quiet: print "Phase guess: %.8f ; DM guess: %.5f"%(
-                #            phaseguess, DMguess)
+                #            phase_guess, DM_guess)
                 #The below else clause might not be a good idea if RFI or
-                #something throws it completely off, whereas first phaseguess
+                #something throws it completely off, whereas first phase_guess
                 #only depends on pulse profile...but there may be special cases
                 #when invidual guesses are needed.
                 #else:
-                #    phaseguess = phis[isubx-1]
-                #    DMguess = DMs[isubx-1]
+                #    phase_guess = phis[isubx-1]
+                #    DM_guess = DMs[isubx-1]
                 #   if not quiet:
                 #       print """
                 #       Phase guess: %.8f
-                #       DM guess:    %.5f"""%(phaseguess, DMguess)
+                #       DM guess:    %.5f"""%(phase_guess, DM_guess)
                 #
                 #Need a status bar?
 
@@ -212,7 +212,7 @@ class GetTOAs:
                 if not quiet: print "Fitting for TOA %d"%(isubx)
                 (phi, DM, scalex, param_errs, nu_zero, covariance, red_chi2,
                         duration, nfeval, rc) = fit_portrait(portx, modelx,
-                                np.array([phaseguess, DMguess]), P, freqsx,
+                                np.array([phase_guess, DM_guess]), P, freqsx,
                                 nu_fit, bounds=bounds, id = id, quiet=quiet)
                 phi_err, DM_err = param_errs[0], param_errs[1]
                 fit_duration += duration
