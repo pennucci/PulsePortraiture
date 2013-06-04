@@ -26,7 +26,7 @@ import psrchive as pr
 #plt.bone()
 #plt.summer()
 plt.pink()
-#plt.close("all")
+plt.close("all")
 
 #List of colors
 cols = ['b', 'g', 'r', 'c', 'm', 'y',
@@ -38,8 +38,8 @@ cols = ['b', 'g', 'r', 'c', 'm', 'y',
 #List of observatory codes; not sure what "0" corresponds to.
 #Cross-check against TEMPO's obsys.dat; need TEMPO2 codes
 obs_codes = {"bary":"@", "???":"0", "gbt":"1", "atca":"2", "ao":"3",
-             "nanshan":"5", "tid43":"6", "pks":"7", "jb":"8", "vla":"c",
-             "ncy":"f", "eff":"g", "jbdfb":"q", "wsrt":"i"}
+             "arecibo":"3", "nanshan":"5", "tid43":"6", "pks":"7", "jb":"8",
+             "vla":"c", "ncy":"f", "eff":"g", "jbdfb":"q", "wsrt":"i"}
 
 #RCSTRINGS dictionary, for the return codes given by scipy.optimize.fmin_tnc
 RCSTRINGS = {"-1":"INFEASIBLE: Infeasible (low > up).",
@@ -296,6 +296,32 @@ def fit_gaussian_portrait_function(params, phases, freqs, nu_ref, data=None,
     deviates = np.ravel((data - gen_gaussian_portrait(prms, phases, freqs,
         nu_ref)) / errs)
     return deviates
+
+def fit_phase_shift_function(phase, model=None, data=None, err=None):
+    """
+    """
+    harmind = np.arange(len(model))
+    phasor = np.exp(harmind * 2.0j * np.pi * phase)
+    C = -np.real((data * np.conj(model) * phasor).sum()) / err**2.0
+    return C
+
+def fit_phase_shift_function_deriv(phase, model=None, data=None, err=None):
+    """
+    """
+    harmind = np.arange(len(model))
+    phasor = np.exp(harmind * 2.0j * np.pi * phase)
+    dC = -np.real((2.0j * np.pi * harmind * data * np.conj(model) *
+        phasor).sum()) / err**2.0
+    return dC
+
+def fit_phase_shift_function_2deriv(phase, model=None, data=None, err=None):
+    """
+    """
+    harmind = np.arange(len(model))
+    phasor = np.exp(harmind * 2.0j * np.pi * phase)
+    d2C = -np.real((-4.0 * (np.pi**2.0) * (harmind**2.0) * data *
+        np.conj(model) * phasor).sum()) / err**2.0
+    return d2C
 
 def fit_portrait_function(params, model=None, p_n=None, data=None, errs=None,
         P=None, freqs=None, nu_ref=np.inf):
@@ -745,21 +771,35 @@ def fit_portrait(data, model, init_params, P, freqs, nu_ref=np.inf,
     scales = get_scales(data, model, phi, DM, P, freqs, nu_ref)
     #Errors on scales, if ever needed
     param_errs += list(pow(p_n / errs**2.0, -0.5))
+    #The below should be changed to a DataBunch
     return (phi, DM, scales, np.array(param_errs), nu_zero, hessian[2],
             red_chi2, duration, nfeval, return_code)
 
-def first_guess(data, model, nguess=1000):
+def fit_phase_shift(data, model, bounds=[-0.5, 0.5]):
     """
     """
-    crosscorr = np.empty(nguess)
-    #phase_guess = np.linspace(0, 1.0, nguess)
-    phase_guess = np.linspace(-0.5, 0.5, nguess)
-    for ii in xrange(nguess):
-        phase = phase_guess[ii]
-        crosscorr[ii] = np.correlate(fft_rotate(data, phase * len(data)),
-                model)
-    phase_guess = phase_guess[crosscorr.argmax()]
-    return phase_guess
+    dFFT = fft.rfft(data)
+    mFFT = fft.rfft(model)
+    #Substitute get_noise below when ready
+    err = np.real(dFFT[-len(dFFT)/4:]).std()
+    d = np.real(np.sum(dFFT * np.conj(dFFT))) / err**2.0
+    p = np.real(np.sum(mFFT * np.conj(mFFT))) / err**2.0
+    other_args = (mFFT, dFFT, err)
+    method = 'brent'
+    if method is not 'bounded':
+        bounds = None
+    results = opt.minimize_scalar(fit_phase_shift_function, args=other_args,
+            method=method, bounds=bounds)
+    phase = results.x
+    scale = -results.fun / p
+    #In the next two error equations, consult fit_portait for factors of 2
+    phase_error = (scale * fit_phase_shift_function_2deriv(phase, mFFT, dFFT,
+        err))**-0.5
+    scale_error = p**0.5
+    errors = [phase_error, scale_error]
+    red_chi2 = (d - ((results.fun**2) / p)) / (len(data) - 2)
+    return DataBunch(errors=errors, phase=phase, red_chi2=red_chi2,
+            scale=scale)
 
 def get_noise(data, frac=4, tau=False, chans=False, fd=False):
     #FIX: Make sure to use on portraits w/o zapped freq. channels
@@ -849,6 +889,8 @@ def rotate_portrait(port, phase=0.0, DM=None, P=None, freqs=None,
     Positive values of phase and DM rotate to earlier phase ("dedisperses").
     When used to dediserpse, rotate_portrait is virtually identical to
     arch.dedisperse() in PSRCHIVE.
+
+    Currently has to take an array with a 2-D shape.
     """
     pFFT = fft.rfft(port, axis=1)
     for nn in xrange(len(pFFT)):
@@ -868,7 +910,8 @@ def fft_rotate(arr, bins):
     Ripped and altered from PRESTO
 
     Return array 'arr' rotated by 'bins' places to the left.
-    The rotation is done in the Fourier domain using the Shift Theorem.            'bins' can be fractional.
+    The rotation is done in the Fourier domain using the Shift Theorem.
+    'bins' can be fractional.
     The resulting vector will have the same length as the original.
     """
     arr = np.asarray(arr)
@@ -932,7 +975,8 @@ def calculate_TOA(epoch, P, phi, DM=0.0, nu_ref1=np.inf, nu_ref2=np.inf):
     return TOA
 
 def load_data(filenm, dedisperse=False, dededisperse=False, tscrunch=False,
-        pscrunch=False, rm_baseline=True, flux_prof=False, quiet=False):
+        pscrunch=False, rm_baseline=True, flux_prof=False, norm_weights=True,
+        quiet=False):
     """
     Will read and return data using PSRCHIVE.
     The returned archive is 'refreshed'.
@@ -1031,13 +1075,15 @@ def load_data(filenm, dedisperse=False, dededisperse=False, tscrunch=False,
                 nsubx)
     #Returns refreshed arch; could be changed...
     arch.refresh()
+    if norm_weights:
+        weights = weights_norm
     #Return getitem/attribute-accessible class!
     data = DataBunch(arch=arch, bw=bw, flux_prof=flux_prof,
             flux_profx=flux_profx, freqs=freqs, freqsxs=freqsxs,
             masks=masks, epochs=epochs, nbin=nbin, nchan=nchan,
             nchanx=nchanx, noise_std=noise_std, nsub=nsub, nsubx=nsubx,
             nu0=nu0, phases=phases, prof=prof, Ps=Ps, source=source,
-            subints=subints, subintsxs=subintsxs, weights=weights_norm)
+            subints=subints, subintsxs=subintsxs, weights=weights)
     return data
 
 def unpack_dict(data):
@@ -1115,7 +1161,11 @@ def read_model(modelfile, phases=None, freqs=None, quiet=False):
     if not quiet and not read_only:
         print "Model Name: %s"%name
         print "Made %d component model with %d profile bins,"%(ngauss, nbin)
-        print "%d frequency channels, %.0f MHz bandwidth, centered near %.3f MHz,"%(nchan, (freqs[-1] - freqs[0]) + ((freqs[-1] - freqs[-2])), freqs.mean())
+        if len(freqs) != 1:
+            bw = (freqs[-1] - freqs[0]) + ((freqs[-1] - freqs[-2]))
+        else:
+            bw = 0.0
+        print "%d frequency channels, %.0f MHz bandwidth, centered near %.3f MHz,"%(nchan, bw, freqs.mean())
         print "with model parameters referenced at %.3f MHz."%nu_ref
     if read_only:
         return name, nu_ref, ngauss, params, fit_flags
@@ -1248,13 +1298,13 @@ def quick_add_archs(metafile, outfile, rotate=False, fiducial=0.5,
     """
     """
     from os import system
-    archs = open(metafile, "r").readlines()
-    for iarch in xrange(len(archs)):
-        datafile = archs[iarch].split()[0]
+    datafiles = open(metafile, "r").readlines()
+    datafiles = [datafiles[ifile][:-1] for ifile in xrange(len(datafiles))]
+    for ifile in xrange(len(datafiles)):
         data = load_data(datafile, dedisperse=True, dededisperse=False,
                 tscrunch=True, pscrunch=True, rm_baseline=True,
-                flux_prof=False, quiet=True)
-        if iarch == 0:
+                flux_prof=False, norm_weights=True, quiet=True)
+        if ifile == 0:
             nchan = data.nchan
             nbin = data.nbin
             cmd = "cp %s %s"%(datafile, outfile)
@@ -1272,6 +1322,7 @@ def quick_add_archs(metafile, outfile, rotate=False, fiducial=0.5,
         else:
             rotport = data.subints[0,0]
         totport += rotport
+        #The below assumes equal weight to all files!
         totweights += data.weights[0]
         if not quiet: print "Added %s"%datafile
     totweights = np.where(totweights==0, 1, totweights)
@@ -1300,7 +1351,7 @@ def concatenate_ports(metafile, quiet=True):
         datafile = datafiles[ifile]
         data = load_data(datafile, dedisperse=True, dededisperse=False,
                 tscrunch=True, pscrunch=True, rm_baseline=True,
-                flux_prof=True, quiet=quiet)
+                flux_prof=True, norm_weights=True, quiet=quiet)
         if ifile == 0:
             nbin = data.nbin
             phases = data.phases

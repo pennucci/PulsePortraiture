@@ -54,14 +54,16 @@ class GetTOAs:
         if len(self.datafiles) == 1 or self.common is True:
             data = load_data(self.datafiles[0], dedisperse=False,
                     dededisperse=False, tscrunch=True, pscrunch=True,
-                    rm_baseline=True, flux_prof=False, quiet=True)
+                    rm_baseline=True, flux_prof=False, norm_weights=True,
+                    quiet=True)
             if self.is_gauss_model:
                 self.model_name, self.ngauss, self.model = read_model(
                         self.modelfile, data.phases, data.freqs, self.quiet)
             else:
                 self.model_data = load_data(self.modelfile, dedisperse=True,
                         dededisperse=False, tscrunch=True, pscrunch=True,
-                        rm_baseline=True, flux_prof=False, quiet=True)
+                        rm_baseline=True, flux_prof=False, norm_weights=True,
+                        quiet=True)
                 self.model_name = self.model_data.source
                 self.ngauss = 0
                 self.model_weights = self.model_data.weights[0]
@@ -94,7 +96,8 @@ class GetTOAs:
             #Load data
             data = load_data(datafile, dedisperse=False,
                     dededisperse=False, tscrunch=False, pscrunch=True,
-                    rm_baseline=True, flux_prof=False, quiet=quiet)
+                    rm_baseline=True, flux_prof=False, norm_weights=True,
+                    quiet=quiet)
             #Unpack the data dictionary into the local namespace; see load_data
             #for dictionary keys.
             for key in data.keys():
@@ -183,11 +186,13 @@ class GetTOAs:
                     #different, in general, from nu_fit; this results in an
                     #(appropriate) phase offset w.r.t to what would be seen
                     #in the PSRCHIVE dedispersed portrait.
-                    #Currently, first_guess ranges between +/- 0.5
-                    phase_guess = first_guess(rot_port.mean(axis=0),
-                            model.mean(axis=0), nguess=1000)
+                    #Currently, fit_phase_shift returns an unbounded phase
+                    phase_guess = fit_phase_shift(rot_port.mean(axis=0),
+                            model.mean(axis=0), nguess=1000).phase
                     DM_guess = DM_stored
-                    phase_guess_0 = phase_guess
+                    phase_guess_0 = phase_guess % 1
+                    if phase_guess_0 > 0.5:
+                        phase_guess_0 -= 1.0
                 phase_guess = phase_transform(phase_guess_0, DM_guess,
                         nu_fits[0], nu_fit, P)
                 #    if not quiet: print "Phase guess: %.8f ; DM guess: %.5f"%(
@@ -446,7 +451,8 @@ class GetTOAs:
         ifile = self.datafiles.index(datafile)
         data = load_data(datafile, dedisperse=True,
                 dededisperse=False, tscrunch=False,
-                pscrunch=True, rm_baseline=True, flux_prof=False, quiet=quiet)
+                pscrunch=True, rm_baseline=True, flux_prof=False,
+                norm_weights=True, quiet=quiet)
         title = "%s ; subintx %d"%(datafile, isubx)
         port = np.transpose(data.weights[isubx] * np.transpose(
             data.subints[isubx,0]))
@@ -462,7 +468,8 @@ class GetTOAs:
         ifile = self.datafiles.index(datafile)
         data = load_data(datafile, dedisperse=False,
                 dededisperse=False, tscrunch=False,
-                pscrunch=True, rm_baseline=True, flux_prof=False, quiet=quiet)
+                pscrunch=True, rm_baseline=True, flux_prof=False,
+                norm_weights=True, quiet=quiet)
         phi = self.phis[ifile][isubx]
         #Pre-corrected DM, if corrected
         DM_fitted = self.DMs[ifile][isubx] / self.doppler_fs[ifile][isubx]

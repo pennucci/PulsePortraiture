@@ -17,7 +17,8 @@ class DataPortrait:
         if self.metafile is None:
             self.data = load_data(datafile, dedisperse=True,
                     dededisperse=False, tscrunch=True, pscrunch=True,
-                    rm_baseline=True, flux_prof=True, quiet=quiet)
+                    rm_baseline=True, flux_prof=True, norm_weights=True,
+                    quiet=quiet)
             #Unpack the data dictionary into the local namespace;
             #see load_data for dictionary keys.
             for key in self.data.keys():
@@ -197,8 +198,12 @@ class DataPortrait:
             self.model_masked = np.transpose(self.weights[0] *
                     np.transpose(self.model))
             self.modelx = np.compress(self.weights[0], self.model, axis=0)
-            phase_guess = first_guess(self.portx.mean(axis=0),
-                    self.modelx.mean(axis=0), nguess=1000)
+            #Currently, fit_phase_shift returns an unbounded phase
+            phase_guess = fit_phase_shift(self.portx.mean(axis=0),
+                    self.modelx.mean(axis=0)).phase
+            phase_guess %= 1
+            if phase_guess > 0.5:
+                phase_guess -= 1.0
             DM_guess = 0.0
             (self.phi, self.DM, self.scalesx, param_errs, nu_zero, covar,
                     self.red_chi2, self.fit_duration, self.nfeval, self.rc) = (
@@ -455,7 +460,7 @@ if __name__ == "__main__":
                       action="store", metavar="archive", dest="datafile",
                       help="PSRCHIVE archive from which to generate gaussian model.")
     parser.add_option("-M", "--metafile",
-                      action="store",metavar="metafile", dest="metafile",
+                      action="store", metavar="metafile", dest="metafile",
                       help="File containing list of archive file names, each of which represents a unique band; these files are concatenated, without rotation, for the fit. nbin must not differ. This does not yet work right.")
     parser.add_option("-o", "--outfile",
                       action="store", metavar="outfile", dest="outfile",
