@@ -186,10 +186,13 @@ class GetTOAs:
                     #different, in general, from nu_fit; this results in an
                     #(appropriate) phase offset w.r.t to what would be seen
                     #in the PSRCHIVE dedispersed portrait.
-                    #Currently, fit_phase_shift returns an unbounded phase
+                    #A single phase_guess per file may not be appropriate if
+                    #the pulsar is in a short-period binary...
                     phase_guess = fit_phase_shift(rot_port.mean(axis=0),
-                            model.mean(axis=0), nguess=1000).phase
+                            model.mean(axis=0)).phase
                     DM_guess = DM_stored
+                    #Currently, fit_phase_shift returns an unbounded phase,
+                    #so transform to be on the interval [-0.5, 0.5]
                     phase_guess_0 = phase_guess % 1
                     if phase_guess_0 > 0.5:
                         phase_guess_0 -= 1.0
@@ -239,9 +242,10 @@ class GetTOAs:
                 TOA = epochs[isubx] + pr.MJD((phi_prime * P) / (3600 * 24.))
                 #Do errors change?
                 TOA_err = phi_err * P * 1e6 # [us]
-                ####################
-                #DOPPLER CORRECTION#
-                ####################
+
+                ##########################
+                #DOPPLER CORRECTION OF DM#
+                ##########################
                 if self.bary_DM: #Default is True
                     #NB: the 'doppler factor' retrieved from PSRCHIVE seems to
                     #be the inverse of the convention nu_source/nu_observed
@@ -445,6 +449,7 @@ class GetTOAs:
     def show_subint(self, datafile=None, isubx=0, quiet=False):
         """
         subintx 0 = python index 0
+        isubx is currently mapped incorrectly.
         """
         if datafile is None:
             datafile = self.datafiles[0]
@@ -456,12 +461,13 @@ class GetTOAs:
         title = "%s ; subintx %d"%(datafile, isubx)
         port = np.transpose(data.weights[isubx] * np.transpose(
             data.subints[isubx,0]))
-        show_port(port=port, phases=data.phases, freqs=data.freqs, title=title,
-                prof=True, fluxprof=True, rvrsd=bool(data.bw < 0))
+        show_portrait(port=port, phases=data.phases, freqs=data.freqs,
+                title=title, prof=True, fluxprof=True, rvrsd=bool(data.bw < 0))
 
     def show_fit(self, datafile=None, isubx=0, quiet=False):
         """
         subintx 0 = python index 0
+        isubx is currently mapped incorrectly.
         """
         if datafile is None:
             datafile = self.datafiles[0]
@@ -693,7 +699,7 @@ if __name__ == "__main__":
                       action="store_true", dest="pam_cmd", default=False,
                       help='Append pam commands to file "pam_cmd."')
     parser.add_option("--uncommon",
-                      action="store_true", dest="uncommon", default=False,
+                      action="store_false", dest="common", default=True,
                       help="If supplying a metafile, use this flag if the data are not homogenous (i.e. have different nu0, bw, nchan, nbin)")
     parser.add_option("--showplot",
                       action="store_true", dest="showplot", default=False,
@@ -729,7 +735,7 @@ if __name__ == "__main__":
     pam_cmd = options.pam_cmd
     outfile = options.outfile
     errfile = options.errfile
-    common = not options.uncommon
+    common = options.common
     showplot = options.showplot
     quiet = options.quiet
 

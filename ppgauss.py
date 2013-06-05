@@ -240,7 +240,7 @@ class DataPortrait:
         """
         """
         title = "%s Portrait"%self.source
-        show_port(self.port, self.phases, self.freqs, title, True, True,
+        show_portrait(self.port, self.phases, self.freqs, title, True, True,
                 bool(self.bw < 0))
 
     def show_model_fit(self):
@@ -491,7 +491,7 @@ if __name__ == "__main__":
                       action="store", dest="figure", default=False,
                       help="Save PNG figure of final fit to figurename. [default=Not saved]")
     parser.add_option("--verbose",
-                      action="store_true", dest="verbose", default=False,
+                      action="store_false", dest="quiet", default=True,
                       help="More to stdout.")
 
     (options, args) = parser.parse_args()
@@ -515,7 +515,7 @@ if __name__ == "__main__":
     fixamp = options.fixamp
     niter = int(options.niter)
     figure = options.figure
-    quiet = not options.verbose
+    quiet = options.quiet
 
     dp = DataPortrait(datafile=datafile, metafile=metafile, quiet=quiet)
     dp.make_gaussian_model(modelfile = None,

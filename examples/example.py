@@ -5,7 +5,7 @@ from pplib import *
 
 #Use example.gmodel and example.par to design a fake pulsar
 modelfile = "example.gmodel"
-ephemfile = "example.par"
+ephemeris = "example.par"
 
 #Generate some fake datafiles
 #These files will be homogenous, even though they don't need to be
@@ -35,7 +35,7 @@ for ifile in range(nfiles):
     if ifile == 0: quiet=False
     else: quiet = True
     start_MJD = MJD0 + ifile*days
-    make_fake_pulsar(modelfile, ephemfile, outfile="example-%d.fits"%(ifile+1),
+    make_fake_pulsar(modelfile, ephemeris, outfile="example-%d.fits"%(ifile+1),
             nsub=nsub, npol=npol, nchan=nchan, nbin=nbin, nu0=nu0, bw=bw,
             tsub=tsub, phase=0.0, dDM=dDMs[ifile], start_MJD=None,
             weights=weights, noise_std=noise_std, t_scat=None, bw_scint=None,

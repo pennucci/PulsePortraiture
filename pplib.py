@@ -883,14 +883,37 @@ def get_scales(data, model, phase, DM, P, freqs, nu_ref=np.inf):
     scales /= p_n
     return scales
 
+def rotate_data(data, phase=0.0, DM=0.0, P=None, freqs=None,
+        nu_ref=np.inf):
+    """
+    Positive values of phase and DM rotate to earlier phase ("dedisperses").
+    When used to dediserpse, rotate_portrait is virtually identical to
+    arch.dedisperse() in PSRCHIVE.
+    """
+    nsub, npol, nchan, nbin = data.shape
+    if DM == 0.0:
+        D = 0.0
+    else:
+        D = Dconst * DM / P
+    dFFT = fft.rfft(data, axis=3)
+    nharm = len(dFFT[0,0,0])
+
+    for ichan in xrange(nchan):
+            freq = freqs[nn]
+            harmind = np.arange(nharm)
+            phasor = np.exp(harmind * 2.0j * np.pi * (phase + (D *
+                (freq**-2.0 - nu_ref**-2.0))))
+            ones = np.ones([nsub, npol])
+            phasor = np.einsum('ij,kl',ones,phasor)
+            dFFT[nn,:] *= phasor
+    return fft.irfft(dFFT)
+
 def rotate_portrait(port, phase=0.0, DM=None, P=None, freqs=None,
         nu_ref=np.inf):
     """
     Positive values of phase and DM rotate to earlier phase ("dedisperses").
     When used to dediserpse, rotate_portrait is virtually identical to
     arch.dedisperse() in PSRCHIVE.
-
-    Currently has to take an array with a 2-D shape.
     """
     pFFT = fft.rfft(port, axis=1)
     for nn in xrange(len(pFFT)):
@@ -903,6 +926,14 @@ def rotate_portrait(port, phase=0.0, DM=None, P=None, freqs=None,
             phasor = np.exp(np.arange(len(pFFT[nn])) * 2.0j * np.pi * (phase +
                 (D * (freq**-2.0 - nu_ref**-2.0))))
             pFFT[nn,:] *= phasor
+    return fft.irfft(pFFT)
+
+def rotate_profile(profile, phase=0.0):
+    """
+    Positive values rotate to earlier phase.
+    """
+    pFFT = fft.rfft(profile)
+    pFFT *= np.exp(np.arange(len(pFFT)) * 2.0j * np.pi * phase)
     return fft.irfft(pFFT)
 
 def fft_rotate(arr, bins):
@@ -1015,6 +1046,7 @@ def load_data(filenm, dedisperse=False, dededisperse=False, tscrunch=False,
     if rm_baseline: arch.remove_baseline()
     #pscrunch?
     if pscrunch: arch.pscrunch()
+    state = arch.get_state()
     #tscrunch?
     if tscrunch: arch.tscrunch()
     nsub = arch.get_nsubint()
@@ -1071,8 +1103,9 @@ def load_data(filenm, dedisperse=False, dededisperse=False, tscrunch=False,
         # channels         = %d\n\
         # chan (mean)      = %d\n\
         # subints          = %d\n\
-        # unzapped subint  = %d\n"%(P, DM, nu0, bw, nbin, nchan, nchanx, nsub,
-                nsubx)
+        # unzapped subint  = %d\n\
+        pol'n state        = %s\n"%(P, DM, nu0, bw, nbin, nchan, nchanx, nsub,
+                nsubx, state)
     #Returns refreshed arch; could be changed...
     arch.refresh()
     if norm_weights:
@@ -1083,7 +1116,7 @@ def load_data(filenm, dedisperse=False, dededisperse=False, tscrunch=False,
             masks=masks, epochs=epochs, nbin=nbin, nchan=nchan,
             nchanx=nchanx, noise_std=noise_std, nsub=nsub, nsubx=nsubx,
             nu0=nu0, phases=phases, prof=prof, Ps=Ps, source=source,
-            subints=subints, subintsxs=subintsxs, weights=weights)
+            state=state, subints=subints, subintsxs=subintsxs, weights=weights)
     return data
 
 def unpack_dict(data):
@@ -1189,14 +1222,100 @@ def check_file(filename):
         except ValueError:
             pass
 
-def make_fake_pulsar(modelfile, ephemfile, outfile="fake_pulsar.fits", nsub=1,
+def write_archive(data, ephemeris, freqs, nu0=None, bw=None,
+        outfile="pparchive.fits", tsub=None, start_MJD=None, weights=None,
+        dedispersed=True, state="Coherence", obs="GBT", quiet=False):
+    """
+    Mostly written by PBD.
+    """
+    nsub, npol, nchan, nbin = data.shape
+    if nu0 is None:
+        #This is off by a tiny bit...
+        nu0 = freqs.mean()
+    if bw is None:
+        #This is off by a tiny bit...
+        bw = (freqs.max() - freqs.min()) + abs(freqs[1] - freqs[0])
+    #Phase bin centers
+    phases = np.linspace(0.0 + (nbin*2)**-1, 1.0 - (nbin*2)**-1, nbin)
+    #Create the Archive instance.
+    #This is kind of a weird hack, if we create a PSRFITS
+    #Archive directly, some header info does not get filled
+    #in.  If we instead create an ASP archive, it will automatically
+    #be (correctly) converted to PSRFITS when it is unloaded...
+    arch = pr.Archive_new_Archive("ASP")
+    arch.resize(nsub, npol, nchan, nbin)
+    try:
+        import parfile
+        par = parfile.psr_par(ephemeris)
+        PSR = par.PSR
+        DECJ = par.DECJ
+        RAJ = par.RAJ
+        DM = par.DM
+    except ImportError:
+        parfile = open(ephemeris,"r").readlines()
+        for xx in xrange(len(parfile)):
+            param = parfile[xx].split()
+            if param[0] == ("PSR" or "PSRJ"):
+                PSR = param[1]
+            elif param[0] == "RAJ":
+                RAJ = param[1]
+            elif param[0] == "DECJ":
+                DECJ = param[1]
+            elif param[0] == "DM":
+                DM = float(line[1])
+            else:
+                pass
+    #Dec needs to have a sign for the following sky_coord call
+    if (DECJ[0] != '+' and DECJ[0] != '-'):
+        DECJ = "+" + DECJ
+    arch.set_dispersion_measure(DM)
+    arch.set_source(PSR)
+    arch.set_coordinates(pr.sky_coord(RAJ + DECJ))
+    #Set some other stuff
+    arch.set_centre_frequency(nu0)
+    arch.set_bandwidth(bw)
+    arch.set_telescope(obs)
+    if npol==4:
+        arch.set_state(state) #Could also do 'Stokes' here
+    #Fill in some subintegration attributes
+    if start_MJD is None:
+        start_MJD = pr.MJD(50000, 0, 0.0)
+    epoch = start_MJD
+    if tsub is None:
+        tsub = 0.0
+    epoch += tsub/2.0
+    for subint in arch:
+        subint.set_epoch(epoch)
+        subint.set_duration(tsub)
+        epoch += tsub
+        for ichan in xrange(nchan):
+            subint.set_centre_frequency(ichan, freqs[ichan])
+    #Fill in polycos
+    arch.set_ephemeris(ephemeris)
+    #Now finally, fill in the data!
+    arch.set_dedispersed(True)
+    arch.dedisperse()
+    if weights is None: weights = np.ones([nsub, nchan])
+    isub = 0
+    for subint in arch:
+        for ipol in xrange(npol):
+            for ichan in xrange(nchan):
+                subint.set_weight(ichan, weights[isub, ichan])
+                prof = subint.get_Profile(ipol,ichan)
+                prof.get_amps()[:] = data[isub, ipol, ichan]
+        isub += 1
+    if not dedispered: arch.dededisperse()
+    arch.unload(outfile)
+    if not quiet: print "\nUnloaded %s.\n"%outfile
+
+def make_fake_pulsar(modelfile, ephemeris, outfile="fake_pulsar.fits", nsub=1,
         npol=1, nchan=512, nbin=1048, nu0=1500.0, bw=800.0, tsub=300.0,
         phase=0.0, dDM=0.0, start_MJD=None, weights=None, noise_std=1.0,
         t_scat=None, bw_scint=None, state="Coherence", obs="GBT", quiet=False):
     """
     Mostly written by PBD.
     'phase' [rot] is an arbitrary rotation to all subints.
-    'dDM' [cm**-3 pc] is an additional DM to what is given in ephemfile.
+    'dDM' [cm**-3 pc] is an additional DM to what is given in ephemeris.
     """
     chanwidth = bw / nchan
     lofreq = nu0 - (bw/2)
@@ -1221,13 +1340,13 @@ def make_fake_pulsar(modelfile, ephemfile, outfile="fake_pulsar.fits", nsub=1,
     arch.resize(nsub,npol,nchan,nbin)
     try:
         import parfile
-        par = parfile.psr_par(ephemfile)
+        par = parfile.psr_par(ephemeris)
         PSR = par.PSR
         DECJ = par.DECJ
         RAJ = par.RAJ
         DM = par.DM
     except ImportError:
-        parfile = open(ephemfile,"r").readlines()
+        parfile = open(ephemeris,"r").readlines()
         for xx in xrange(len(parfile)):
             param = parfile[xx].split()
             if param[0] == ("PSR" or "PSRJ"):
@@ -1264,7 +1383,7 @@ def make_fake_pulsar(modelfile, ephemfile, outfile="fake_pulsar.fits", nsub=1,
         for ichan in xrange(nchan):
             subint.set_centre_frequency(ichan, freqs[ichan])
     #Fill in polycos
-    arch.set_ephemeris(ephemfile)
+    arch.set_ephemeris(ephemeris)
     #Now finally, fill in the data!
     #NB the different pols are not realistic: same model, same noise_std
     name, ngauss, model = read_model(modelfile, phases, freqs, quiet=quiet)
@@ -1301,6 +1420,7 @@ def quick_add_archs(metafile, outfile, rotate=False, fiducial=0.5,
     datafiles = open(metafile, "r").readlines()
     datafiles = [datafiles[ifile][:-1] for ifile in xrange(len(datafiles))]
     for ifile in xrange(len(datafiles)):
+        datafile = datafiles[ifile]
         data = load_data(datafile, dedisperse=True, dededisperse=False,
                 tscrunch=True, pscrunch=True, rm_baseline=True,
                 flux_prof=False, norm_weights=True, quiet=True)
@@ -1359,7 +1479,7 @@ def write_princeton_TOA(TOA_MJDi, TOA_MJDf, TOA_err, nu_ref, dDM, obs='@',
     else:
         print obs + " %13s %8.3f %s %8.3f"%(name, nu_ref, TOA, TOA_err)
 
-def show_port(port, phases=None, freqs=None, title=None, prof=True,
+def show_portrait(port, phases=None, freqs=None, title=None, prof=True,
         fluxprof=True, rvrsd=False, colorbar=True, savefig=False,
         aspect="auto", interpolation="none", origin="lower", extent=None,
         **kwargs):
