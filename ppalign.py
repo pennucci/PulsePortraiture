@@ -2,29 +2,26 @@
 
 from pplib import *
 
-#need to average same freqs...not just Tscrunch
 #gaps in plotting
 #which band to put first, hand rotate
 #to use beginning template from data or gauss?
 #stopping/convergence criteria
 #smoothing
-#polarization info!
 #documentation
 #Stokes versus coherence
 #independent alignment of different pols?  alignment via something other
 #than phase shift? PPA?
-#write separate arbitrarily aligned files or one big one?
 #-F -T -P options for output standard profile?
 #SNR cutoff!
 #fiducial phase option
-#all data same pol state, or psrunch
+#all data same pol state, or pscrunch
 #use norm_weights?
 #proper t- f- p- scrunch calculations?
 
 class AlignData:
     """
     """
-    def __init__(self, datafiles, templatefile=None, gauss=None, niter=1,
+    def __init__(self, datafiles, templatefile=None, gauss=0.0, niter=0,
             pscrunch=False, talign=False, falign=False, align_all=False,
             quiet=False):
         if file_is_ASCII(datafiles):
@@ -52,10 +49,13 @@ class AlignData:
             self.talign = self.falign = False
         self.quiet = quiet
         self.nsub = 0
+        self.length = 0.0
         self.P = 0.0
         self.nchan = 0
+        self.nu0s = []
         self.lofreq = np.inf
         self.hifreq = 0.0
+        self.bws = []
         all_data = []
         epochs = []
         okisub = []
@@ -79,7 +79,7 @@ class AlignData:
                     source = "None"
                 else:
                     source = data.source
-                if self.gauss is not None:
+                if self.gauss:
                     wid = self.gauss
                     self.model = amp * gaussian_profile(self.nbin, loc=0.5,
                             wid=wid)
@@ -94,16 +94,20 @@ class AlignData:
                     else:
                         self.model = data.prof
             self.nsub += data.nsub
+            self.length += (data.arch.end_time() -
+                    data.arch.start_time()).in_seconds()
             self.P += data.Ps.mean()
             epochs.append(data.epochs)
             okisub.append(data.okisub)
             self.nchan += data.nchan
+            self.nu0s.append(data.nu0)
             lf = data.freqs.min() - (abs(data.bw) / (2*data.nchan))
             if lf < self.lofreq:
                 self.lofreq = lf
             hf = data.freqs.max() + (abs(data.bw) / (2*data.nchan))
             if hf > self.hifreq:
                 self.hifreq = hf
+            self.bws.append(data.bw)
             freqs.append(data.freqs)
             okichan.append(data.okichan)
             all_data.append(data.subints)
@@ -111,8 +115,14 @@ class AlignData:
         self.P /= len(self.datafiles)    #Will be used only as a toy period
         self.all_data = all_data
         self.epochs = epochs
+        self.mean_MJD = np.array([np.array(self.epochs).ravel()[isub].in_days()
+            for isub in range(self.nsub)]).mean()
+        self.start_MJD = \
+                np.array([np.array(self.epochs).ravel()[isub].in_days()
+                    for isub in range(self.nsub)]).min()
         self.okisub = okisub
         self.freqs = freqs
+        self.bw = self.hifreq - self.lofreq
         self.okichan = okichan
         self.weights = weights
         tot_weight = [weights[iarch].sum(axis=0) for iarch in
@@ -241,9 +251,10 @@ class AlignData:
             weight += data_weight
         prof /= weight
         self.profile = prof
+        self.profile_weight = weight
 
-    def write_data(self, data, freqs, nu0, tsub, start_MJD, weights,
-            ephemeris=None, outfile=None, dedispersed=False, quiet=False):
+    def write_data(self, data, freqs, nu0, bw, tsub, start_MJD, weights,
+            ephemeris=None, outfile=None, dedispersed=True, quiet=False):
         """
         Data needs to have shape nsub, npol, nchan, nbin
         """
@@ -261,7 +272,7 @@ class AlignData:
         if not quiet:
             print "Writing archive %s..."%outfile
         write_archive(data=data, ephemeris=ephemeris, freqs=freqs, nu0=nu0,
-                bw=None, outfile=outfile, tsub=None, start_MJD=None,
+                bw=bw, outfile=outfile, tsub=tsub, start_MJD=start_MJD,
                 weights=weights, dedispersed=dedispersed, state=self.state,
                 obs=self.obs, quiet=quiet)
         if rm: os.system(rm_cmd)
@@ -281,63 +292,112 @@ if __name__ == "__main__":
     parser.add_option("-M", "--metafile",
                       action="store", metavar="metafile", dest="metafile",
                       help="List of archive filenames in metafile to be aligned.")
-#    parser.add_option("-m", "--modify",
-#                      action="store_true", dest="modify", default=False,
-#                      help="Modify the original files on disk [default=False].")
-    parser.add_option("-e", "--ext",
-                      action="store", dest="ext", default=None,
-                      help="Write new files with this extension.")
-    parser.add_option("-o", "--outfile",
-                      action="store", metavar="outfile", dest="outfile",
-                      default=None,
-                      help="Name of single output archive name.")
     parser.add_option("-t", "--template",
                       action="store", metavar="template", dest="templatefile",
                       default=None,
                       help="PSRCHIVE archive containing initial template. [default=None]")
     parser.add_option("-g", "--gauss",
                       action="store", metavar="wid", dest="gauss",
-                      default=None,
+                      default=0.0,
                       help="Single gaussian FWHM width for initial template. [default=None]")
     parser.add_option("-E", "--ephemeris",
                       action="store", metavar="ephemeris", dest="ephemeris",
                       default=None,
-                      help="Ephemeris file to be installed. Danger. [default=Ephemeris stored in first file in metafile]")
+                      help="Ephemeris file to be installed in output archive(s). Danger. [default=Ephemeris stored in first file in metafile]")
     parser.add_option("--niter",
-                      action="store", metavar="int", dest="niter", default=1,
-                      help="Number of iterations to loop over archives. [default=1]")
-    parser.add_option("--no_pscrunch",
-                      action="store_false", dest="pscrunch", default=True,
-                      help="Do not pscrunch archives before aligning. [default=pscrunch]")
+                      action="store", metavar="int", dest="niter", default=3,
+                      help="Number of iterations to loop over archives. [default=3]")
+    parser.add_option("--pscrunch",
+                      action="store_true", dest="pscrunch", default=False,
+                      help="pscrunch archives before aligning. [default=False]")
+    parser.add_option("--talign",
+                      action="store_true", dest="talign", default=False,
+                      help="Align archives over subint, averaging over frequencies. Can be used with falign.  [deafult=False]")
+    parser.add_option("--falign",
+                      action="store_true", dest="falign", default=False,
+                      help="Align archives over frequency, averaging over subintegrations. Can be used with talign.  [deafult=False]")
+    parser.add_option("--align_all",
+                      action="store_true", dest="align_all", default=False,
+                      help="Align profiles individually across subints and frequencies.  Overrides talign and falign.  [deafult=False]")
+    parser.add_option("--port",
+                      action="store", metavar="filename",
+                      dest="port_name", default=None,
+                      help="Output a concatenated frequency-phase portrait of the aligned, averaged data with name filename.")
+    parser.add_option("--prof",
+                      action="store", metavar="filename",
+                      dest="prof_name", default=None,
+                      help="Output a profile of the aligned, averaged data with name filename.")
+    parser.add_option("--ext",
+                      action="store", metavar="ext",
+                      dest="ext", default=None,
+                      help="Output the aligned data file-by-file with file extention ext.")
     parser.add_option("--verbose",
                       action="store_false", dest="quiet", default=True,
                       help="More to stdout.")
     (options, args) = parser.parse_args()
 
     if (options.datafile is None and options.metafile is None) or (
-            options.template is None and options.gauss is None):
+            options.templatefile is None and options.gauss is None) or (
+                    options.port_name is None and options.prof_name is None \
+                            and options.ext is None):
         print "\nppalign.py -- arbitrarily align profiles\n"
         parser.print_help()
         print ""
         parser.exit()
 
+    datafile = options.datafile
     metafile = options.metafile
-    outfile = options.outfile
     templatefile = options.templatefile
-    if options.gauss is not None:
-        gauss = float(options.gauss)
-    else:
-        gauss = None
+    gauss = float(options.gauss)
     ephemeris = options.ephemeris
     niter = int(options.niter)
     pscrunch = options.pscrunch
+    talign = options.talign
+    falign = options.falign
+    align_all = options.align_all
+    prof_name = options.prof_name
+    port_name = options.port_name
+    ext = options.ext
     quiet = options.quiet
 
-    ad = AlignData(metafile=metafile, outfile=outfile,
-            templatefile=templatefile, gauss=gauss, ephemeris=ephemeris,
-            niter=niter, pscrunch=pscrunch, quiet=quiet)
+    if metafile is None:
+        datafiles = datafile
+    else:
+        datafiles = metafile
+
+    ad = AlignData(datafiles=datafiles, templatefile=templatefile, gauss=gauss,
+            niter=niter, pscrunch=pscrunch, talign=talign, falign=falign,
+            align_all=align_all, quiet=quiet)
     ad.align_data()
-    ad.make_portrait()
-    #or
-    ad.make_profile()
-    ad.write_data()
+
+    if port_name is not None:
+        ad.make_portrait()
+        ad.write_data(np.array([ad.portrait]), ad.portrait_freqs, ad.nu0, None,
+                ad.length, pr.MJD(ad.start_MJD),
+                np.array([ad.portrait_weights]), ephemeris, port_name,
+                dedispersed=True, quiet=quiet)
+
+    if prof_name is not None:
+        ad.make_profile()
+        ad.write_data(np.einsum('ikjl', np.array([[ad.profile]])),
+                np.array([ad.nu0]), ad.nu0, ad.bw, ad.length,
+                pr.MJD(ad.start_MJD), np.array([[ad.profile_weight]]),
+                ephemeris, prof_name, dedispersed=True, quiet=quiet)
+
+    if ext is not None:
+        for iarch in range(ad.nfile):
+            data = ad.all_data[iarch]
+            nsub, npol, nchan, nbin = data.shape
+            outfile = ad.datafiles[iarch] + "." + ext
+            arch = load_data(ad.datafiles[iarch]).arch
+            arch.set_dedispersed(True)
+            arch.dedisperse()
+            isub = 0
+            for subint in arch:
+                for ipol in xrange(npol):
+                    for ichan in xrange(nchan):
+                        prof = subint.get_Profile(ipol, ichan)
+                        prof.get_amps()[:] = data[isub, ipol, ichan]
+                isub += 1
+            arch.unload(outfile)
+            if not quiet: print "\nUnloaded %s.\n"%outfile

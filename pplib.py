@@ -1273,7 +1273,7 @@ def file_is_ASCII(filename):
             pass
 
 def write_archive(data, ephemeris, freqs, nu0=None, bw=None,
-        outfile="pparchive.fits", tsub=None, start_MJD=None, weights=None,
+        outfile="pparchive.fits", tsub=1.0, start_MJD=None, weights=None,
         dedispersed=True, state="Coherence", obs="GBT", quiet=False):
     """
     Mostly written by PBD.
@@ -1334,8 +1334,6 @@ def write_archive(data, ephemeris, freqs, nu0=None, bw=None,
     if start_MJD is None:
         start_MJD = pr.MJD(50000, 0, 0.0)
     epoch = start_MJD
-    if tsub is None:
-        tsub = 0.0
     epoch += tsub/2.0
     for subint in arch:
         subint.set_epoch(epoch)
@@ -1394,7 +1392,10 @@ def make_fake_pulsar(modelfile, ephemeris, outfile="fake_pulsar.fits", nsub=1,
     try:
         import parfile
         par = parfile.psr_par(ephemeris)
-        PSR = par.PSR
+        try:
+            PSR = par.PSR
+        except AttributeError:
+            PSR = par.PSRJ
         DECJ = par.DECJ
         RAJ = par.RAJ
         DM = par.DM
