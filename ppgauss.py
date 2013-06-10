@@ -17,8 +17,8 @@ class DataPortrait:
         if self.metafile is None:
             self.data = load_data(datafile, dedisperse=True,
                     dededisperse=False, tscrunch=True, pscrunch=True,
-                    rm_baseline=True, flux_prof=True, norm_weights=True,
-                    quiet=quiet)
+                    fscrunch=False, rm_baseline=True, flux_prof=True,
+                    norm_weights=True, quiet=quiet)
             #Unpack the data dictionary into the local namespace;
             #see load_data for dictionary keys.
             for key in self.data.keys():

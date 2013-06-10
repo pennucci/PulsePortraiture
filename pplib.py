@@ -883,30 +883,74 @@ def get_scales(data, model, phase, DM, P, freqs, nu_ref=np.inf):
     scales /= p_n
     return scales
 
-def rotate_data(data, phase=0.0, DM=0.0, P=None, freqs=None,
-        nu_ref=np.inf):
+def rotate_data(data, phase=0.0, DM=0.0, Ps=None, freqs=None,
+        nu_ref=np.inf, taxis=None, faxis=-2, baxis=-1,):
     """
     Positive values of phase and DM rotate to earlier phase ("dedisperses").
     When used to dediserpse, rotate_portrait is virtually identical to
     arch.dedisperse() in PSRCHIVE.
+
+    faxis, freqs needed if rotating for DM != 0.0
+    taxis needed if len(Ps) > 1, for DM != 0.0
+
+    ***Need to change this convention***
     """
-    nsub, npol, nchan, nbin = data.shape
+    shape = data.shape
+    ndim = len(shape)
+    idim = 'ijklmnop'
+    idim = idim[:ndim]
+    iaxis = range(ndim)
+    baxis = iaxis[baxis]
+    bdim = list(idim)[baxis]
+    dFFT = fft.rfft(data, axis=baxis)
+    nharm = dFFT.shape[baxis]
+    harmind = np.arange(nharm)
     if DM == 0.0:
         D = 0.0
+        baxis = iaxis.pop(baxis)
+        othershape = np.take(shape, iaxis)
+        ones = np.ones(othershape)
+        order = np.take(list(idim), iaxis)
+        order = ''.join([order[xx] for xx in xrange(len(order))])
+        phasor = np.exp(harmind * 2.0j * np.pi * phase)
+        phasor = np.einsum(order + ',' + bdim, ones, phasor)
+        dFFT *= phasor
     else:
-        D = Dconst * DM / P
-    dFFT = fft.rfft(data, axis=3)
-    nharm = len(dFFT[0,0,0])
-
-    for ichan in xrange(nchan):
-            freq = freqs[nn]
-            harmind = np.arange(nharm)
-            phasor = np.exp(harmind * 2.0j * np.pi * (phase + (D *
-                (freq**-2.0 - nu_ref**-2.0))))
-            ones = np.ones([nsub, npol])
-            phasor = np.einsum('ij,kl',ones,phasor)
-            dFFT[nn,:] *= phasor
-    return fft.irfft(dFFT)
+        D = Dconst * DM / Ps
+        if taxis:
+            taxis = iaxis[taxis]
+            tdim = list(idim)[taxis]
+            nsub = D.shape[0]
+        else:
+            pass
+        faxis = iaxis[faxis]
+        fdim = list(idim)[faxis]
+        nchan = shape[faxis]
+        fterm = freqs**-2.0 - nu_ref**-2.0
+        if taxis:
+            phase += np.einsum('i,j', D, fterm)
+            phase = np.einsum('ij,k', phase, harmind)
+        else:
+            phase += D * fterm
+            phase = np.einsum('i,j', phase, harmind)
+        phasor = np.exp(2.0j * np.pi * phase)
+        if taxis:
+            inds = np.array([taxis, faxis, baxis])
+        else:
+            inds = np.array([faxis, baxis])
+        inds.sort()
+        inds = inds[::-1]
+        inds = np.array([iaxis.pop(ii) for ii in inds])
+        othershape = np.take(shape, iaxis)
+        order = np.take(list(idim), iaxis)
+        order = ''.join([order[xx] for xx in xrange(len(order))])
+        ones = np.ones(othershape)
+        if taxis:
+            phasor = np.einsum(order + ',' + tdim + fdim + bdim, ones, phasor)
+        else:
+            phasor = np.einsum(order + ',' + fdim + bdim, ones, phasor)
+        dFFT *= phasor
+    return fft.irfft(dFFT, axis=baxis)
 
 def rotate_portrait(port, phase=0.0, DM=None, P=None, freqs=None,
         nu_ref=np.inf):
@@ -1006,17 +1050,33 @@ def calculate_TOA(epoch, P, phi, DM=0.0, nu_ref1=np.inf, nu_ref2=np.inf):
     return TOA
 
 def load_data(filenm, dedisperse=False, dededisperse=False, tscrunch=False,
-        pscrunch=False, rm_baseline=True, flux_prof=False, norm_weights=True,
-        quiet=False):
+        pscrunch=False, fscrunch=False, rm_baseline=True, flux_prof=False,
+        norm_weights=True, quiet=False):
     """
     Will read and return data using PSRCHIVE.
     The returned archive is 'refreshed'.
+    Perhaps should have default to not returning arch (poten. memory problem)
     """
     #Load archive
     arch = pr.Archive_load(filenm)
     source = arch.get_source()
     if not quiet:
         print "\nReading data from %s on source %s..."%(filenm, source)
+    #De/dedisperse?
+    if dedisperse: arch.dedisperse()
+    if dededisperse: arch.dededisperse()
+    DM = arch.get_dispersion_measure()
+    #Maybe use better baseline subtraction??
+    if rm_baseline: arch.remove_baseline()
+    #tscrunch?
+    if tscrunch: arch.tscrunch()
+    nsub = arch.get_nsubint()
+    #pscrunch?
+    if pscrunch: arch.pscrunch()
+    state = arch.get_state()
+    npol = arch.get_npol()
+    #fscrunch?
+    if fscrunch: arch.fscrunch()
     #Nominal "center" of the band, but not necessarily
     nu0 = arch.get_centre_frequency()
     #For the negative BW cases.  Good fix
@@ -1038,22 +1098,9 @@ def load_data(filenm, dedisperse=False, dededisperse=False, tscrunch=False,
     phases = np.linspace(0.0 + (nbin*2)**-1, 1.0 - (nbin*2)**-1, nbin)
     #These are NOT the bin centers...
     #phases = np.arange(nbin, dtype='d') / nbin
-    #De/dedisperse?
-    if dedisperse: arch.dedisperse()
-    if dededisperse: arch.dededisperse()
-    DM = arch.get_dispersion_measure()
-    #Maybe use better basline subtraction??
-    if rm_baseline: arch.remove_baseline()
-    #pscrunch?
-    if pscrunch: arch.pscrunch()
-    state = arch.get_state()
-    #tscrunch?
-    if tscrunch: arch.tscrunch()
-    nsub = arch.get_nsubint()
     #Get data
     #PSRCHIVE indices [subint:pol:chan:bin]
-    subints = arch.get_data()[:,:,:,:]
-    npol = arch.get_npol()
+    subints = arch.get_data()
     Ps = np.array([arch.get_Integration(isub).get_folding_period() for isub in
         xrange(nsub)],dtype=np.double)
     epochs = [arch.get_Integration(isub).get_epoch() for isub in xrange(nsub)]
@@ -1061,6 +1108,8 @@ def load_data(filenm, dedisperse=False, dededisperse=False, tscrunch=False,
     weights = arch.get_weights()
     weights_norm = np.where(weights == 0.0, np.zeros(weights.shape),
             np.ones(weights.shape))
+    okisub = np.compress(weights_norm.mean(axis=1), np.arange(nsub))
+    okichan = np.compress(weights_norm.mean(axis=0), np.arange(nchan))
     #np.einsum is AWESOME
     masks = np.einsum('ij,k', weights_norm, np.ones(nbin))
     masks = np.einsum('j,ikl', np.ones(npol), masks)
@@ -1115,8 +1164,9 @@ def load_data(filenm, dedisperse=False, dededisperse=False, tscrunch=False,
             flux_profx=flux_profx, freqs=freqs, freqsxs=freqsxs,
             masks=masks, epochs=epochs, nbin=nbin, nchan=nchan,
             nchanx=nchanx, noise_std=noise_std, nsub=nsub, nsubx=nsubx,
-            nu0=nu0, phases=phases, prof=prof, Ps=Ps, source=source,
-            state=state, subints=subints, subintsxs=subintsxs, weights=weights)
+            nu0=nu0, okichan=okichan, okisub=okisub, phases=phases, prof=prof,
+            Ps=Ps, source=source, state=state, subints=subints,
+            subintsxs=subintsxs, weights=weights)
     return data
 
 def unpack_dict(data):
@@ -1205,7 +1255,7 @@ def read_model(modelfile, phases=None, freqs=None, quiet=False):
     else:
         return name, ngauss, model
 
-def check_file(filename):
+def file_is_ASCII(filename):
     """
     """
     from os import popen4
@@ -1247,7 +1297,10 @@ def write_archive(data, ephemeris, freqs, nu0=None, bw=None,
     try:
         import parfile
         par = parfile.psr_par(ephemeris)
-        PSR = par.PSR
+        try:
+            PSR = par.PSR
+        except AttributeError:
+            PSR = par.PSRJ
         DECJ = par.DECJ
         RAJ = par.RAJ
         DM = par.DM
@@ -1301,10 +1354,10 @@ def write_archive(data, ephemeris, freqs, nu0=None, bw=None,
         for ipol in xrange(npol):
             for ichan in xrange(nchan):
                 subint.set_weight(ichan, weights[isub, ichan])
-                prof = subint.get_Profile(ipol,ichan)
+                prof = subint.get_Profile(ipol, ichan)
                 prof.get_amps()[:] = data[isub, ipol, ichan]
         isub += 1
-    if not dedispered: arch.dededisperse()
+    if not dedispersed: arch.dededisperse()
     arch.unload(outfile)
     if not quiet: print "\nUnloaded %s.\n"%outfile
 
@@ -1400,7 +1453,7 @@ def make_fake_pulsar(modelfile, ephemeris, outfile="fake_pulsar.fits", nsub=1,
             #rotmodel = model
             for ichan in xrange(nchan):
                 subint.set_weight(ichan, weights[isub, ichan])
-                prof = subint.get_Profile(ipol,ichan)
+                prof = subint.get_Profile(ipol, ichan)
                 noise = noise_std[ichan]
                 if noise:
                     prof.get_amps()[:] = rotmodel[ichan] + np.random.normal(
@@ -1422,7 +1475,7 @@ def quick_add_archs(metafile, outfile, rotate=False, fiducial=0.5,
     for ifile in xrange(len(datafiles)):
         datafile = datafiles[ifile]
         data = load_data(datafile, dedisperse=True, dededisperse=False,
-                tscrunch=True, pscrunch=True, rm_baseline=True,
+                tscrunch=True, pscrunch=True, fscrunch=False, rm_baseline=True,
                 flux_prof=False, norm_weights=True, quiet=True)
         if ifile == 0:
             nchan = data.nchan
