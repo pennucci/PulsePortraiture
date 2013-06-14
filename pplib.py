@@ -785,19 +785,17 @@ def fit_phase_shift(data, model, bounds=[-0.5, 0.5]):
     d = np.real(np.sum(dFFT * np.conj(dFFT))) / err**2.0
     p = np.real(np.sum(mFFT * np.conj(mFFT))) / err**2.0
     other_args = (mFFT, dFFT, err)
-    method = 'brent'
-    if method is not 'bounded':
-        bounds = None
-    results = opt.minimize_scalar(fit_phase_shift_function, args=other_args,
-            method=method, bounds=bounds)
-    phase = results.x
-    scale = -results.fun / p
+    results = opt.brute(fit_phase_shift_function, [tuple(bounds)],
+            args=other_args, Ns=100, full_output=True)
+    phase = results[0]
+    fmin = results[1]
+    scale = -fmin / p
     #In the next two error equations, consult fit_portait for factors of 2
     phase_error = (scale * fit_phase_shift_function_2deriv(phase, mFFT, dFFT,
         err))**-0.5
     scale_error = p**0.5
     errors = [phase_error, scale_error]
-    red_chi2 = (d - ((results.fun**2) / p)) / (len(data) - 2)
+    red_chi2 = (d - ((fmin**2) / p)) / (len(data) - 2)
     return DataBunch(errors=errors, phase=phase, red_chi2=red_chi2,
             scale=scale)
 
@@ -1145,7 +1143,7 @@ def load_data(filenm, dedisperse=False, dededisperse=False, tscrunch=False,
     if not quiet:
         P = arch.get_Integration(0).get_folding_period()*1000.0
         print "\tP [ms]             = %.1f\n\
-        DM [cm**-3 pc]     = %.1f\n\
+        DM [cm**-3 pc]     = %.4f\n\
         center freq. [MHz] = %.4f\n\
         bandwidth [MHz]    = %.1f\n\
         # bins in prof     = %d\n\

@@ -82,7 +82,7 @@ class GetTOAs:
             del(data)
 
     def get_TOAs(self, datafile=None, bounds=[(None, None), (None, None)],
-            show_plot=False, safe=False, quiet=False):
+            show_plot=False, quiet=False):
         """
         """
         start = time.time()
@@ -328,9 +328,6 @@ class GetTOAs:
                 tot_duration += stop - start
                 self.show_results(datafile)
                 start = time.time()
-            if safe:
-                self.write_TOAs(datafile, "pptoas_toas.bak")
-                self.write_dm_errs(datafile, "pptoas_dmerrs.bak")
         if not show_plot:
             tot_duration = time.time() - start
         if not quiet:
@@ -504,6 +501,7 @@ class GetTOAs:
 
     def show_results(self, datafile=None):
         """
+        Need descriptors in the plots...rx, etc.
         """
         if datafile:
             ifile = self.datafiles.index(datafile)
@@ -528,8 +526,12 @@ class GetTOAs:
         pf = np.polynomial.polynomial.polyfit
         #This is to obtain the TOA phase offsets w.r.t. nu_ref
         #Apparently, changing phis in place changes self.phis ???
-        phi_primes = phase_transform(phis, DMs_fitted, nu_fits, self.nu_ref,
-                Ps)
+        if self.nu_ref == "nu_fit":
+            phi_primes = phase_transform(phis, DMs_fitted, nu_fits,
+                    self.nu0s[ifile], Ps)
+        else:
+            phi_primes = phase_transform(phis, DMs_fitted, nu_fits,
+                    self.nu_ref, Ps)
         milli_sec_shifts = (phi_primes) * Ps * 1e3
         #Not sure weighting works...
         fit_results = pf(MJDs, milli_sec_shifts, 1, full=True, w=phi_errs**-2)
@@ -746,7 +748,7 @@ if __name__ == "__main__":
     gt = GetTOAs(datafiles=datafiles, modelfile=modelfile, nu_ref=nu_ref,
             DM0=DM0, one_DM=one_DM, bary_DM=bary_DM, common=common,
             quiet=quiet)
-    gt.get_TOAs(show_plot=showplot, safe=False, quiet=quiet)
+    gt.get_TOAs(show_plot=showplot, quiet=quiet)
     gt.write_TOAs(outfile=outfile)
     if errfile is not None: gt.write_dm_errs(outfile=errfile)
     if pam_cmd: gt.write_pam_cmds()

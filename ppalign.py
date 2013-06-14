@@ -97,7 +97,7 @@ class AlignData:
             self.length += (data.arch.end_time() -
                     data.arch.start_time()).in_seconds()
             self.P += data.Ps.mean()
-            epochs.append(data.epochs)
+            epochs.extend(data.epochs[isub] for isub in range(data.nsub))
             okisub.append(data.okisub)
             self.nchan += data.nchan
             self.nu0s.append(data.nu0)
@@ -390,6 +390,8 @@ if __name__ == "__main__":
             nsub, npol, nchan, nbin = data.shape
             outfile = ad.datafiles[iarch] + "." + ext
             arch = load_data(ad.datafiles[iarch]).arch
+            #NEED PSCRUNCH OPTION IN HERE
+            #CORRUPT DATA??
             arch.set_dedispersed(True)
             arch.dedisperse()
             isub = 0
