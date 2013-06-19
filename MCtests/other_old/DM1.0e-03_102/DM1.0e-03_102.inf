@@ -1,9 +1,0 @@
-niter/node 102
-nchan      128
-nbin       2048
-nu0        820.000000
-bw         200.000000
-P          2.89
-DM0        0.0000
-DM_inj     0.0010
-noise_std  3.70
