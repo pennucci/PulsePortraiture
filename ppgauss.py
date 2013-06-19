@@ -8,33 +8,22 @@ from pplib import *
 class DataPortrait:
     """
     """
-    def __init__(self, datafile=None, metafile=None, quiet=False):
+    def __init__(self, datafile=None, quiet=False):
         ""
         ""
         self.init_params = []
         self.datafile = datafile
-        self.metafile = metafile
-        if self.metafile is None:
-            self.data = load_data(datafile, dedisperse=True,
-                    dededisperse=False, tscrunch=True, pscrunch=True,
-                    fscrunch=False, rm_baseline=True, flux_prof=True,
-                    norm_weights=True, quiet=quiet)
-            #Unpack the data dictionary into the local namespace;
-            #see load_data for dictionary keys.
-            for key in self.data.keys():
-                exec("self." + key + " = self.data['" + key + "']")
-            if self.source is None: self.source = "noname"
-            self.port = (self.masks * self.subints)[0,0]
-            self.portx = self.subintsxs[0][0]
-        else:
-            self.data = concatenate_ports(metafile, quiet=quiet)
-            #Unpack the data dictionary into the local namespace;
-            #see concatenate_ports for dictionary keys.
-            for key in self.data.keys():
-                exec("self." + key + " = self.data['" + key + "']")
-            self.freqsxs = [self.freqsx]
-            self.Ps = np.array([self.P])
-            self.weights = np.array([self.weights])
+        self.data = load_data(datafile, dedisperse=True,
+                dededisperse=False, tscrunch=True, pscrunch=True,
+                fscrunch=False, rm_baseline=True, flux_prof=True,
+                norm_weights=True, quiet=quiet)
+        #Unpack the data dictionary into the local namespace;
+        #see load_data for dictionary keys.
+        for key in self.data.keys():
+            exec("self." + key + " = self.data['" + key + "']")
+        if self.source is None: self.source = "noname"
+        self.port = (self.masks * self.subints)[0,0]
+        self.portx = self.subintsxs[0][0]
 
     def fit_profile(self, profile):
         """
@@ -459,12 +448,9 @@ if __name__ == "__main__":
     parser.add_option("-d", "--datafile",
                       action="store", metavar="archive", dest="datafile",
                       help="PSRCHIVE archive from which to generate gaussian model.")
-    parser.add_option("-M", "--metafile",
-                      action="store", metavar="metafile", dest="metafile",
-                      help="File containing list of archive file names, each of which represents a unique band; these files are concatenated, without rotation, for the fit. nbin must not differ. This does not yet work right.")
     parser.add_option("-o", "--outfile",
                       action="store", metavar="outfile", dest="outfile",
-                      help="Name of output model file name. [default=archive.gmodel or metafile.gmodel]")
+                      help="Name of output model file name. [default=archive.gmodel]")
     parser.add_option("-m", "--model_name",
                       action="store", metavar="model_name", dest="model_name",
                       help="Name given to model. [default=PSRCHIVE Source name]")
@@ -496,14 +482,13 @@ if __name__ == "__main__":
 
     (options, args) = parser.parse_args()
 
-    if options.datafile is None and options.metafile is None:
+    if options.datafile is None:
         print "\nppgauss.py - generates gaussian-component model portrait\n"
         parser.print_help()
         print ""
         parser.exit()
 
     datafile = options.datafile
-    metafile = options.metafile
     outfile = options.outfile
     model_name = options.model_name
     if options.nu_ref: nu_ref = float(options.nu_ref)
@@ -517,7 +502,7 @@ if __name__ == "__main__":
     figure = options.figure
     quiet = options.quiet
 
-    dp = DataPortrait(datafile=datafile, metafile=metafile, quiet=quiet)
+    dp = DataPortrait(datafile=datafile, quiet=quiet)
     dp.make_gaussian_model(modelfile = None,
             ref_prof=(nu_ref, bw_ref), fixloc=fixloc, fixwid=fixwid,
             fixamp=fixamp, niter=niter, writemodel=True, outfile=outfile,
