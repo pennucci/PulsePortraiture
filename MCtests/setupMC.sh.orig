@@ -1,0 +1,22 @@
+#!/bin/bash
+
+SCRATCHDIR=/scratch/ppmc    #needs to match in the submit script
+MODELFILE=M28A.gmodel
+EPHEMFILE=M28A.par
+
+STARTDIR=/nimrod2/tpennucc/PP/test/MCtests
+
+mkdir -p ${SCRATCHDIR}
+rsync -avuxP nimrod:/home/tpennucc/PP/pplib_dist.py ${SCRATCHDIR}/
+rsync -avuxP nimrod:${STARTDIR}/ppmc.py ${SCRATCHDIR}/
+rsync -avuxP nimrod:${STARTDIR}/${MODELFILE} ${SCRATCHDIR}/model
+rsync -avuxP nimrod:${STARTDIR}/${EPHEMFILE} ${SCRATCHDIR}/ephemeris
+
+for i in 01 02 03 04 05 06 07 08 09 10 11 12 13 14 15 16 17 18 19 
+do
+    ssh nimrod$i 'mkdir -p %s'%${SCRATCHDIR}
+    rsync -avuxP nimrod:/home/tpennucc/PP/pplib_dist.py nimrod$i:${SCRATCHDIR}/
+    rsync -avuxP nimrod:${STARTDIR}/ppmc.py nimrod$i:${SCRATCHDIR}/
+    rsync -avuxP nimrod:${STARTDIR}/${MODELFILE} nimrod$i:${SCRATCHDIR}/model
+    rsync -avuxP nimrod:${STARTDIR}/${EPHEMFILE} nimrod$i:${SCRATCHDIR}/ephemeris
+done

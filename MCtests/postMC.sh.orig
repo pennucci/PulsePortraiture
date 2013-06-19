@@ -1,0 +1,16 @@
+#!/bin/bash
+
+SCRATCHDIR=/scratch/ppmc    #needs to match in the submit script
+
+STARTDIR=/nimrod2/tpennucc/PP/test/MCtests
+
+rsync -avuxP nimrod:${SCRATCHDIR}/*inf ${STARTDIR}/
+rsync -avuxP nimrod:${SCRATCHDIR}/*pick ${STARTDIR}/
+rm -rf ${SCRATCHDIR}
+
+for i in 01 02 03 04 05 06 07 08 09 10 11 12 13 14 15 16 17 18 19
+do
+    rsync -avuxP nimrod$i:${SCRATCHDIR}/*inf ${STARTDIR}/
+    rsync -avuxP nimrod$i:${SCRATCHDIR}/*pick ${STARTDIR}/
+    ssh nimrod$i 'rm -rf %s'%${SCRATCHDIR}
+done

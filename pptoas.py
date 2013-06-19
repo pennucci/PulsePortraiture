@@ -396,6 +396,9 @@ class GetTOAs:
         sys.stdout = sys.__stdout__
 
     def write_dm_errs(self, datafile=None, outfile=None):
+        """
+        This needs an additional ID per line...
+        """
         if datafile is None:
             datafiles = self.datafiles
         else:
@@ -418,6 +421,8 @@ class GetTOAs:
         if outfile is not None: of.close()
 
     def write_pam_cmds(self, datafile=None, outfile=None):
+        """
+        """
         if datafile is None:
             datafiles = self.datafiles
         else:

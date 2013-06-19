@@ -21,6 +21,7 @@ import lmfit as lm
 import psrchive as pr
 
 #Colormap preference
+#Comment these out for dispatching on nodes (not implemented yet)
 #plt.copper()
 #plt.gray()
 #plt.bone()
@@ -787,7 +788,7 @@ def fit_phase_shift(data, model, bounds=[-0.5, 0.5]):
     other_args = (mFFT, dFFT, err)
     results = opt.brute(fit_phase_shift_function, [tuple(bounds)],
             args=other_args, Ns=100, full_output=True)
-    phase = results[0]
+    phase = results[0][0]
     fmin = results[1]
     scale = -fmin / p
     #In the next two error equations, consult fit_portait for factors of 2

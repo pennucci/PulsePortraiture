@@ -340,7 +340,7 @@ if __name__ == "__main__":
             options.templatefile is None and options.gauss is None) or (
                     options.port_name is None and options.prof_name is None \
                             and options.ext is None):
-        print "\nppalign.py -- arbitrarily align profiles\n"
+        print "\nppalign.py -- arbitrarily align profiles\n\t      (BETA): not at all guaranteed to work.\n"
         parser.print_help()
         print ""
         parser.exit()
