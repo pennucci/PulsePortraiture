@@ -1006,11 +1006,16 @@ def DM_delay(DM, freq, freq2=np.inf, P=None):
     else:
         return delay
 
-def phase_transform(phi, DM, freq1=np.inf, freq2=np.inf, P=None):
+def phase_transform(phi, DM, freq1=np.inf, freq2=np.inf, P=None, mod=True):
     """
     """
     if P is None: P= 1.0
-    return phi + (Dconst * DM * P**-1 * (freq2**-2.0 - freq1**-2.0))
+    phi_prime =  phi + (Dconst * DM * P**-1 * (freq2**-2.0 - freq1**-2.0))
+    if mod:
+        phi_prime %= 1
+        if phi_prime >= 0.5:
+            phi_prime -= 1.0
+    return phi_prime
 
 def guess_fit_freq(freqs, SNRs=None):
     """
@@ -1159,9 +1164,9 @@ def load_data(filenm, dedisperse=False, dededisperse=False, tscrunch=False,
     if norm_weights:
         weights = weights_norm
     #Return getitem/attribute-accessible class!
-    data = DataBunch(arch=arch, bw=bw, flux_prof=flux_prof,
-            flux_profx=flux_profx, freqs=freqs, freqsxs=freqsxs,
-            masks=masks, epochs=epochs, nbin=nbin, nchan=nchan,
+    data = DataBunch(arch=arch, bw=bw, DM=DM, epochs=epochs,
+            flux_prof=flux_prof, flux_profx=flux_profx, freqs=freqs,
+            freqsxs=freqsxs, masks=masks, nbin=nbin, nchan=nchan,
             nchanx=nchanx, noise_std=noise_std, nsub=nsub, nsubx=nsubx,
             nu0=nu0, okichan=okichan, okisub=okisub, phases=phases, prof=prof,
             Ps=Ps, source=source, state=state, subints=subints,
@@ -1361,7 +1366,8 @@ def write_archive(data, ephemeris, freqs, nu0=None, bw=None,
 def make_fake_pulsar(modelfile, ephemeris, outfile="fake_pulsar.fits", nsub=1,
         npol=1, nchan=512, nbin=1048, nu0=1500.0, bw=800.0, tsub=300.0,
         phase=0.0, dDM=0.0, start_MJD=None, weights=None, noise_std=1.0,
-        t_scat=None, bw_scint=None, state="Coherence", obs="GBT", quiet=False):
+        scale=1.0, dedisperse=False, t_scat=None, bw_scint=None,
+        state="Coherence", obs="GBT", quiet=False):
     """
     Mostly written by PBD.
     'phase' [rot] is an arbitrary rotation to all subints.
@@ -1442,8 +1448,8 @@ def make_fake_pulsar(modelfile, ephemeris, outfile="fake_pulsar.fits", nsub=1,
     name, ngauss, model = read_model(modelfile, phases, freqs, quiet=quiet)
     #If wanting to use PSRCHIVE's rotation scheme, uncomment the dedisperse and
     #dededisperse lines, and set rotmodel = model.
-    #arch.set_dedispersed(True)
-    #arch.dedisperse()
+    arch.set_dedispersed(False)
+    arch.dededisperse()
     if weights is None: weights = np.ones([nsub, nchan])
     isub = 0
     for subint in arch:
@@ -1458,10 +1464,12 @@ def make_fake_pulsar(modelfile, ephemeris, outfile="fake_pulsar.fits", nsub=1,
                 if noise:
                     prof.get_amps()[:] = rotmodel[ichan] + np.random.normal(
                             0.0, noise, nbin)
+                    prof.get_amps()[:] *= scale
                 else:
                     prof.get_amps()[:] = rotmodel[ichan]
+                    prof.get_amps()[:] *= scale
         isub += 1
-    #arch.dededisperse()
+    if dedisperse: arch.dedisperse()
     arch.unload(outfile)
     if not quiet: print "\nUnloaded %s.\n"%outfile
 
@@ -1593,7 +1601,8 @@ def show_portrait(port, phases=None, freqs=None, title=None, prof=True,
         ax2.set_xticklabels(())
         ax2.set_yticks([0, round(prof.max() / 2, 1), round(prof.max(), 1)])
         plt.xlim(phases.min(), phases.max())
-        plt.ylim(prof.min()-1.0, prof.max()*1.1)
+        rng = prof.max() - prof.min()
+        plt.ylim(prof.min() - 0.03*rng, prof.max() + 0.05*rng)
         plt.ylabel("Flux Units")
         if title: plt.title(title)
     if fi:
@@ -1601,7 +1610,8 @@ def show_portrait(port, phases=None, freqs=None, title=None, prof=True,
         ax3.plot(fluxprofx, freqsx, 'kx')
         ax3.set_xticks([0, round(fluxprofx.max() / 2, 2),
             round(fluxprofx.max(), 2)])
-        plt.xlim(fluxprofx.max()*1.1, fluxprofx.min()*0.9)
+        rng = fluxprofx.max() - fluxprofx.min()
+        plt.xlim(fluxprofx.max() + 0.03*rng, fluxprofx.min() - 0.01*rng)
         plt.xlabel("Flux Units")
         ax3.set_yticks(ax1.get_yticks())
         #ax3.set_yticklabels(ytklbs)

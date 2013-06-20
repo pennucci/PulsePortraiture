@@ -313,6 +313,7 @@ class GetTOAs:
             self.scales.append(scales)
             self.scalesx.append(scalesx)
             self.scale_errs.append(scale_errs)
+            self.covariances.append(covariances)
             self.red_chi2s.append(red_chi2s)
             self.nfevals.append(nfevals)
             self.rcs.append(rcs)
@@ -537,6 +538,7 @@ class GetTOAs:
         else:
             phi_primes = phase_transform(phis, DMs_fitted, nu_fits,
                     self.nu_ref, Ps)
+        #phi_primes may have N rotations incorporated...
         milli_sec_shifts = (phi_primes) * Ps * 1e3
         #Not sure weighting works...
         fit_results = pf(MJDs, milli_sec_shifts, 1, full=True, w=phi_errs**-2)

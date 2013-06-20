@@ -38,8 +38,9 @@ for ifile in range(nfiles):
     make_fake_pulsar(modelfile, ephemeris, outfile="example-%d.fits"%(ifile+1),
             nsub=nsub, npol=npol, nchan=nchan, nbin=nbin, nu0=nu0, bw=bw,
             tsub=tsub, phase=0.0, dDM=dDMs[ifile], start_MJD=None,
-            weights=weights, noise_std=noise_std, t_scat=None, bw_scint=None,
-            state="Coherence", obs="GBT", quiet=quiet)
+            weights=weights, noise_std=noise_std, scale=1.0, dedisperse=False,
+            t_scat=None, bw_scint=None, state="Coherence", obs="GBT",
+            quiet=quiet)
     #NB: t_scat, bw_scint not yet implemented
     #NB: the input parfile cannot yet have binary parameters
 
