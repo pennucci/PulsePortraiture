@@ -1312,7 +1312,9 @@ def write_archive(data, ephemeris, freqs, nu0=None, bw=None,
         parfile = open(ephemeris,"r").readlines()
         for xx in xrange(len(parfile)):
             param = parfile[xx].split()
-            if param[0] == ("PSR" or "PSRJ"):
+            if len(param) == 0:
+                pass
+            elif param[0] == ("PSR" or "PSRJ"):
                 PSR = param[1]
             elif param[0] == "RAJ":
                 RAJ = param[1]
