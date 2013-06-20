@@ -1321,7 +1321,7 @@ def write_archive(data, ephemeris, freqs, nu0=None, bw=None,
             elif param[0] == "DECJ":
                 DECJ = param[1]
             elif param[0] == "DM":
-                DM = float(line[1])
+                DM = float(param[1])
             else:
                 pass
     #Dec needs to have a sign for the following sky_coord call
