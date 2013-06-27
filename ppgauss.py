@@ -460,7 +460,7 @@ if __name__ == "__main__":
                       help="Reference frequency [MHz] for the gaussian model; the initial profile to fit will be centered on this freq. [default=PSRCHIVE center frequency]")
     parser.add_option("--bw",
                       action="store", metavar="bw", dest="bw_ref", default=None,
-                      help="Used with --freq; amount of bandwidth [MHz] centered on nu_ref to average for the initial profile fit. [default=Full bandwidth]")
+                      help="Used with --nu_ref; amount of bandwidth [MHz] centered on nu_ref to average for the initial profile fit. [default=Full bandwidth]")
     parser.add_option("--fixloc",
                       action="store_true", dest="fixloc", default=False,
                       help="Fix locations of gaussians across frequency. [default=False]")

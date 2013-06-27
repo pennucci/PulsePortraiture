@@ -192,7 +192,7 @@ class GetTOAs:
                             model.mean(axis=0)).phase
                     DM_guess = DM_stored
                     #Currently, fit_phase_shift returns an unbounded phase,
-                    #so transform to be on the interval [-0.5, 0.5]
+                    #so here we transform to be on the interval [-0.5, 0.5]
                     phase_guess_0 = phase_guess % 1
                     if phase_guess_0 > 0.5:
                         phase_guess_0 -= 1.0
