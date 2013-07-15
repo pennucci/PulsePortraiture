@@ -1251,7 +1251,7 @@ def write_model(filenm, name, nu_ref, model_params, fit_flags):
     outfile.close()
     print "%s written."%filenm
 
-def read_model(modelfile, phases=None, freqs=None, quiet=False):
+def read_model(modelfile, phases=None, freqs=None, P=1.0, quiet=False):
     """
     """
     if phases is None and freqs is None:
@@ -1295,6 +1295,7 @@ def read_model(modelfile, phases=None, freqs=None, quiet=False):
     if not read_only:
         nbin = len(phases)
         nchan = len(freqs)
+        params[1] *= nbin / P
         model = gen_gaussian_portrait(params, phases, freqs, nu_ref)
     if not quiet and not read_only:
         print "Model Name: %s"%name

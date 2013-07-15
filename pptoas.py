@@ -58,7 +58,8 @@ class GetTOAs:
                     norm_weights=True, quiet=True)
             if self.is_gauss_model:
                 self.model_name, self.ngauss, self.model = read_model(
-                        self.modelfile, data.phases, data.freqs, self.quiet)
+                        self.modelfile, data.phases, data.freqs, data.Ps[0],
+                        self.quiet)
             else:
                 self.model_data = load_data(self.modelfile, dedisperse=True,
                         dededisperse=False, tscrunch=True, pscrunch=True,
@@ -106,7 +107,7 @@ class GetTOAs:
             #Read model
             if len(datafiles) !=1 and self.common is False:
                 self.model_name, self.ngauss, model = read_model(
-                        self.modelfile, phases, freqs, quiet=quiet)
+                        self.modelfile, phases, freqs, Ps.mean(), quiet=quiet)
             else:
                 model = self.model
             nu_fits = np.empty(nsubx, dtype=np.float)
@@ -497,7 +498,8 @@ class GetTOAs:
             model = np.transpose(weights * np.transpose(self.model))
         else:
             model_name, ngauss, model = read_model(self.modelfile, phases,
-                    freqs, quiet=quiet)
+                    freqs, data.Ps.mean(), quiet=quiet)
+                    #freqs, data.Ps[isubx], quiet=quiet)
         port = rotate_portrait(data.subints[isubx,0], phi, DM_fitted, P, freqs,
                 nu_fit)
         port = np.transpose(weights * np.transpose(port))
