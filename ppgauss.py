@@ -25,17 +25,18 @@ class DataPortrait:
         self.port = (self.masks * self.subints)[0,0]
         self.portx = self.subintsxs[0][0]
 
-    def fit_profile(self, profile):
+    def fit_profile(self, profile, tau=0.0, fixscat=True):
         """
         """
         fig = plt.figure()
         profplot = fig.add_subplot(211)
         #Maybe can do better than self.noise_std below
         interactor = GaussianSelector(profplot, profile, self.noise_std,
-                minspanx=None, minspany=None, useblit=True)
+                tau=tau, fixscat=fixscat, minspanx=None, minspany=None,
+                useblit=True)
         plt.show()
         self.init_params = interactor.fitted_params
-        self.ngauss = (len(self.init_params) - 1) / 3
+        self.ngauss = (len(self.init_params) - 2) / 3
 
     def fit_flux_profile(self, guessA=1.0, guessalpha=0.0, fit=True, plot=True,
             quiet=False):
@@ -76,14 +77,15 @@ class DataPortrait:
 
 
     def make_gaussian_model(self, modelfile=None,
-            ref_prof=(None, None), fixloc=False, fixwid=False, fixamp=False,
-            niter=0, writemodel=False, outfile=None, model_name=None,
-            residplot=None, quiet=False):
+            ref_prof=(None, None), tau=0.0, fixloc=False, fixwid=False,
+            fixamp=False, fixscat=True, niter=0, writemodel=False,
+            outfile=None, model_name=None, residplot=None, quiet=False):
         """
         """
         if modelfile:
             (self.model_name, self.nu_ref, self.ngauss, self.init_model_params,
                     self.fit_flags) = read_model(modelfile)
+            self.init_model_params[1] *= self.nbin / self.Ps[0]
         else:
             if model_name is None:
                 self.model_name = self.source
@@ -102,21 +104,22 @@ class DataPortrait:
                 #values for the profile than self.profile, if given the full
                 #band and center frequency.  Unsure why; shouldn't matter.
                 profile = np.take(self.port, okinds, axis=0).mean(axis=0)
-                self.fit_profile(profile)
+                self.fit_profile(profile, tau=tau, fixscat=fixscat)
             #All slopes, spectral indices start at 0.0
             locparams = widparams = ampparams = np.zeros(self.ngauss)
             self.init_model_params = np.empty([self.ngauss, 6])
             for igauss in xrange(self.ngauss):
                 self.init_model_params[igauss] = np.array(
-                        [self.init_params[1::3][igauss], locparams[igauss],
-                            self.init_params[2::3][igauss], widparams[igauss],
-                            self.init_params[3::3][igauss], ampparams[igauss]])
+                        [self.init_params[2::3][igauss], locparams[igauss],
+                            self.init_params[3::3][igauss], widparams[igauss],
+                            self.init_params[4::3][igauss], ampparams[igauss]])
             self.init_model_params = np.array([self.init_params[0]] +
-                list(np.ravel(self.init_model_params)))
+                [self.init_params[1]] + list(np.ravel(self.init_model_params)))
             self.fit_flags = np.ones(len(self.init_model_params))
-            self.fit_flags[2::6] *= not(fixloc)
-            self.fit_flags[4::6] *= not(fixwid)
-            self.fit_flags[6::6] *= not(fixamp)
+            self.fit_flags[1] *= not(fixscat)
+            self.fit_flags[3::6] *= not(fixloc)
+            self.fit_flags[5::6] *= not(fixwid)
+            self.fit_flags[7::6] *= not(fixamp)
         #The noise...
         self.portx_noise = np.outer(get_noise(self.portx, chans=True),
                 np.ones(self.nbin))
@@ -160,12 +163,11 @@ class DataPortrait:
                     60.0)
         if writemodel:
             if outfile is None:
-                if self.metafile is not None:
-                    outfile = self.metafile + ".gmodel"
-                else:
-                    outfile = self.datafile + ".gmodel"
-            write_model(outfile, self.model_name, self.nu_ref,
-                    self.model_params, self.fit_flags)
+                outfile = self.datafile + ".gmodel"
+            model_params = np.copy(self.model_params)
+            model_params[1] *= (1e6 * self.Ps[0]) / self.nbin
+            write_model(outfile, self.model_name, self.nu_ref, model_params,
+                    self.fit_flags)
         if residplot:
             resids = self.port - self.model_masked
             titles = ("%s"%self.datafile, "%s"%self.model_name, "Residuals")
@@ -241,8 +243,8 @@ class DataPortrait:
                 self.freqs, titles, bool(self.bw < 0))
 
 class GaussianSelector:
-    def __init__(self, ax, profile, errs, minspanx=None,
-                 minspany=None, useblit=True):
+    def __init__(self, ax, profile, errs, tau=0.0, fixscat=True, minspanx=None,
+            minspany=None, useblit=True):
         """
         Ripped and altered from SMR's pygaussfit.py
         """
@@ -259,9 +261,13 @@ class GaussianSelector:
         self.proflen = len(profile)
         self.phases = np.arange(self.proflen, dtype='d') / self.proflen
         self.errs = errs
+        self.tauguess = tau #in bins
+        self.fit_scattering = not fixscat
+        if self.fit_scattering and self.tauguess == 0.0:
+            self.tauguess = 0.5 #seems to break otherwise
         self.visible = True
         self.DCguess = sorted(profile)[len(profile)/10 + 1]
-        self.init_params = [self.DCguess]
+        self.init_params = [self.DCguess, self.tauguess]
         self.ngauss = 0
         self.canvas = ax.figure.canvas
         self.canvas.mpl_connect('motion_notify_event', self.onmove)
@@ -373,9 +379,10 @@ class GaussianSelector:
         plt.xlabel('Pulse Phase')
         plt.ylabel('Pulse Amplitude')
         DC = params[0]
+        tau = params[1]
         # Plot the individual gaussians
         for igauss in xrange(self.ngauss):
-            loc, wid, amp = params[(1 + igauss*3):(4 + igauss*3)]
+            loc, wid, amp = params[(2 + igauss*3):(5 + igauss*3)]
             plt.plot(self.phases, DC + amp*gaussian_profile(self.proflen, loc,
                 wid), '%s'%cols[igauss])
 
@@ -399,7 +406,7 @@ class GaussianSelector:
             print "Fitting reference gaussian profile..."
             fitted_params, chi_sq, dof, residuals = fit_gaussian_profile(
                     self.profile, self.init_params, np.zeros(self.proflen) +
-                    self.errs, quiet=True)
+                    self.errs, self.fit_scattering, quiet=True)
             self.fitted_params = fitted_params
             # scaled uncertainties
             #scaled_fit_errs = fit_errs * np.sqrt(chi_sq / dof)
@@ -459,8 +466,12 @@ if __name__ == "__main__":
                       default=None,
                       help="Reference frequency [MHz] for the gaussian model; the initial profile to fit will be centered on this freq. [default=PSRCHIVE center frequency]")
     parser.add_option("--bw",
-                      action="store", metavar="bw", dest="bw_ref", default=None,
+                      action="store", metavar="bw", dest="bw_ref",
+                      default=None,
                       help="Used with --nu_ref; amount of bandwidth [MHz] centered on nu_ref to average for the initial profile fit. [default=Full bandwidth]")
+    parser.add_option("--tau",
+                      action="store", metavar="tau", dest="tau", default=None,
+                      help="Scattering timescale [sec] at nu_ref, assuming alpha=-4.4 (which can be changed internally).  [default=0]")
     parser.add_option("--fixloc",
                       action="store_true", dest="fixloc", default=False,
                       help="Fix locations of gaussians across frequency. [default=False]")
@@ -470,6 +481,9 @@ if __name__ == "__main__":
     parser.add_option("--fixamp",
                       action="store_true", dest="fixamp", default=False,
                       help="Fix amplitudes of gaussians across frequency. [default=False]")
+    parser.add_option("--fitscat",
+                      action="store_true", dest="fitscat", default=False,
+                      help="Fit scattering timescale to tau w.r.t nu_ref.  [default=False]")
     parser.add_option("--niter",
                       action="store", metavar="int", dest="niter", default=0,
                       help="Number of iterations to loop for generating better model. [default=0]")
@@ -495,15 +509,19 @@ if __name__ == "__main__":
     else: nu_ref = options.nu_ref
     if options.bw_ref: bw_ref = float(options.bw_ref)
     else: bw_ref = options.bw_ref
+    tau = float(options.tau)
     fixloc = options.fixloc
     fixwid = options.fixwid
     fixamp = options.fixamp
+    fixscat = not options.fitscat
     niter = int(options.niter)
     figure = options.figure
     quiet = options.quiet
 
     dp = DataPortrait(datafile=datafile, quiet=quiet)
+    tau *= dp.nbin / dp.Ps[0]
     dp.make_gaussian_model(modelfile = None,
-            ref_prof=(nu_ref, bw_ref), fixloc=fixloc, fixwid=fixwid,
-            fixamp=fixamp, niter=niter, writemodel=True, outfile=outfile,
-            model_name=model_name, residplot=figure, quiet=quiet)
+            ref_prof=(nu_ref, bw_ref), tau=tau, fixloc=fixloc, fixwid=fixwid,
+            fixamp=fixamp, fixscat=fixscat, niter=niter,
+            writemodel=True, outfile=outfile, model_name=model_name,
+            residplot=figure, quiet=quiet)

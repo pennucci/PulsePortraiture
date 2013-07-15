@@ -1,11 +1,14 @@
 #Arbitrary model name, usually incoporates the source
 MODEL  PSR_1234-5678_8COMP_LBand
 
-#Frequency that model parameters reference
+#Frequency that model parameters reference [MHz]
 FREQ   1300.0000
 
-#DC component to the model (should be close to zero)
+#DC component to the model (should be close to zero), and FIT flag
 DC     0.00889801  1
+
+#Scattering timescale [s], with reference to FREQ, and FIT flag
+TAU    0.00000000  1
 
 #Each line corresponding to a gaussian component looks like:
 #COMPNN       LOC FIT?      M_LOC FIT?        WID FIT?      M_WID FIT?         AMP FIT?    PL_INDEX FIT?

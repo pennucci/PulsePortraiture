@@ -17,6 +17,7 @@ import matplotlib.gridspec as gs
 import numpy as np
 import numpy.fft as fft
 import scipy.optimize as opt
+import scipy.signal as ss
 import lmfit as lm
 import psrchive as pr
 
@@ -64,6 +65,9 @@ Dconst_trad = 0.000241**-1 #[MHz**2 cm**3 pc**-1 s]
 #Choose wisely.
 Dconst = Dconst_trad
 
+#Power-law index for scattering law
+scattering_alpha = -4.4
+
 class DataBunch(dict):
     """
     This class is a great little recipe!  Creates a simple class instance
@@ -74,13 +78,13 @@ class DataBunch(dict):
         dict.__init__(self, kwds)
         self.__dict__ = self
 
-def gaussian_profile(N, loc, wid, norm=False, abs_wid=False, zeroout=True):
+def gaussian_profile(nbin, loc, wid, norm=False, abs_wid=False, zeroout=True):
     """
     Taken and tweaked from SMR's pygaussfit.py
 
     Return a gaussian pulse profile with 'N' bins and peak amplitude of 1.
     If norm=True, return the profile such that the integrated density = 1.
-        'N' = the number of points in the profile
+        'nbin' = the number of bins in the profile
         'loc' = the pulse phase location (0-1)
         'wid' = the gaussian pulse's full width at half-max (FWHM)
     If abs_wid=True, will use abs(wid).
@@ -94,25 +98,25 @@ def gaussian_profile(N, loc, wid, norm=False, abs_wid=False, zeroout=True):
     if wid > 0.0:
         pass
     elif wid == 0.0:
-        return np.zeros(N, 'd')
+        return np.zeros(nbin, 'd')
     elif wid < 0.0 and zeroout:
-        return np.zeros(N, 'd')
+        return np.zeros(nbin, 'd')
     elif wid < 0.0 and not zeroout:
         pass
     else:
         return 0
     sigma = wid / (2 * np.sqrt(2 * np.log(2)))
     mean = loc % 1.0
-    locval = np.arange(N, dtype='d') / float(N)
+    locval = np.arange(nbin, dtype='d') / float(nbin)
     if (mean < 0.5):
         locval = np.where(np.greater(locval, mean + 0.5), locval - 1.0, locval)
     else:
         locval = np.where(np.less(locval, mean - 0.5), locval + 1.0, locval)
     try:
         zs = (locval - mean) / sigma
-        okzinds = np.compress(np.fabs(zs) < 20.0, np.arange(N))   #Why 20?
+        okzinds = np.compress(np.fabs(zs) < 20.0, np.arange(nbin))   #Why 20?
         okzs = np.take(zs, okzinds)
-        retval = np.zeros(N, 'd')
+        retval = np.zeros(nbin, 'd')
         np.put(retval, okzinds, np.exp(-0.5 * (okzs)**2.0)/(sigma * np.sqrt(2 *
             np.pi)))
         if norm:
@@ -126,32 +130,36 @@ def gaussian_profile(N, loc, wid, norm=False, abs_wid=False, zeroout=True):
                 return retval / np.max(abs(retval))  #TTP hack
     except OverflowError:
         print "Problem in gaussian prof:  mean = %f  sigma = %f" %(mean, sigma)
-        return np.zeros(N, 'd')
+        return np.zeros(nbin, 'd')
 
-def gen_gaussian_profile(params, N):
+def gen_gaussian_profile(params, nbin):
     """
     Taken and tweaked from SMR's pygaussfit.py
 
     Return a model of a DC-component + ngauss gaussian functions.
     params is a sequence of 1 + (ngauss*3) values; the first value is the DC
     component.  Each remaining group of three represents the gaussians
-    loc (0-1), wid (i.e. FWHM) (0-1), and amplitude (>0.0).  N is the number of
-    points in the model.
+    loc (0-1), wid (i.e. FWHM) (0-1), and amplitude (>0.0).
+    nbin is the number of bins in the model.
 
     cf. gaussian_profile(...)
     """
-    ngauss = (len(params) - 1) / 3
-    model = np.zeros(N, dtype='d') + params[0]
+    ngauss = (len(params) - 2) / 3
+    model = np.zeros(nbin, dtype='d') + params[0]
     for igauss in xrange(ngauss):
-        loc, wid, amp = params[(1 + igauss*3):(4 + igauss*3)]
-        model += amp * gaussian_profile(N, loc, wid)
+        loc, wid, amp = params[(2 + igauss*3):(5 + igauss*3)]
+        model += amp * gaussian_profile(nbin, loc, wid)
+    if params[1] != 0.0:
+        bins = np.arange(nbin)
+        sk = scattering_kernel(params[1], 1.0, np.array([1.0]), bins, P=1.0)[0]
+        model = add_scattering(model, sk, repeat=3)
     return model
 
 def gen_gaussian_portrait(params, phases, freqs, nu_ref):
     """
     Build the gaussian model portrait based on params.
 
-    params is an array of 1 + (ngauss*6) values; the first value is the DC
+    params is an array of 2 + (ngauss*6) values; the first value is the DC
     component.  Each remaining group of six represent the gaussians loc (0-1),
     linear slope in loc, wid (i.e. FWHM) (0-1), linear slope in wid,
     amplitude (>0,0), and spectral index alpha (no implicit negative).
@@ -162,26 +170,29 @@ def gen_gaussian_portrait(params, phases, freqs, nu_ref):
 
     cf. gaussian_profile(...), gen_gaussian_profile(...)
     """
-    refparams = np.array([params[0]]+ list(params[1::2]))
-    locparams = params[2::6]
-    widparams = params[4::6]
-    ampparams = params[6::6]
-    ngauss = len(refparams[1::3])
+    refparams = np.array([params[0]] + [params[1]*0.0] + list(params[2::2]))
+    tau = params[1]
+    locparams = params[3::6]
+    widparams = params[5::6]
+    ampparams = params[7::6]
+    ngauss = len(refparams[2::3])
     nbin = len(phases)
     nchan = len(freqs)
     gport = np.empty([nchan, nbin])
     gparams = np.empty([nchan, len(refparams)])
     #DC term
     gparams[:,0] = refparams[0]
+    #Scattering term - first make unscattered portrait
+    gparams[:,1] = refparams[1]
     #Locs
-    gparams[:,1::3] = np.outer(freqs - nu_ref, locparams) + np.outer(np.ones(
-        nchan), refparams[1::3])
-    #Wids
-    gparams[:,2::3] = np.outer(freqs - nu_ref, widparams) + np.outer(np.ones(
+    gparams[:,2::3] = np.outer(freqs - nu_ref, locparams) + np.outer(np.ones(
         nchan), refparams[2::3])
+    #Wids
+    gparams[:,3::3] = np.outer(freqs - nu_ref, widparams) + np.outer(np.ones(
+        nchan), refparams[3::3])
     #Amps
-    gparams[:,3::3] = np.exp(np.outer(np.log(freqs) - np.log(nu_ref),
-        ampparams) + np.outer(np.ones(nchan), np.log(refparams[3::3])))
+    gparams[:,4::3] = np.exp(np.outer(np.log(freqs) - np.log(nu_ref),
+        ampparams) + np.outer(np.ones(nchan), np.log(refparams[4::3])))
     #Amps; I am unsure why I needed this fix at some point
     #gparams[:, 0::3][:, 1:] = np.exp(np.outer(np.log(freqs) - np.log(nu_ref),
     #    ampparams) + np.outer(np.ones(nchan), np.log(refparams[0::3][1:])))
@@ -189,6 +200,10 @@ def gen_gaussian_portrait(params, phases, freqs, nu_ref):
         #Need to contrain so values don't go negative, etc., which is currently
         #done in gaussian_profile
         gport[ichan] = gen_gaussian_profile(gparams[ichan], nbin)
+    if tau != 0.0:
+        sk = scattering_kernel(tau, nu_ref, freqs, np.arange(nbin), 1.0,
+                alpha=scattering_alpha)
+        gport = add_scattering(gport, sk, repeat=3)
     return gport
 
 def powlaw(nu, nu_ref, A, alpha):
@@ -241,6 +256,37 @@ def powlaw_freqs(lo, hi, N, alpha, mid=False):
             midnus[ii] = 0.5 * (nus[ii] + nus[ii+1])
         nus = midnus
     return nus
+
+def scattering_kernel(tau, nu_ref, freqs, phases, P, alpha=scattering_alpha):
+    """
+    Phase-bin centers...tau in [sec] or [bin]
+    """
+    nchan = len(freqs)
+    nbin = len(phases)
+    if tau == 0.0:
+        ts = np.zeros([nchan, nbin])
+        ts[:,0] = 1.0
+    else:
+        ts = np.array([phases*P for ichan in xrange(nchan)])
+        taus = tau * (freqs / nu_ref)**alpha
+        sk = np.exp(-np.transpose(np.transpose(ts) * taus**-1.0))
+    return sk
+
+def add_scattering(data, kernel, repeat=3):
+    mid = repeat/2
+    d = np.array(list(data.transpose()) * repeat).transpose()
+    k = np.array(list(kernel.transpose()) * repeat).transpose()
+    if len(data.shape) == 1:
+        nbin = data.shape[0]
+        norm_kernel = kernel / kernel.sum()
+        scattered_data = ss.convolve(norm_kernel, d)[mid * nbin : (mid+1) *
+                nbin]
+    else:
+        nbin = data.shape[1]
+        norm_kernel = np.transpose(np.transpose(k) * k.sum(axis=1)**-1)
+        scattered_data = np.fft.irfft(np.fft.rfft(norm_kernel) *
+                np.fft.rfft(d))[:, mid * nbin : (mid+1) * nbin]
+    return scattered_data
 
 def fit_powlaw_function(params, freqs, nu_ref, data=None, errs=None):
     """
@@ -553,7 +599,8 @@ def fit_powlaw(data, init_params, errs, freqs, nu_ref):
         results.params.itervalues()])
     return fitted_params, fit_errs, chi_sq, dof, residuals
 
-def fit_gaussian_profile(data, init_params, errs, quiet=True):
+def fit_gaussian_profile(data, init_params, errs, fit_scattering=False,
+        quiet=True):
     """
     Fits a set of gaussians to a pulse profile using lmfit's least-squares
     algorithm.
@@ -570,21 +617,25 @@ def fit_gaussian_profile(data, init_params, errs, quiet=True):
     quiet=True suppresses output [default].
     """
     nparam = len(init_params)
-    ngauss = (len(init_params) - 1) / 3
+    ngauss = (len(init_params) - 2) / 3
+    fs = fit_scattering
     #Generate the parameter structure
     params = lm.Parameters()
     for ii in xrange(nparam):
         if ii == 0:
             params.add('dc', init_params[ii], vary=True, min=None, max=None,
                     expr=None)
-        elif ii in range(nparam)[1::3]:
-            params.add('loc%s'%str((ii-1)/3 + 1), init_params[ii], vary=True,
-                    min=None, max=None, expr=None)
+        elif ii ==1:
+            params.add('tau', init_params[ii], vary=fs, min=0.0, max=None,
+                    expr=None)
         elif ii in range(nparam)[2::3]:
-            params.add('wid%s'%str((ii-1)/3 + 1), init_params[ii], vary=True,
-                    min=0.0, max=None, expr=None)
+            params.add('loc%s'%str((ii-2)/3 + 1), init_params[ii], vary=True,
+                    min=None, max=None, expr=None)
         elif ii in range(nparam)[3::3]:
-            params.add('amp%s'%str((ii-1)/3 + 1), init_params[ii], vary=True,
+            params.add('wid%s'%str((ii-3)/3 + 1), init_params[ii], vary=True,
+                    min=0.0, max=None, expr=None)
+        elif ii in range(nparam)[4::3]:
+            params.add('amp%s'%str((ii-4)/3 + 1), init_params[ii], vary=True,
                     min=0.0, max=None, expr=None)
         else:
             print "Undefined index %d."%ii
@@ -636,30 +687,33 @@ def fit_gaussian_portrait(data, init_params, errs, fit_flags, phases, freqs,
 
     """
     nparam = len(init_params)
-    ngauss = (len(init_params) - 1) / 6
+    ngauss = (len(init_params) - 2) / 6
     #Generate the parameter structure
     params = lm.Parameters()
     for ii in xrange(nparam):
         if ii == 0:         #DC, not limited
             params.add('dc', init_params[ii], vary=bool(fit_flags[ii]),
                     min=None, max=None, expr=None)
-        elif ii%6 == 1:     #loc limits
-            params.add('loc%s'%str((ii-1)/6 + 1), init_params[ii],
+        elif ii == 1:       #tau, limited by 0
+            params.add('tau', init_params[ii], vary=bool(fit_flags[ii]),
+                    min=0.0, max=None, expr=None)
+        elif ii%6 == 2:     #loc limits
+            params.add('loc%s'%str((ii-2)/6 + 1), init_params[ii],
                     vary=bool(fit_flags[ii]), min=None, max=None, expr=None)
-        elif ii%6 == 2:     #loc slope limits
-            params.add('m_loc%s'%str((ii-1)/6 + 1), init_params[ii],
+        elif ii%6 == 3:     #loc slope limits
+            params.add('m_loc%s'%str((ii-3)/6 + 1), init_params[ii],
                     vary=bool(fit_flags[ii]), min=None, max=None, expr=None)
-        elif ii%6 == 3:     #wid limits, limited by 0
-            params.add('wid%s'%str((ii-1)/6 + 1), init_params[ii],
+        elif ii%6 == 4:     #wid limits, limited by 0
+            params.add('wid%s'%str((ii-4)/6 + 1), init_params[ii],
                     vary=bool(fit_flags[ii]), min=0.0, max=None, expr=None)
-        elif ii%6 == 4:     #wid slope limits
-            params.add('m_wid%s'%str((ii-1)/6 + 1), init_params[ii],
+        elif ii%6 == 5:     #wid slope limits
+            params.add('m_wid%s'%str((ii-5)/6 + 1), init_params[ii],
                     vary=bool(fit_flags[ii]), min=None, max=None, expr=None)
-        elif ii%6 == 5:     #amp limits, limited by 0
-            params.add('amp%s'%str((ii-1)/6 + 1), init_params[ii],
+        elif ii%6 == 0:     #amp limits, limited by 0
+            params.add('amp%s'%str((ii-6)/6 + 1), init_params[ii],
                     vary=bool(fit_flags[ii]), min=0.0, max=None, expr=None)
-        elif ii%6 == 0:     #amp index limits
-            params.add('alpha%s'%str((ii-1)/6 + 1), init_params[ii],
+        elif ii%6 == 1:     #amp index limits
+            params.add('alpha%s'%str((ii-7)/6 + 1), init_params[ii],
                     vary=bool(fit_flags[ii]), min=None, max=None, expr=None)
         else:
             print "Undefined index %d."%ii
@@ -1013,8 +1067,7 @@ def phase_transform(phi, DM, freq1=np.inf, freq2=np.inf, P=None, mod=True):
     phi_prime =  phi + (Dconst * DM * P**-1 * (freq2**-2.0 - freq1**-2.0))
     if mod:
         phi_prime %= 1
-        if phi_prime >= 0.5:
-            phi_prime -= 1.0
+        np.where(phi_prime >= 0.5, phi_prime - 1.0, phi_prime)
     return phi_prime
 
 def guess_fit_freq(freqs, SNRs=None):
@@ -1188,11 +1241,12 @@ def write_model(filenm, name, nu_ref, model_params, fit_flags):
     outfile.write("MODEL  %s\n"%name)
     outfile.write("FREQ   %.4f\n"%nu_ref)
     outfile.write("DC     %.8f  %d\n"%(model_params[0], fit_flags[0]))
-    ngauss = (len(model_params) - 1) / 6
+    outfile.write("TAU    %.8f  %d\n"%(model_params[1], fit_flags[1]))
+    ngauss = (len(model_params) - 2) / 6
     for igauss in xrange(ngauss):
-        comp = model_params[(1 + igauss*6):(7 + igauss*6)]
-        fit_comp = fit_flags[(1 + igauss*6):(7 + igauss*6)]
-        line = (igauss+1,) + tuple(np.array(zip(comp, fit_comp)).ravel())
+        comp = model_params[(2 + igauss*6):(8 + igauss*6)]
+        fit_comp = fit_flags[(2 + igauss*6):(8 + igauss*6)]
+        line = (igauss + 1, ) + tuple(np.array(zip(comp, fit_comp)).ravel())
         outfile.write("COMP%02d %1.8f  %d  % 10.8f  %d  % 10.8f  %d  % 10.8f  %d  % 12.8f  %d  % 12.8f  %d\n"%line)
     outfile.close()
     print "%s written."%filenm
@@ -1217,6 +1271,9 @@ def read_model(modelfile, phases=None, freqs=None, quiet=False):
             elif info[0] == "DC":
                 dc = float(info[1])
                 fit_dc = int(info[2])
+            elif info[0] == "TAU":
+                tau = float(info[1])
+                fit_tau = int(info[2])
             elif info[0][:4] == "COMP":
                 comps.append(line)
                 ngauss += 1
@@ -1224,23 +1281,17 @@ def read_model(modelfile, phases=None, freqs=None, quiet=False):
                 pass
         except IndexError:
             pass
-    #ngauss = len(modeldata) - 3
-    params = np.zeros(ngauss*6 + 1)
+    params = np.zeros(ngauss*6 + 2)
     fit_flags = np.zeros(len(params))
-    #name = modeldata.pop(0)[:-1]
-    #nu_ref = float(modeldata.pop(0))
-    #dc_line = modeldata.pop(0)
-    #dc = float(dc_line.split()[0])
-    #fit_dc = int(dc_line.split()[1])
     params[0] = dc
+    params[1] = tau
     fit_flags[0] = fit_dc
+    fit_flags[1] = fit_tau
     for igauss in xrange(ngauss):
-        #comp = map(float, modeldata[igauss].split()[::2])
         comp = map(float, comps[igauss].split()[1::2])
-        #fit_comp = map(int, modeldata[igauss].split()[1::2])
         fit_comp = map(int, comps[igauss].split()[2::2])
-        params[1 + igauss*6 : 7 + (igauss*6)] = comp
-        fit_flags[1 + igauss*6 : 7 + (igauss*6)] = fit_comp
+        params[2 + igauss*6 : 8 + (igauss*6)] = comp
+        fit_flags[2 + igauss*6 : 8 + (igauss*6)] = fit_comp
     if not read_only:
         nbin = len(phases)
         nchan = len(freqs)
@@ -1368,8 +1419,8 @@ def write_archive(data, ephemeris, freqs, nu0=None, bw=None,
 def make_fake_pulsar(modelfile, ephemeris, outfile="fake_pulsar.fits", nsub=1,
         npol=1, nchan=512, nbin=1048, nu0=1500.0, bw=800.0, tsub=300.0,
         phase=0.0, dDM=0.0, start_MJD=None, weights=None, noise_std=1.0,
-        scale=1.0, dedisperse=False, t_scat=None, bw_scint=None,
-        state="Coherence", obs="GBT", quiet=False):
+        scale=1.0, dedisperse=False, t_scat=0.0, alpha=scattering_alpha,
+        bw_scint=None, state="Coherence", obs="GBT", quiet=False):
     """
     Mostly written by PBD.
     'phase' [rot] is an arbitrary rotation to all subints.
@@ -1459,6 +1510,10 @@ def make_fake_pulsar(modelfile, ephemeris, outfile="fake_pulsar.fits", nsub=1,
         for ipol in xrange(npol):
             rotmodel = rotate_portrait(model, -phase, -(DM+dDM), P, freqs, nu0)
             #rotmodel = model
+            if t_scat:
+                sk = scattering_kernel(t_scat, nu0, freqs, phases, P,
+                        alpha=alpha)
+                rotmodel = add_scattering(rotmodel, sk, repeat=3)
             for ichan in xrange(nchan):
                 subint.set_weight(ichan, weights[isub, ichan])
                 prof = subint.get_Profile(ipol, ichan)

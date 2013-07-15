@@ -13,7 +13,7 @@ ephemeris = "example.par"
 nfiles = 3      #Number of datafiles/epochs
 MJD0 = 50000.00 #Start day [MJD]
 days = 20.0     #Days between epochs
-nsub = 20       #Number of subintegrations
+nsub = 10       #Number of subintegrations
 npol = 1        #Number of polarization (can be 4, but will only use total I)
 nchan = 64      #Number of frequency channels
 nbin = 512      #Number of phase bins
@@ -25,6 +25,8 @@ dDM_mean = 3e-4 #Add in random dispersion measure offsets with this mean value
 dDM_std = 2e-4  #Add in random dispersion measure offsets with this std
 dDMs = np.random.normal(dDM_mean, dDM_std, nfiles)
 #dDMs = np.zeros(nfiles) #Uncomment and set dDM_mean and dDM_std to zero for no injected dDMs
+t_scat = 0e-6   #Add scattering with this timescale [s] w.r.t. nu0
+alpha = -4.4    #t_scat will follow a powerlaw with this spectral index
 weights = np.ones([nsub, nchan]) #Change if you want to have an "RFI" mask
                                  #eg. band edges zapped:
                                  #weights[:,:10] = 0 ; weights[:,-10:] = 0
@@ -39,9 +41,9 @@ for ifile in range(nfiles):
             nsub=nsub, npol=npol, nchan=nchan, nbin=nbin, nu0=nu0, bw=bw,
             tsub=tsub, phase=0.0, dDM=dDMs[ifile], start_MJD=None,
             weights=weights, noise_std=noise_std, scale=1.0, dedisperse=False,
-            t_scat=None, bw_scint=None, state="Coherence", obs="GBT",
-            quiet=quiet)
-    #NB: t_scat, bw_scint not yet implemented
+            t_scat=t_scat, alpha=alpha, bw_scint=None, state="Coherence",
+            obs="GBT", quiet=quiet)
+    #NB: bw_scint not yet implemented
     #NB: the input parfile cannot yet have binary parameters
 
 os.system("ls example-*.fits > example.meta")
@@ -62,7 +64,8 @@ dp = pg.DataPortrait(datafile)
 #Have a look at the data you're fitting
 dp.show_data_portrait()
 #Fit a model; see ppgauss.py for all options
-dp.make_gaussian_model(ref_prof=(nu0, bw/4), niter=5, writemodel=True,
+dp.make_gaussian_model(ref_prof=(nu0, bw/4), tau=(t_scat * dp.nbin) / dp.Ps[0],
+        fixscat= not bool(t_scat), niter=5, writemodel=True,
         outfile="example-fit.gmodel", model_name="Example_Fit",
         residplot="example.png", quiet=False)
 #You can always then continue iterations using:
