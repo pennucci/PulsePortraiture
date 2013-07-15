@@ -229,7 +229,8 @@ class GetTOAs:
                 #  CALCULATE  TOA  #
                 ####################
                 if self.nu_ref is None:
-                    nu_ref = nu0
+                    #nu_ref = nu0
+                    nu_ref = nu_zero
                 elif self.nu_ref == "nu_fit":
                     nu_ref = nu_fit
                 else:
@@ -352,8 +353,10 @@ class GetTOAs:
             nsubx = self.nsubxs[ifile]
             if nu_ref is None:
                 #Default to self.nu_ref
+                #Default to self.nu_zeros
                 if self.nu_ref is None:
-                    nu_refs = self.nu0s[ifile] * np.ones(nsubx)
+                    #nu_refs = self.nu0s[ifile] * np.ones(nsubx)
+                    nu_refs = self.nu_zeros[ifile] * np.ones(nsubx)
                 elif self.nu_ref == "nu_fit":
                     nu_refs = self.nu_fits[ifile]
                 else:
@@ -690,7 +693,7 @@ if __name__ == "__main__":
     parser.add_option("--nu_ref",
                       action="store", metavar="nu_ref", dest="nu_ref",
                       default=None,
-                      help="Frequency [MHz] to which the fitted TOAs/DMs are referenced, i.e. the frequency that has zero delay from a non-zero DM. 'inf' is used for inifite frequency.  If the special string 'nu_fit' is used, the TOAs will be referenced to the frequency used in the fit. [default=nu0 (PSRCHIVE's 'center' of band)]")
+                      help="Frequency [MHz] to which the fitted TOAs/DMs are referenced, i.e. the frequency that has zero delay from a non-zero DM. 'inf' is used for inifite frequency.  If the special string 'nu_fit' is used, the TOAs will be referenced to the frequency used in the fit. [default=nu_zero (zero-covariance frequency)]")
     parser.add_option("--DM",
                       action="store", metavar="DM", dest="DM0", default=None,
                       help="Nominal DM [cm**-3 pc] (float) from which to measure offset.  If unspecified, will use the DM stored in the archive.")
