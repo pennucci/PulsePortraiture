@@ -816,7 +816,7 @@ def fit_portrait(data, model, init_params, P, freqs, nu_ref=np.inf,
     if not quiet and results.success is True:
         sys.stderr.write("Fit succeeded with return code %d -- %s\n"
                 %(results.status, rcstring))
-    #Curvature matrix = 1/2 2deriv of chi2 (cf. gregory sect 11.5)
+    #Curvature matrix = 1/2 2deriv of chi2 (cf. Gregory sect 11.5)
     #Parameter errors are related to curvature matrix by **-0.5 
     hessian, nu_zero = fit_portrait_function_2deriv(np.array([phi, DM]),
         mFFT, p_n, dFFT, errs, P, freqs, nu_ref, True)

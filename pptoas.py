@@ -75,7 +75,6 @@ class GetTOAs:
             self.nchan = data.nchan
             self.nbin = data.nbin
             self.nu0 = data.nu0
-            if self.nu_ref is None: self.nu_ref = data.nu0
             self.bw = data.bw
             self.freqs = data.freqs
             self.lofreq = self.freqs[0]-(self.bw/(2*self.nchan))
@@ -244,7 +243,7 @@ class GetTOAs:
                 TOA = epochs[isubx] + pr.MJD((phi_prime * P) / (3600 * 24.))
                 #Do errors change?
                 TOA_err = phi_err * P * 1e6 # [us]
-
+                print nu_zero, TOA.intday(), TOA.fracday(), TOA_err
                 ##########################
                 #DOPPLER CORRECTION OF DM#
                 ##########################
@@ -357,7 +356,7 @@ class GetTOAs:
                 #Default to self.nu_zeros
                 if self.nu_ref is None:
                     #nu_refs = self.nu0s[ifile] * np.ones(nsubx)
-                    nu_refs = self.nu_zeros[ifile] * np.ones(nsubx)
+                    nu_refs = self.nu_zeros[ifile]
                 elif self.nu_ref == "nu_fit":
                     nu_refs = self.nu_fits[ifile]
                 else:
@@ -535,14 +534,10 @@ class GetTOAs:
         cols = ['b','k','g','b','r']
         fig = plt.figure()
         pf = np.polynomial.polynomial.polyfit
-        #This is to obtain the TOA phase offsets w.r.t. nu_ref
+        #This is to obtain the TOA phase offsets w.r.t. nu0
         #Apparently, changing phis in place changes self.phis ???
-        if self.nu_ref == "nu_fit":
-            phi_primes = phase_transform(phis, DMs_fitted, nu_fits,
+        phi_primes = phase_transform(phis, DMs_fitted, nu_fits,
                     self.nu0s[ifile], Ps)
-        else:
-            phi_primes = phase_transform(phis, DMs_fitted, nu_fits,
-                    self.nu_ref, Ps)
         #phi_primes may have N rotations incorporated...
         milli_sec_shifts = (phi_primes) * Ps * 1e3
         #Not sure weighting works...

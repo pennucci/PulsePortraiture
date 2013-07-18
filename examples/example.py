@@ -78,21 +78,19 @@ dp.make_gaussian_model(ref_prof=(nu0, bw/4), tau=(t_scat * dp.nbin) / dp.Ps[0],
 #Now we would measure TOAs and DMs
 print "Running pptoas.py to fit TOAs and DMs..."
 import pptoas as pt
-#Set the frequency that your TOAs reference
-nu_ref = nu0
 #Set the DM to which the offsets are referenced (eg. from the input ephemeris)
 i,o = os.popen4("grep DM example.par")
 DM0 = float(o.readline().split()[1])
 #Initiate Class instance; one could also use a smoothed average of the data
 #as a model instead of the analytic gaussian model
-gt = pt.GetTOAs(metafile, "example-fit.gmodel", nu_ref=nu_ref, DM0=DM0)
+gt = pt.GetTOAs(metafile, "example-fit.gmodel", DM0=DM0)
 gt.get_TOAs()
 #Show results from first datafile
 gt.show_results()
 #Show typical fit
 gt.show_fit()
 #Write TOAs
-gt.write_TOAs(outfile="example.tim", nu_ref=nu_ref)
+gt.write_TOAs(outfile="example.tim")
 #See fitted versus injected DMs
 print ""
 print "Injected DMs, mean, std:"
