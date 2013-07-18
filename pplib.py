@@ -66,7 +66,7 @@ Dconst_trad = 0.000241**-1 #[MHz**2 cm**3 pc**-1 s]
 Dconst = Dconst_trad
 
 #Power-law index for scattering law
-scattering_alpha = -4.4
+scattering_alpha = -4.0
 
 class DataBunch(dict):
     """
@@ -1066,7 +1066,8 @@ def phase_transform(phi, DM, freq1=np.inf, freq2=np.inf, P=None, mod=True):
     if P is None: P= 1.0
     phi_prime =  phi + (Dconst * DM * P**-1 * (freq2**-2.0 - freq1**-2.0))
     if mod:
-        phi_prime %= 1
+        #phi_prime %= 1
+        np.where(abs(phi_prime) >= 0.5, phi_prime % 1, phi_prime)
         np.where(phi_prime >= 0.5, phi_prime - 1.0, phi_prime)
     return phi_prime
 
@@ -1251,7 +1252,7 @@ def write_model(filenm, name, nu_ref, model_params, fit_flags):
     outfile.close()
     print "%s written."%filenm
 
-def read_model(modelfile, phases=None, freqs=None, P=1.0, quiet=False):
+def read_model(modelfile, phases=None, freqs=None, P=None, quiet=False):
     """
     """
     if phases is None and freqs is None:
@@ -1295,7 +1296,12 @@ def read_model(modelfile, phases=None, freqs=None, P=1.0, quiet=False):
     if not read_only:
         nbin = len(phases)
         nchan = len(freqs)
-        params[1] *= nbin / P
+        if params[1] != 0:
+            if P is None:
+                print "Need period P for non-zero scattering value TAU."
+                return 0
+            else:
+                params[1] *= nbin / P
         model = gen_gaussian_portrait(params, phases, freqs, nu_ref)
     if not quiet and not read_only:
         print "Model Name: %s"%name
