@@ -389,7 +389,7 @@ if __name__ == "__main__":
             data = ad.all_data[iarch]
             nsub, npol, nchan, nbin = data.shape
             outfile = ad.datafiles[iarch] + "." + ext
-            arch = load_data(ad.datafiles[iarch]).arch
+            arch = load_data(ad.datafiles[iarch], quiet=True).arch
             #NEED PSCRUNCH OPTION IN HERE
             #CORRUPT DATA??
             arch.set_dedispersed(True)
@@ -399,6 +399,7 @@ if __name__ == "__main__":
                 for ipol in xrange(npol):
                     for ichan in xrange(nchan):
                         prof = subint.get_Profile(ipol, ichan)
+                        #data[isub, ipol, ichan] = rotate_data(data[isub, ipol, ichan], np.random.uniform())
                         prof.get_amps()[:] = data[isub, ipol, ichan]
                 isub += 1
             arch.unload(outfile)

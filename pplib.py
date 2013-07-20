@@ -1067,8 +1067,8 @@ def phase_transform(phi, DM, freq1=np.inf, freq2=np.inf, P=None, mod=True):
     phi_prime =  phi + (Dconst * DM * P**-1 * (freq2**-2.0 - freq1**-2.0))
     if mod:
         #phi_prime %= 1
-        np.where(abs(phi_prime) >= 0.5, phi_prime % 1, phi_prime)
-        np.where(phi_prime >= 0.5, phi_prime - 1.0, phi_prime)
+        phi_prime = np.where(abs(phi_prime) >= 0.5, phi_prime % 1, phi_prime)
+        phi_prime = np.where(phi_prime >= 0.5, phi_prime - 1.0, phi_prime)
     return phi_prime
 
 def guess_fit_freq(freqs, SNRs=None):
@@ -1211,8 +1211,8 @@ def load_data(filenm, dedisperse=False, dededisperse=False, tscrunch=False,
         # chan (mean)      = %d\n\
         # subints          = %d\n\
         # unzapped subint  = %d\n\
-        pol'n state        = %s\n"%(P, DM, nu0, bw, nbin, nchan, nchanx, nsub,
-                nsubx, state)
+        pol'n state        = %s\n"%(P, DM, nu0, abs(bw), nbin, nchan, nchanx,
+                nsub, nsubx, state)
     #Returns refreshed arch; could be changed...
     arch.refresh()
     if norm_weights:
@@ -1310,7 +1310,7 @@ def read_model(modelfile, phases=None, freqs=None, P=None, quiet=False):
             bw = (freqs[-1] - freqs[0]) + ((freqs[-1] - freqs[-2]))
         else:
             bw = 0.0
-        print "%d frequency channels, %.0f MHz bandwidth, centered near %.3f MHz,"%(nchan, bw, freqs.mean())
+        print "%d frequency channels, %.0f MHz bandwidth, centered near %.3f MHz,"%(nchan, abs(bw), freqs.mean())
         print "with model parameters referenced at %.3f MHz."%nu_ref
     if read_only:
         return name, nu_ref, ngauss, params, fit_flags

@@ -6,7 +6,7 @@ class GetTOAs:
     """
     """
     def __init__(self, datafiles, modelfile, nu_ref=None, DM0=None,
-            one_DM=False, bary_DM=True, common=True, quiet=False):
+            one_DM=False, bary_DM=True, common=False, quiet=False):
         """
         """
         if file_is_ASCII(datafiles):
@@ -243,7 +243,6 @@ class GetTOAs:
                 TOA = epochs[isubx] + pr.MJD((phi_prime * P) / (3600 * 24.))
                 #Do errors change?
                 TOA_err = phi_err * P * 1e6 # [us]
-                print nu_zero, TOA.intday(), TOA.fracday(), TOA_err
                 ##########################
                 #DOPPLER CORRECTION OF DM#
                 ##########################
@@ -426,6 +425,7 @@ class GetTOAs:
 
     def write_pam_cmds(self, datafile=None, outfile=None):
         """
+        DO NOT USE
         """
         if datafile is None:
             datafiles = self.datafiles
@@ -439,8 +439,11 @@ class GetTOAs:
             ifile = datafiles.index(datafile)
             phis = self.phis[ifile]
             phi_errs = self.phi_errs[ifile]
+            nu0 = self.nu0s[ifile]
+            nu_fits = self.nu_fits[ifile]
             DeltaDM_mean = self.DeltaDM_means[ifile]
             DM0 = self.DM0s[ifile]
+            DM = DeltaDM_mean + DM0
             pam_ext = datafile[-datafile[::-1].find("."):] + ".rot"
             #The below returns the weighted mean and the sum of the weights,
             #but needs to do better in the case of small-error outliers from
@@ -448,8 +451,10 @@ class GetTOAs:
             phi_mean, phi_var = np.average(phis, weights=phi_errs**-2,
                     returned=True)
             phi_var = phi_var**-1
-            of.write("pam -e %s -r %.7f -d %.5f %s\n"%(pam_ext, phi_mean,
-                DeltaDM_mean + DM0, datafile))
+            phi_mean = phase_transform(phi_mean, DM, nu_fits.mean(), nu0,
+                    np.array(self.Ps).mean())
+            of.write("pam -e %s -r %.7f -d %.5f %s\n"%(pam_ext, phi_mean, DM,
+                datafile))
         if outfile is not None: of.close()
 
     def show_subint(self, datafile=None, isubx=0, quiet=False):
@@ -707,9 +712,9 @@ if __name__ == "__main__":
     parser.add_option("--pam_cmd",
                       action="store_true", dest="pam_cmd", default=False,
                       help='Append pam commands to file "pam_cmd."')
-    parser.add_option("--uncommon",
-                      action="store_false", dest="common", default=True,
-                      help="If supplying a metafile, use this flag if the data are not homogenous (i.e. have different nu0, bw, nchan, nbin)")
+    parser.add_option("--common",
+                      action="store_true", dest="common", default=False,
+                      help="If supplying a metafile, use this flag if the data are homogenous (i.e. have the same nu0, bw, nchan, nbin)")
     parser.add_option("--showplot",
                       action="store_true", dest="showplot", default=False,
                       help="Plot fit results for each epoch. Only useful if nsubint > 1.")

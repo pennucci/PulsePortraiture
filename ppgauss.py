@@ -165,7 +165,8 @@ class DataPortrait:
             if outfile is None:
                 outfile = self.datafile + ".gmodel"
             model_params = np.copy(self.model_params)
-            model_params[1] *= (1e6 * self.Ps[0]) / self.nbin
+            #model_params[1] *= (1e6 * self.Ps[0]) / self.nbin
+            model_params[1] *= self.Ps[0] / self.nbin
             write_model(outfile, self.model_name, self.nu_ref, model_params,
                     self.fit_flags)
         if residplot:
@@ -471,7 +472,7 @@ if __name__ == "__main__":
                       help="Used with --nu_ref; amount of bandwidth [MHz] centered on nu_ref to average for the initial profile fit. [default=Full bandwidth]")
     parser.add_option("--tau",
                       action="store", metavar="tau", dest="tau", default=None,
-                      help="Scattering timescale [sec] at nu_ref, assuming alpha=-4.4 (which can be changed internally).  [default=0]")
+                      help="Scattering timescale [sec] at nu_ref, assuming alpha=-4.0 (which can be changed internally).  [default=0]")
     parser.add_option("--fixloc",
                       action="store_true", dest="fixloc", default=False,
                       help="Fix locations of gaussians across frequency. [default=False]")
