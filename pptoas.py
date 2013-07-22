@@ -336,7 +336,8 @@ class GetTOAs:
             print "Total time: %.2f, ~%.2f min/TOA"%(tot_duration / 60,
                     tot_duration / (60 * np.sum(np.array(self.nsubxs))))
 
-    def write_TOAs(self, datafile=None, outfile=None, nu_ref=None):
+    def write_TOAs(self, datafile=None, outfile=None, nu_ref=None,
+            dmerrfile=None):
         """
         """
         #FIX - determine observatory
@@ -347,6 +348,8 @@ class GetTOAs:
             datafiles = [datafile]
         if outfile is not None:
             sys.stdout = open(outfile,"a")
+        if dmerrfile is not None:
+            dmerrs = open(dmerrfile,"a")
         for datafile in datafiles:
             ifile = datafiles.index(datafile)
             nsubx = self.nsubxs[ifile]
@@ -386,42 +389,27 @@ class GetTOAs:
                 obs_code = obs_codes["%s"%self.obs[ifile].upper()]
             #Currently writes topocentric frequencies
             for isubx in xrange(nsubx):
+                TOA_MJDi = TOAs[isubx].intday()
+                TOA_MJDf = TOAs[isubx].fracday()
+                TOA_err = TOA_errs[isubx]
                 if self.one_DM:
                     DeltaDM_mean = self.DeltaDM_means[ifile]
-                    write_princeton_TOA(TOAs[isubx].intday(),
-                            TOAs[isubx].fracday(), TOA_errs[isubx],
+                    DM_err = self.DeltaDM_errs[ifile]
+                    write_princeton_TOA(TOA_MJDi, TOA_MJDf, TOA_err,
                             nu_refs[isubx], DeltaDM_mean, obs=obs_code)
                 else:
                     DeltaDMs = self.DMs[ifile] - self.DM0s[ifile]
-                    write_princeton_TOA(TOAs[isubx].intday(),
-                            TOAs[isubx].fracday(), TOA_errs[isubx],
+                    DM_err = self.DM_errs[ifile][isubx]
+                    write_princeton_TOA(TOA_MJDi, TOA_MJDf, TOA_err,
                             nu_refs[isubx], DeltaDMs[isubx], obs=obs_code)
+                if dmerrfile is not None:
+                    TOA_MJDi = TOAs[isubx].intday()
+                    TOA_MJDf = TOAs[isubx].fracday()
+                    TOA = "%5d"%int(TOA_MJDi) + ("%.13f"%TOA_MJDf)[1:]
+                    dmerrs.write("%s\t%.6f\n"%(TOA, DM_err))
+        if dmerrfile is not None:
+            dmerrs.close()
         sys.stdout = sys.__stdout__
-
-    def write_dm_errs(self, datafile=None, outfile=None):
-        """
-        This needs an additional ID per line...
-        """
-        if datafile is None:
-            datafiles = self.datafiles
-        else:
-            datafiles = [datafile]
-        if outfile is not None:
-            of = open(outfile, "a")
-        else:
-            of = sys.__stdout__
-        for datafile in datafiles:
-            ifile = datafiles.index(datafile)
-            nsubx = self.nsubxs[ifile]
-            if self.one_DM:
-                DeltaDM_err = self.DeltaDM_errs[ifile]
-                for isubx in xrange(nsubx):
-                    of.write("%.5e\n"%DeltaDM_err)
-            else:
-                DM_errs = self.DM_errs[ifile]
-                for isubx in xrange(nsubx):
-                    of.write("%.5e\n"%DM_errs[isubx])
-        if outfile is not None: of.close()
 
     def write_pam_cmds(self, datafile=None, outfile=None):
         """
@@ -761,6 +749,5 @@ if __name__ == "__main__":
             DM0=DM0, one_DM=one_DM, bary_DM=bary_DM, common=common,
             quiet=quiet)
     gt.get_TOAs(show_plot=showplot, quiet=quiet)
-    gt.write_TOAs(outfile=outfile)
-    if errfile is not None: gt.write_dm_errs(outfile=errfile)
+    gt.write_TOAs(outfile=outfile, dmerrfile=errfile)
     if pam_cmd: gt.write_pam_cmds()
