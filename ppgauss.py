@@ -155,9 +155,9 @@ class DataPortrait:
             self.niter -= 1
             self.cnvrgnc = self.check_convergence(efac=1.0, quiet=quiet)
         if not quiet:
-            print "Residuals mean: %.3f"%(self.portx - self.modelx).mean()
-            print "Residuals std:  %.3f"%(self.portx - self.modelx).std()
-            print "Data std:       %.3f\n"%self.noise_std
+            print "Residuals mean: %.2e"%(self.portx - self.modelx).mean()
+            print "Residuals std:  %.2e"%(self.portx - self.modelx).std()
+            print "Data std:       %.2e\n"%self.noise_std
             print "Total fit time: %.2f min"%(self.total_time / 60.0)
             print "Total time:     %.2f min\n"%((time.time() - self.start) /
                     60.0)
@@ -165,7 +165,9 @@ class DataPortrait:
             if outfile is None:
                 outfile = self.datafile + ".gmodel"
             model_params = np.copy(self.model_params)
-            #model_params[1] *= (1e6 * self.Ps[0]) / self.nbin
+            #Aesthetic mod?
+            model_params[2::6] = np.where(model_params[2::6] >= 1.0,
+                    model_params[2::6] % 1, model_params[2::6])
             model_params[1] *= self.Ps[0] / self.nbin
             write_model(outfile, self.model_name, self.nu_ref, model_params,
                     self.fit_flags)
@@ -216,7 +218,7 @@ class DataPortrait:
             print " duration of %.2f min"%(self.duration /  60.)
             print " phase offset of %.2e +/- %.2e [rot]"%(self.phi,
                 self.phierr)
-            print " DM of %.2e +/- %.2e [cm**-3 pc]"%(self.DM, self.DMerr)
+            print " DM of %.6e +/- %.2e [cm**-3 pc]"%(self.DM, self.DMerr)
             print " red. chi**2 of %.2f."%self.red_chi2
         else:
             if self.niter and (self.itern - self.niter) != 0:
@@ -471,7 +473,7 @@ if __name__ == "__main__":
                       default=None,
                       help="Used with --nu_ref; amount of bandwidth [MHz] centered on nu_ref to average for the initial profile fit. [default=Full bandwidth]")
     parser.add_option("--tau",
-                      action="store", metavar="tau", dest="tau", default=None,
+                      action="store", metavar="tau", dest="tau", default=0.0,
                       help="Scattering timescale [sec] at nu_ref, assuming alpha=-4.0 (which can be changed internally).  [default=0]")
     parser.add_option("--fixloc",
                       action="store_true", dest="fixloc", default=False,

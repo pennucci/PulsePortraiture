@@ -41,7 +41,8 @@ cols = ['b', 'g', 'r', 'c', 'm', 'y',
 #Cross-check against TEMPO's obsys.dat; need TEMPO2 codes
 obs_codes = {"bary":"@", "???":"0", "gbt":"1", "atca":"2", "ao":"3",
              "arecibo":"3", "nanshan":"5", "tid43":"6", "pks":"7", "jb":"8",
-             "vla":"c", "ncy":"f", "eff":"g", "jbdfb":"q", "wsrt":"i"}
+             "vla":"c", "ncy":"f", "eff":"g", "jbdfb":"q", "wsrt":"i",
+             "lofar":"t"}
 
 #RCSTRINGS dictionary, for the return codes given by scipy.optimize.fmin_tnc
 RCSTRINGS = {"-1":"INFEASIBLE: Infeasible (low > up).",
@@ -1203,7 +1204,7 @@ def load_data(filenm, dedisperse=False, dededisperse=False, tscrunch=False,
     if not quiet:
         P = arch.get_Integration(0).get_folding_period()*1000.0
         print "\tP [ms]             = %.1f\n\
-        DM [cm**-3 pc]     = %.4f\n\
+        DM [cm**-3 pc]     = %.6f\n\
         center freq. [MHz] = %.4f\n\
         bandwidth [MHz]    = %.1f\n\
         # bins in prof     = %d\n\
@@ -1749,7 +1750,8 @@ def show_residual_plot(port, model, resids=None, phases=None, freqs=None,
     weights = port.mean(axis=1)
     portx = np.compress(weights, port, axis=0)
     residsx = np.compress(weights, resids, axis=0)
-    text =  "Residuals mean ~ %.3f\nResiduals std ~  %.3f\nData std ~       %.3f"%(residsx.mean(), residsx.std(), get_noise(portx))
+    text =  "Residuals mean ~ %.2e\nResiduals std ~ %.2e\nData std ~ %.2e"%(
+            residsx.mean(), residsx.std(), get_noise(portx))
     ax4.text(0.5, 0.5, text, ha="center", va="center")
     ax4.set_xticklabels(())
     ax4.set_xticks(())

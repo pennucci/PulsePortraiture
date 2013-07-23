@@ -5,8 +5,7 @@ from pplib import *
 class GetTOAs:
     """
     """
-    def __init__(self, datafiles, modelfile, nu_ref=None, DM0=None,
-            one_DM=False, bary_DM=True, common=False, quiet=False):
+    def __init__(self, datafiles, modelfile, common=False, quiet=False):
         """
         """
         if file_is_ASCII(datafiles):
@@ -18,10 +17,6 @@ class GetTOAs:
             self.datafiles = [datafiles]
         self.is_gauss_model = file_is_ASCII(modelfile)
         self.modelfile = modelfile
-        self.nu_ref = nu_ref
-        self.DM0 = DM0
-        self.one_DM = one_DM
-        self.bary_DM = bary_DM
         self.common = common
         self.obs = []
         self.nu0s = []
@@ -81,10 +76,15 @@ class GetTOAs:
             if self.source is None: self.source = "noname"
             del(data)
 
-    def get_TOAs(self, datafile=None, bounds=[(None, None), (None, None)],
-            show_plot=False, quiet=False):
+    def get_TOAs(self, datafile=None, nu_ref=None, DM0=None, one_DM=False,
+            bary_DM=True, bounds=[(None, None), (None, None)], show_plot=False,
+            quiet=False):
         """
         """
+        self.nu_ref = nu_ref
+        self.DM0 = DM0
+        self.one_DM = one_DM
+        self.bary_DM = bary_DM
         start = time.time()
         tot_duration = 0.0
         if datafile is None:
@@ -162,6 +162,7 @@ class GetTOAs:
                 #minimizes the covariance.  The zero-covariance frequency,
                 #nu_zero is calculated after.
                 nu_fit = guess_fit_freq(freqsx, channel_SNRs)
+                nu_fit = freqsx[-1]
                 nu_fits[isubx] = nu_fit
 
                 ####################
@@ -353,6 +354,7 @@ class GetTOAs:
         for datafile in datafiles:
             ifile = datafiles.index(datafile)
             nsubx = self.nsubxs[ifile]
+            DM0 = self.DM0s[ifile]
             if nu_ref is None:
                 #Default to self.nu_ref
                 #Default to self.nu_zeros
@@ -406,7 +408,7 @@ class GetTOAs:
                     TOA_MJDi = TOAs[isubx].intday()
                     TOA_MJDf = TOAs[isubx].fracday()
                     TOA = "%5d"%int(TOA_MJDi) + ("%.13f"%TOA_MJDf)[1:]
-                    dmerrs.write("%s\t%.6f\n"%(TOA, DM_err))
+                    dmerrs.write("%s\t%.8f\t%.6f\n"%(TOA, DM0, DM_err))
         if dmerrfile is not None:
             dmerrs.close()
         sys.stdout = sys.__stdout__
@@ -683,7 +685,7 @@ if __name__ == "__main__":
     parser.add_option("--nu_ref",
                       action="store", metavar="nu_ref", dest="nu_ref",
                       default=None,
-                      help="Frequency [MHz] to which the fitted TOAs/DMs are referenced, i.e. the frequency that has zero delay from a non-zero DM. 'inf' is used for inifite frequency.  If the special string 'nu_fit' is used, the TOAs will be referenced to the frequency used in the fit. [default=nu_zero (zero-covariance frequency)]")
+                      help="Frequency [MHz] to which the fitted TOAs/DMs are referenced, i.e. the frequency that has zero delay from a non-zero DM. 'inf' is used for inifite frequency.  If the special string 'nu_fit' is used, the TOAs will be referenced to the frequency used in the fit. [default=nu_zero (zero-covariance frequency, recommended)]")
     parser.add_option("--DM",
                       action="store", metavar="DM", dest="DM0", default=None,
                       help="Nominal DM [cm**-3 pc] (float) from which to measure offset.  If unspecified, will use the DM stored in the archive.")
@@ -745,9 +747,9 @@ if __name__ == "__main__":
         datafiles = datafile
     else:
         datafiles = metafile
-    gt = GetTOAs(datafiles=datafiles, modelfile=modelfile, nu_ref=nu_ref,
-            DM0=DM0, one_DM=one_DM, bary_DM=bary_DM, common=common,
+    gt = GetTOAs(datafiles=datafiles, modelfile=modelfile, common=common,
             quiet=quiet)
-    gt.get_TOAs(show_plot=showplot, quiet=quiet)
+    gt.get_TOAs(nu_ref=nu_ref, DM0=DM0, one_DM=one_DM, bary_DM=bary_DM,
+            show_plot=showplot, quiet=quiet)
     gt.write_TOAs(outfile=outfile, dmerrfile=errfile)
     if pam_cmd: gt.write_pam_cmds()
