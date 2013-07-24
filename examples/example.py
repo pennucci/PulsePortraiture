@@ -83,8 +83,8 @@ i,o = os.popen4("grep DM example.par")
 DM0 = float(o.readline().split()[1])
 #Initiate Class instance; one could also use a smoothed average of the data
 #as a model instead of the analytic gaussian model
-gt = pt.GetTOAs(metafile, "example-fit.gmodel", DM0=DM0)
-gt.get_TOAs()
+gt = pt.GetTOAs(metafile, "example-fit.gmodel")
+gt.get_TOAs(DM0=DM0)
 #Show results from first datafile
 gt.show_results()
 #Show typical fit

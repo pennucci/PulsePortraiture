@@ -52,6 +52,7 @@ class AlignData:
         self.length = 0.0
         self.P = 0.0
         self.nchan = 0
+        self.nchans = []
         self.nu0s = []
         self.lofreq = np.inf
         self.hifreq = 0.0
@@ -99,6 +100,7 @@ class AlignData:
             self.P += data.Ps.mean()
             epochs.extend(data.epochs[isub] for isub in range(data.nsub))
             okisub.append(data.okisub)
+            self.nchans.append(data.nchan)
             self.nchan += data.nchan
             self.nu0s.append(data.nu0)
             lf = data.freqs.min() - (abs(data.bw) / (2*data.nchan))
@@ -205,11 +207,11 @@ class AlignData:
                                             self.all_data[iarch][okisub[isub],
                                                 :, okichan[ichan]], phase)
                 new_model += self.all_data[iarch].mean(axis=2).mean(axis=0)
-            self.model = new_model / self.nfile
-            if self.state is "Coherence":
-                self.model = self.model[0] + self.model[1]
-            else:
-                self.model = self.model[0]
+            #self.model = new_model / self.nfile
+            #if self.state is "Coherence":
+            #    self.model = self.model[0] + self.model[1]
+            #else:
+            #    self.model = self.model[0]
             yield
 
     def make_portrait(self):
@@ -305,8 +307,8 @@ if __name__ == "__main__":
                       default=None,
                       help="Ephemeris file to be installed in output archive(s). Danger. [default=Ephemeris stored in first file in metafile]")
     parser.add_option("--niter",
-                      action="store", metavar="int", dest="niter", default=3,
-                      help="Number of iterations to loop over archives. [default=3]")
+                      action="store", metavar="int", dest="niter", default=1,
+                      help="Number of iterations to loop over archives. [default=1]")
     parser.add_option("--pscrunch",
                       action="store_true", dest="pscrunch", default=False,
                       help="pscrunch archives before aligning. [default=False]")

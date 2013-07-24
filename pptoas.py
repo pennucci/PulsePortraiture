@@ -76,14 +76,12 @@ class GetTOAs:
             if self.source is None: self.source = "noname"
             del(data)
 
-    def get_TOAs(self, datafile=None, nu_ref=None, DM0=None, one_DM=False,
-            bary_DM=True, bounds=[(None, None), (None, None)], show_plot=False,
-            quiet=False):
+    def get_TOAs(self, datafile=None, nu_ref=None, DM0=None, bary_DM=True,
+            bounds=[(None, None), (None, None)], show_plot=False, quiet=False):
         """
         """
         self.nu_ref = nu_ref
         self.DM0 = DM0
-        self.one_DM = one_DM
         self.bary_DM = bary_DM
         start = time.time()
         tot_duration = 0.0
@@ -162,7 +160,7 @@ class GetTOAs:
                 #minimizes the covariance.  The zero-covariance frequency,
                 #nu_zero is calculated after.
                 nu_fit = guess_fit_freq(freqsx, channel_SNRs)
-                nu_fit = freqsx[-1]
+                #nu_fit = freqsx[-1]
                 nu_fits[isubx] = nu_fit
 
                 ####################
@@ -338,7 +336,7 @@ class GetTOAs:
                     tot_duration / (60 * np.sum(np.array(self.nsubxs))))
 
     def write_TOAs(self, datafile=None, outfile=None, nu_ref=None,
-            dmerrfile=None):
+            one_DM=False, dmerrfile=None):
         """
         """
         #FIX - determine observatory
@@ -394,7 +392,7 @@ class GetTOAs:
                 TOA_MJDi = TOAs[isubx].intday()
                 TOA_MJDf = TOAs[isubx].fracday()
                 TOA_err = TOA_errs[isubx]
-                if self.one_DM:
+                if one_DM:
                     DeltaDM_mean = self.DeltaDM_means[ifile]
                     DM_err = self.DeltaDM_errs[ifile]
                     write_princeton_TOA(TOA_MJDi, TOA_MJDf, TOA_err,
@@ -529,7 +527,7 @@ class GetTOAs:
         cols = ['b','k','g','b','r']
         fig = plt.figure()
         pf = np.polynomial.polynomial.polyfit
-        #This is to obtain the TOA phase offsets w.r.t. nu0
+        #This is to obtain the TOA phase offsets w.r.t. nu_ref
         #Apparently, changing phis in place changes self.phis ???
         phi_primes = phase_transform(phis, DMs_fitted, nu_fits,
                     self.nu0s[ifile], Ps)
@@ -749,7 +747,7 @@ if __name__ == "__main__":
         datafiles = metafile
     gt = GetTOAs(datafiles=datafiles, modelfile=modelfile, common=common,
             quiet=quiet)
-    gt.get_TOAs(nu_ref=nu_ref, DM0=DM0, one_DM=one_DM, bary_DM=bary_DM,
-            show_plot=showplot, quiet=quiet)
-    gt.write_TOAs(outfile=outfile, dmerrfile=errfile)
+    gt.get_TOAs(nu_ref=nu_ref, DM0=DM0, bary_DM=bary_DM, show_plot=showplot,
+            quiet=quiet)
+    gt.write_TOAs(outfile=outfile, one_DM=one_DM, dmerrfile=errfile)
     if pam_cmd: gt.write_pam_cmds()

@@ -156,7 +156,8 @@ def gen_gaussian_profile(params, nbin):
         model = add_scattering(model, sk, repeat=3)
     return model
 
-def gen_gaussian_portrait(params, phases, freqs, nu_ref):
+def gen_gaussian_portrait(params, phases, freqs, nu_ref, join_ichans=[],
+        P=None):
     """
     Build the gaussian model portrait based on params.
 
@@ -171,6 +172,10 @@ def gen_gaussian_portrait(params, phases, freqs, nu_ref):
 
     cf. gaussian_profile(...), gen_gaussian_profile(...)
     """
+    njoin = len(join_ichans)
+    if njoin:
+        join_params = params[-njoin*2:]
+        params = params[:-njoin*2]
     refparams = np.array([params[0]] + [params[1]*0.0] + list(params[2::2]))
     tau = params[1]
     locparams = params[3::6]
@@ -205,6 +210,13 @@ def gen_gaussian_portrait(params, phases, freqs, nu_ref):
         sk = scattering_kernel(tau, nu_ref, freqs, np.arange(nbin), 1.0,
                 alpha=scattering_alpha)
         gport = add_scattering(gport, sk, repeat=3)
+    if njoin:
+        for ij in range(njoin):
+            join_ichan = join_ichans[ij]
+            phi = join_params[0::2][ij]
+            DM =  join_params[1::2][ij]
+            gport[join_ichan] = rotate_portrait(gport[join_ichan], phi,
+                    DM, P, freqs[join_ichan], nu_ref)
     return gport
 
 def powlaw(nu, nu_ref, A, alpha):
@@ -323,7 +335,7 @@ def fit_gaussian_profile_function(params, data=None, errs=None):
     return (data - gen_gaussian_profile(prms, len(data))) / errs
 
 def fit_gaussian_portrait_function(params, phases, freqs, nu_ref, data=None,
-        errs=None):
+        errs=None, join_ichans=None, P=None):
     """
     Function to pass to minimizer in fit_gaussian_portrait that returns
     residuals weighted by errs**-1.
@@ -342,7 +354,7 @@ def fit_gaussian_portrait_function(params, phases, freqs, nu_ref, data=None,
     """
     prms = np.array([param.value for param in params.itervalues()])
     deviates = np.ravel((data - gen_gaussian_portrait(prms, phases, freqs,
-        nu_ref)) / errs)
+        nu_ref, join_ichans, P)) / errs)
     return deviates
 
 def fit_phase_shift_function(phase, model=None, data=None, err=None):
@@ -664,7 +676,7 @@ def fit_gaussian_profile(data, init_params, errs, fit_scattering=False,
     return fitted_params, redchi_sq, dof, residuals
 
 def fit_gaussian_portrait(data, init_params, errs, fit_flags, phases, freqs,
-        nu_ref, quiet=True):
+        nu_ref, join_params=[], P=None, quiet=True):
     """
     Fits a set of evolving gaussians to a phase-frequency pulse portrait using
     lmfit's least-squares algorithm.
@@ -719,8 +731,20 @@ def fit_gaussian_portrait(data, init_params, errs, fit_flags, phases, freqs,
         else:
             print "Undefined index %d."%ii
             sys.exit()
+    if len(join_params):
+        join_ichans = join_params[0]
+        njoin = len(join_ichans)
+        for ii in xrange(njoin):
+            params.add('phase%s'%str(ii+1), join_params[1][0::2][ii],
+                    vary=bool(join_params[2][0::2][ii]), min=None, max=None,
+                        expr=None)
+            params.add('DM%s'%str(ii+1), join_params[1][1::2][ii],
+                    vary=bool(join_params[2][1::2][ii]), min=None, max=None,
+                        expr=None)
+    else:
+        join_ichans = []
     other_args = {'data':data, 'errs':errs, 'phases':phases, 'freqs':freqs,
-            'nu_ref':nu_ref}
+            'nu_ref':nu_ref, 'join_ichans':join_ichans, 'P':P}
     #Now fit it
     results = lm.minimize(fit_gaussian_portrait_function, params,
             kws=other_args)
@@ -730,7 +754,6 @@ def fit_gaussian_portrait(data, init_params, errs, fit_flags, phases, freqs,
     chi_sq = results.chisqr
     redchi_sq = results.redchi
     residuals = results.residual
-    model = gen_gaussian_portrait(fitted_params, phases, freqs, nu_ref)
     if not quiet:
         print "---------------------------------------------------------------"
         print "Gaussian Portrait Fit"

@@ -12,18 +12,116 @@ class DataPortrait:
         ""
         ""
         self.init_params = []
-        self.datafile = datafile
-        self.data = load_data(datafile, dedisperse=True,
-                dededisperse=False, tscrunch=True, pscrunch=True,
-                fscrunch=False, rm_baseline=True, flux_prof=True,
-                norm_weights=True, quiet=quiet)
-        #Unpack the data dictionary into the local namespace;
-        #see load_data for dictionary keys.
-        for key in self.data.keys():
-            exec("self." + key + " = self.data['" + key + "']")
-        if self.source is None: self.source = "noname"
-        self.port = (self.masks * self.subints)[0,0]
-        self.portx = self.subintsxs[0][0]
+        if file_is_ASCII(datafile):
+            self.join_params = []
+            self.join_fit_flags = []
+            self.join_nchans = [0]
+            self.join_nchanxs = [0]
+            self.join_ichans = []
+            self.join_ichanxs = []
+            self.nchans = []
+            self.metafile = self.datafile = datafile
+            self.datafiles = open(datafile, "r").readlines()
+            self.datafiles = [self.datafiles[ifile][:-1] for ifile in
+                    xrange(len(self.datafiles))]
+            self.njoin = len(self.datafiles)
+            self.Ps = 0.0
+            self.nchan = 0
+            self.nchanx = 0
+            #self.nu0s = []
+            self.lofreq = np.inf
+            self.hifreq = 0.0
+            self.freqs = []
+            self.freqsxs = []
+            self.port = []
+            self.portx = []
+            self.noise_std = 0.0
+            self.weights = []
+            for ifile in range(len(self.datafiles)):
+                datafile = self.datafiles[ifile]
+                data = load_data(datafile, dedisperse=True, tscrunch=True,
+                        pscrunch=True, norm_weights=True, quiet=quiet)
+                self.nchan += data.nchan
+                self.nchanx += data.nchanx
+                if ifile == 0:
+                    self.join_nchans.append(self.nchan)
+                    self.join_nchanxs.append(self.nchanx)
+                    self.join_params.append(0.0)
+                    self.join_fit_flags.append(0)
+                    self.join_params.append(data.DM*0.0)
+                    self.join_fit_flags.append(1)
+                    self.nbin = data.nbin
+                    self.phases = data.phases
+                    refprof = data.prof
+                    self.source = data.source
+                else:
+                    self.join_nchans.append(self.nchan)
+                    self.join_nchanxs.append(self.nchanx)
+                    prof = data.prof
+                    phi = -fit_phase_shift(prof, refprof).phase
+                    self.join_params.append(phi)
+                    self.join_fit_flags.append(1)
+                    self.join_params.append(data.DM*0.0)
+                    self.join_fit_flags.append(1)
+                self.Ps += data.Ps.mean()
+                lf = data.freqs.min() - (abs(data.bw) / (2*data.nchan))
+                if lf < self.lofreq:
+                    self.lofreq = lf
+                hf = data.freqs.max() + (abs(data.bw) / (2*data.nchan))
+                if hf > self.hifreq:
+                    self.hifreq = hf
+                self.freqs.extend(data.freqs)
+                self.freqsxs.extend(data.freqsxs[0])
+                self.weights.extend(data.weights[0])
+                self.port.extend(data.subints[0,0])
+                self.portx.extend(data.subintsxs[0][0])
+                self.noise_std += data.noise_std
+            self.Ps /= len(self.datafiles)
+            self.Ps = [self.Ps] #This line and the next are toys
+            self.noise_std /= len(self.datafiles)
+            self.bw = self.hifreq - self.lofreq
+            self.freqs = np.array(self.freqs)
+            self.freqsxs = np.array(self.freqsxs)
+            self.nu0 = self.freqs.mean()
+            self.isort = np.argsort(self.freqs)
+            self.isortx = np.argsort(self.freqsxs)
+            for ijoin in range(self.njoin):
+                join_ichans = np.intersect1d(np.where(self.isort >=
+                    self.join_nchans[ijoin])[0], np.where(self.isort <
+                        self.join_nchans[ijoin+1])[0])
+                self.join_ichans.append(join_ichans)
+                join_ichanxs = np.intersect1d(np.where(self.isortx >=
+                    self.join_nchanxs[ijoin])[0], np.where(self.isortx <
+                        self.join_nchanxs[ijoin+1])[0])
+                self.join_ichanxs.append(join_ichanxs)
+            self.weights = np.array(self.weights)[self.isort]
+            self.weights = [self.weights]
+            self.port = np.array(self.port)[self.isort]
+            self.portx = np.array(self.portx)[self.isortx]
+            self.freqs.sort()
+            self.freqsxs.sort()
+            self.freqsxs = [self.freqsxs]
+            self.join_params = np.array(self.join_params)
+            self.join_fit_flags = np.array(self.join_fit_flags)
+            self.all_join_params = [self.join_ichanxs, self.join_params,
+                    self.join_fit_flags]
+        else:
+            self.njoin = 0
+            self.join_params = []
+            self.join_ichans = []
+            self.all_join_params = []
+            self.datafile = datafile
+            self.data = load_data(datafile, dedisperse=True,
+                    dededisperse=False, tscrunch=True, pscrunch=True,
+                    fscrunch=False, rm_baseline=True, flux_prof=True,
+                    norm_weights=True, quiet=quiet)
+            #Unpack the data dictionary into the local namespace;
+            #see load_data for dictionary keys.
+            for key in self.data.keys():
+                exec("self." + key + " = self.data['" + key + "']")
+            if self.source is None: self.source = "noname"
+            self.port = (self.masks * self.subints)[0,0]
+            self.portx = self.subintsxs[0][0]
 
     def fit_profile(self, profile, tau=0.0, fixscat=True):
         """
@@ -142,13 +240,18 @@ class DataPortrait:
             if self.cnvrgnc:
                 break
             else:
-                if not quiet:
-                    print "\nRotating data portrait for iteration %d."%(
-                            self.itern - self.niter + 1)
-                self.port = rotate_portrait(self.port, self.phi, self.DM,
-                        self.Ps[0], self.freqs, self.nu_fit)
-                self.portx = rotate_portrait(self.portx, self. phi, self.DM,
-                        self.Ps[0], self.freqsxs[0], self.nu_fit)
+                if not self.njoin:
+                    if not quiet:
+                        print "\nRotating data portrait for iteration %d."%(
+                                self.itern - self.niter + 1)
+                    self.port = rotate_portrait(self.port, self.phi, self.DM,
+                            self.Ps[0], self.freqs, self.nu_fit)
+                    self.portx = rotate_portrait(self.portx, self. phi,
+                            self.DM, self.Ps[0], self.freqsxs[0], self.nu_fit)
+                else:
+                    if not quiet:
+                        print "\...iteration %d..."%(self.itern - self.niter +
+                                1)
             if not quiet:
                 print "Fitting gaussian model portrait..."
             iterator.next()
@@ -185,29 +288,41 @@ class DataPortrait:
             self.fitted_params, self.chi_sq, self.dof = (
                     fit_gaussian_portrait(self.portx, self.model_params,
                         self.portx_noise, self.fit_flags, self.phases,
-                        self.freqsxs[0], self.nu_ref, quiet=quiet))
-            self.model_params = self.fitted_params
-            self.model = gen_gaussian_portrait(self.model_params,
-                    self.phases, self.freqs, self.nu_ref)
+                        self.freqsxs[0], self.nu_ref, self.all_join_params,
+                        self.Ps[0], quiet=quiet))
+            if self.njoin:
+                self.model_params = self.fitted_params[:-self.njoin*2]
+                self.join_params = self.fitted_params[-self.njoin*2:]
+                self.phi = 0.5
+                self.phierr = 0.0
+                self.DM = 1.0
+                self.DMerr = 0.0
+                self.red_chi2 = 0.0
+            else:
+                self.model_params = self.fitted_params[:]
+            self.model = gen_gaussian_portrait(self.fitted_params,
+                    self.phases, self.freqs, self.nu_ref,
+                    self.join_ichans, self.Ps[0])
             self.model_masked = np.transpose(self.weights[0] *
                     np.transpose(self.model))
             self.modelx = np.compress(self.weights[0], self.model, axis=0)
-            #Currently, fit_phase_shift returns an unbounded phase
-            phase_guess = fit_phase_shift(self.portx.mean(axis=0),
-                    self.modelx.mean(axis=0)).phase
-            phase_guess %= 1
-            if phase_guess > 0.5:
-                phase_guess -= 1.0
-            DM_guess = 0.0
-            (self.phi, self.DM, self.scalesx, param_errs, nu_zero, covar,
-                    self.red_chi2, self.fit_duration, self.nfeval, self.rc) = (
-                        fit_portrait(self.portx, self.modelx,
-                            np.array([phase_guess, DM_guess]), self.Ps[0],
-                            self.freqsxs[0], self.nu_fit,
-                            bounds=[(None, None), (None, None)], id=None,
-                            quiet=True))
-            self.phierr = param_errs[0]
-            self.DMerr = param_errs[1]
+            if not self.njoin:
+                #Currently, fit_phase_shift returns an unbounded phase
+                phase_guess = fit_phase_shift(self.portx.mean(axis=0),
+                        self.modelx.mean(axis=0)).phase
+                phase_guess %= 1
+                if phase_guess > 0.5:
+                    phase_guess -= 1.0
+                DM_guess = 0.0
+                (self.phi, self.DM, self.scalesx, param_errs, nu_zero, covar,
+                        self.red_chi2, self.fit_duration, self.nfeval,
+                        self.rc) = fit_portrait(self.portx, self.modelx,
+                                np.array([phase_guess, DM_guess]), self.Ps[0],
+                                self.freqsxs[0], self.nu_fit,
+                                bounds=[(None, None), (None, None)], id=None,
+                                quiet=True)
+                self.phierr = param_errs[0]
+                self.DMerr = param_errs[1]
             self.duration = time.time() - start
             self.total_time += self.duration
             yield
@@ -216,9 +331,10 @@ class DataPortrait:
         if not quiet:
             print "Iter %d:"%(self.itern - self.niter)
             print " duration of %.2f min"%(self.duration /  60.)
-            print " phase offset of %.2e +/- %.2e [rot]"%(self.phi,
-                self.phierr)
-            print " DM of %.6e +/- %.2e [cm**-3 pc]"%(self.DM, self.DMerr)
+            if not self.njoin:
+                print " phase offset of %.2e +/- %.2e [rot]"%(self.phi,
+                        self.phierr)
+                print " DM of %.6e +/- %.2e [cm**-3 pc]"%(self.DM, self.DMerr)
             print " red. chi**2 of %.2f."%self.red_chi2
         else:
             if self.niter and (self.itern - self.niter) != 0:
@@ -458,6 +574,9 @@ if __name__ == "__main__":
     parser.add_option("-d", "--datafile",
                       action="store", metavar="archive", dest="datafile",
                       help="PSRCHIVE archive from which to generate gaussian model.")
+    parser.add_option("-M", "--metafile",
+                      action="store", metavar="metafile", dest="metafile",
+                      help="Experimental.  Not recommended for your use.  Will be able to fit several obs. from different bands.")
     parser.add_option("-o", "--outfile",
                       action="store", metavar="outfile", dest="outfile",
                       help="Name of output model file name. [default=archive.gmodel]")
@@ -499,13 +618,15 @@ if __name__ == "__main__":
 
     (options, args) = parser.parse_args()
 
-    if options.datafile is None:
+    if options.datafile is None and options.metafile is None:
         print "\nppgauss.py - generates gaussian-component model portrait\n"
         parser.print_help()
         print ""
         parser.exit()
 
     datafile = options.datafile
+    metafile = options.metafile
+    if metafile is not None: datafile = metafile
     outfile = options.outfile
     model_name = options.model_name
     if options.nu_ref: nu_ref = float(options.nu_ref)
