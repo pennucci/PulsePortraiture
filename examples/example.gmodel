@@ -14,12 +14,15 @@ TAU    0.00000000  1
 #COMPNN       LOC FIT?      M_LOC FIT?        WID FIT?      M_WID FIT?         AMP FIT?    PL_INDEX FIT?
 #where
 #COMPNN is COMP01, COMP02, COMP03...etc., although the numbering is arbitrary and for bookkeeping only.
-#LOC is the gaussian "mean" position, given in phase [rot]
-#M_LOC is the linear slope in position, given in phase/freq [rot/MHz], as in loc(freq) = M_LOC*freq + LOC
-#WID is the FWHM width, given in phase [rot], as in wid(freq) = M_WID*freq + WID
-#M_WID is the linear slope in width, given in phase/freq [rot/MHz]
-#AMP is the amplitude of the gaussian at the LOC position, given in arbitrary flux units.
-#PL_INDEX is the power-law index of the component amplitudes, as in amp(freq) = AMP*(freq/FREQ)**PL_INDEX
+#LOC is the gaussian "mean" position at frequency FREQ, given in phase [rot]
+#M_LOC is the linear slope in position, given in phase/freq [rot/MHz], as in:
+    #loc(freq) = M_LOC*(freq - FREQ) + LOC
+#WID is the gaussian FWHM width, given in phase [rot]
+#M_WID is the linear slope in width, given in phase/freq [rot/MHz], as in:
+    #wid(freq) = M_WID*(freq - FREQ) + WID
+#AMP is the amplitude of the gaussian at the LOC(FREQ) position, given in arbitrary flux units.
+#PL_INDEX is the power-law index of the component amplitudes, as in:
+    #amp(freq) = AMP * (freq/FREQ)**PL_INDEX
 #FIT? is an integer; 0 is do not fit.
  
 #COMPNN       LOC FIT?      M_LOC FIT?        WID FIT?      M_WID FIT?         AMP FIT?    PL_INDEX FIT?

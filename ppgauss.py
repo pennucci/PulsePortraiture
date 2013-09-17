@@ -227,7 +227,7 @@ class DataPortrait:
         if niter < 0: niter = 0
         self.niter = niter
         self.itern = niter
-        self.model_params = self.init_model_params
+        self.model_params = np.copy(self.init_model_params)
         self.total_time = 0.0
         self.start = time.time()
         #if not quiet:

@@ -79,6 +79,20 @@ class DataBunch(dict):
         dict.__init__(self, kwds)
         self.__dict__ = self
 
+def gaussian_function(xs, loc, wid, norm=False):
+    """
+    See gaussian_profile.
+    """
+    mean = loc
+    sigma = wid / (2 * np.sqrt(2 * np.log(2)))
+    scale = 1.0
+    zs = (xs - mean) / sigma
+    ys = np.exp(-0.5 * zs**2)
+    if norm:
+        scale *= (sigma**2.0 * 2.0 * np.pi)**-0.5
+    return scale * ys
+
+
 def gaussian_profile(nbin, loc, wid, norm=False, abs_wid=False, zeroout=True):
     """
     Taken and tweaked from SMR's pygaussfit.py
@@ -86,8 +100,8 @@ def gaussian_profile(nbin, loc, wid, norm=False, abs_wid=False, zeroout=True):
     Return a gaussian pulse profile with 'N' bins and peak amplitude of 1.
     If norm=True, return the profile such that the integrated density = 1.
         'nbin' = the number of bins in the profile
-        'loc' = the pulse phase location (0-1)
-        'wid' = the gaussian pulse's full width at half-max (FWHM)
+        'loc' = the pulse phase location (0-1) [rot]
+        'wid' = the gaussian pulse's full width at half-max (FWHM) [rot]
     If abs_wid=True, will use abs(wid).
     If zeroout=True and wid <= 0, return a zero array.
     Note: The FWHM of a gaussian is approx 2.35482 "sigma", or exactly
@@ -176,6 +190,8 @@ def gen_gaussian_portrait(params, phases, freqs, nu_ref, join_ichans=[],
     if njoin:
         join_params = params[-njoin*2:]
         params = params[:-njoin*2]
+    #Below, params[1] is multiplied by 0 so that scattering is taken care of
+    #outside of gen_gaussian_profile
     refparams = np.array([params[0]] + [params[1]*0.0] + list(params[2::2]))
     tau = params[1]
     locparams = params[3::6]
@@ -844,6 +860,7 @@ def fit_portrait(data, model, init_params, P, freqs, nu_ref=np.inf,
     #Parameter errors are related to curvature matrix by **-0.5 
     hessian, nu_zero = fit_portrait_function_2deriv(np.array([phi, DM]),
         mFFT, p_n, dFFT, errs, P, freqs, nu_ref, True)
+    #These errors are only "accurate" for the zero-covariance esimates
     param_errs = list(pow(0.5*hessian[:2], -0.5))
     DoF = len(data.ravel()) - (len(freqs) + 2)
     red_chi2 = (d + results.fun) / DoF
@@ -1449,13 +1466,16 @@ def write_archive(data, ephemeris, freqs, nu0=None, bw=None,
 
 def make_fake_pulsar(modelfile, ephemeris, outfile="fake_pulsar.fits", nsub=1,
         npol=1, nchan=512, nbin=1048, nu0=1500.0, bw=800.0, tsub=300.0,
-        phase=0.0, dDM=0.0, start_MJD=None, weights=None, noise_std=1.0,
-        scale=1.0, dedisperse=False, t_scat=0.0, alpha=scattering_alpha,
-        bw_scint=None, state="Coherence", obs="GBT", quiet=False):
+        phase=0.0, nu_ref=np.inf, dDM=0.0, start_MJD=None, weights=None,
+        noise_std=1.0, scale=1.0, dedisperse=False, t_scat=0.0,
+        alpha=scattering_alpha, bw_scint=None, state="Coherence", obs="GBT",
+        quiet=False):
     """
     Mostly written by PBD.
-    'phase' [rot] is an arbitrary rotation to all subints.
+    'phase' [rot] is an arbitrary rotation to all subints, with respect to
+        nu_ref.
     'dDM' [cm**-3 pc] is an additional DM to what is given in ephemeris.
+    Dispersion occurs at infinite frequency.
     """
     chanwidth = bw / nchan
     lofreq = nu0 - (bw/2)
@@ -1487,6 +1507,7 @@ def make_fake_pulsar(modelfile, ephemeris, outfile="fake_pulsar.fits", nsub=1,
             PSR = par.PSRJ
         DECJ = par.DECJ
         RAJ = par.RAJ
+        P0 = par.P0
         DM = par.DM
     except ImportError:
         parfile = open(ephemeris,"r").readlines()
@@ -1498,6 +1519,10 @@ def make_fake_pulsar(modelfile, ephemeris, outfile="fake_pulsar.fits", nsub=1,
                 RAJ = param[1]
             elif param[0] == "DECJ":
                 DECJ = param[1]
+            elif param[0] == "F0":
+                P0 = float(param[1])**-1
+            elif param[0] == "P0":
+                P0 = float(param[1])
             elif param[0] == "DM":
                 DM = float(line[1])
             else:
@@ -1529,7 +1554,7 @@ def make_fake_pulsar(modelfile, ephemeris, outfile="fake_pulsar.fits", nsub=1,
     arch.set_ephemeris(ephemeris)
     #Now finally, fill in the data!
     #NB the different pols are not realistic: same model, same noise_std
-    name, ngauss, model = read_model(modelfile, phases, freqs, quiet=quiet)
+    name, ngauss, model = read_model(modelfile, phases, freqs, P0, quiet)
     #If wanting to use PSRCHIVE's rotation scheme, uncomment the dedisperse and
     #dededisperse lines, and set rotmodel = model.
     arch.set_dedispersed(False)
@@ -1539,7 +1564,8 @@ def make_fake_pulsar(modelfile, ephemeris, outfile="fake_pulsar.fits", nsub=1,
     for subint in arch:
         P = subint.get_folding_period()
         for ipol in xrange(npol):
-            rotmodel = rotate_portrait(model, -phase, -(DM+dDM), P, freqs, nu0)
+            rotmodel = rotate_portrait(model, -phase, -(DM+dDM), P, freqs,
+                    nu_ref)
             #rotmodel = model
             if t_scat:
                 sk = scattering_kernel(t_scat, nu0, freqs, phases, P,
@@ -1622,11 +1648,11 @@ def write_princeton_TOA(TOA_MJDi, TOA_MJDf, TOA_err, nu_ref, dDM, obs='@',
     if nu_ref == np.inf: nu_ref = 0.0
     #Splice together the fractional and integer MJDs
     TOA = "%5d"%int(TOA_MJDi) + ("%.13f"%TOA_MJDf)[1:]
-    if dDM != 0.0:
-        print obs + " %13s %8.3f %s %8.3f              %9.5f"%(name, nu_ref,
-                TOA, TOA_err, dDM)
-    else:
-        print obs + " %13s %8.3f %s %8.3f"%(name, nu_ref, TOA, TOA_err)
+    #if dDM != 0.0:
+    print obs + " %13s %8.3f %s %8.3f              %9.5f"%(name, nu_ref, TOA,
+            TOA_err, dDM)
+    #else:
+    #    print obs + " %13s %8.3f %s %8.3f"%(name, nu_ref, TOA, TOA_err)
 
 def show_portrait(port, phases=None, freqs=None, title=None, prof=True,
         fluxprof=True, rvrsd=False, colorbar=True, savefig=False,

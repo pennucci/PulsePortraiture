@@ -77,7 +77,8 @@ class GetTOAs:
             del(data)
 
     def get_TOAs(self, datafile=None, nu_ref=None, DM0=None, bary_DM=True,
-            bounds=[(None, None), (None, None)], show_plot=False, quiet=False):
+            fit_DM=True, bounds=[(None, None), (None, None)], show_plot=False,
+            quiet=False):
         """
         """
         self.nu_ref = nu_ref
@@ -132,6 +133,8 @@ class GetTOAs:
                 DM0 = DM_stored
             else:
                 DM0 = self.DM0
+            if not fit_DM:
+                bounds[1] = (DM0, DM0)
             if not quiet:
                 print "\nEach of the %d TOAs are approximately %.2f s"%(nsubx,
                         arch.integration_length() / nsub)
@@ -240,7 +243,7 @@ class GetTOAs:
                 #TOA = calculate_TOA(epochs[isubx], P, phi, DM, nu_fit, nu_ref)
                 phi_prime = phase_transform(phi, DM, nu_fit, nu_ref, P)
                 TOA = epochs[isubx] + pr.MJD((phi_prime * P) / (3600 * 24.))
-                #Do errors change?
+                #Do errors change? YES
                 TOA_err = phi_err * P * 1e6 # [us]
                 ##########################
                 #DOPPLER CORRECTION OF DM#
@@ -697,6 +700,9 @@ if __name__ == "__main__":
                       action="store", metavar="errfile", dest="errfile",
                       default=None,
                       help="If specified, will write the fitted DM errors to errfile. Will append.")
+    parser.add_option("--fix_DM",
+                      action="store_false", dest="fit_DM", default=True,
+                      help="Do not fit for DM.  NB: you'll want to also use --no_bary_DM.")
     parser.add_option("--pam_cmd",
                       action="store_true", dest="pam_cmd", default=False,
                       help='Append pam commands to file "pam_cmd."')
@@ -734,6 +740,7 @@ if __name__ == "__main__":
     if DM0: DM0 = float(DM0)
     bary_DM = options.bary_DM
     one_DM = options.one_DM
+    fit_DM = options.fit_DM
     pam_cmd = options.pam_cmd
     outfile = options.outfile
     errfile = options.errfile
@@ -747,7 +754,7 @@ if __name__ == "__main__":
         datafiles = metafile
     gt = GetTOAs(datafiles=datafiles, modelfile=modelfile, common=common,
             quiet=quiet)
-    gt.get_TOAs(nu_ref=nu_ref, DM0=DM0, bary_DM=bary_DM, show_plot=showplot,
-            quiet=quiet)
+    gt.get_TOAs(nu_ref=nu_ref, DM0=DM0, bary_DM=bary_DM, fit_DM=fit_DM,
+            show_plot=showplot, quiet=quiet)
     gt.write_TOAs(outfile=outfile, one_DM=one_DM, dmerrfile=errfile)
     if pam_cmd: gt.write_pam_cmds()
