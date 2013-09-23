@@ -471,7 +471,7 @@ def fit_portrait_function_deriv(params, model=None, p_n=None, data=None,
     return np.array([d_phi, d_DM])
 
 def fit_portrait_function_2deriv(params, model=None, p_n=None, data=None,
-        errs=None, P=None, freqs=None, nu_ref=np.inf, transform=False):
+        errs=None, P=None, freqs=None, nu_ref=np.inf):
     """
     Returns the three unique values in the Hessian, which is a 2x2
     symmetric matrix of the second-derivatives of fit_portrait_function(...).
@@ -486,40 +486,32 @@ def fit_portrait_function_2deriv(params, model=None, p_n=None, data=None,
     """
     phase = params[0]
     D = Dconst * params[1] / P
-    if transform:
-        ii = 2
-    else:
-        ii = 1
-    while(ii):
-        d2_phi, d2_DM, d2_cross = 0.0, 0.0, 0.0
-        W_n = np.empty(len(freqs))
-        for nn in xrange(len(freqs)):
-            freq = freqs[nn]
-            p = p_n[nn]
-            err = errs[nn]
-            harmind = np.arange(len(model[nn]))
-            phasor = np.exp(harmind * 2.0j * np.pi * (phase + (D *
-                (freq**-2.0 - nu_ref**-2.0))))
-            Cdp = np.real(data[nn,:] * np.conj(model[nn,:]) * phasor).sum()
-            dCdp1 = np.real(2.0j * np.pi * harmind * data[nn,:] *
-                    np.conj(model[nn,:]) * phasor).sum()
-            dCdp2 = np.real(pow(2.0j * np.pi * harmind, 2.0) * data[nn,:] *
-                    np.conj(model[nn,:]) * phasor).sum()
-            dDM = (freq**-2.0 - nu_ref**-2.0) * (Dconst/P)
-            W = (pow(dCdp1, 2.0) + (Cdp * dCdp2))
-            W_n[nn] = W / (err**2.0 * p)
-            d2_phi += -2.0 * W / (err**2.0 * p)
-            d2_DM += -2.0 * W * dDM**2.0 / (err**2.0 * p)
-            d2_cross += -2.0 * W * dDM / (err**2.0 * p)
-        ii -= 1
-        if ii:
-            nu_zero = (W_n.sum() / np.sum(W_n * freqs**-2))**0.5
-            phase = phase_transform(phase, params[1], nu_ref, nu_zero, P)
-            nu_ref = nu_zero
-    if transform:
-        return (np.array([d2_phi, d2_DM, d2_cross]), nu_zero)
-    else:
-        return (np.array([d2_phi, d2_DM, d2_cross]), nu_ref)
+    d2_phi, d2_DM, d2_cross = 0.0, 0.0, 0.0
+    W_n = np.empty(len(freqs))
+    for nn in xrange(len(freqs)):
+        freq = freqs[nn]
+        p = p_n[nn]
+        err = errs[nn]
+        harmind = np.arange(len(model[nn]))
+        phasor = np.exp(harmind * 2.0j * np.pi * (phase + (D *
+            (freq**-2.0 - nu_ref**-2.0))))
+        Cdp = np.real(data[nn,:] * np.conj(model[nn,:]) * phasor).sum()
+        dCdp1 = np.real(2.0j * np.pi * harmind * data[nn,:] *
+                np.conj(model[nn,:]) * phasor).sum()
+        dCdp2 = np.real(pow(2.0j * np.pi * harmind, 2.0) * data[nn,:] *
+                np.conj(model[nn,:]) * phasor).sum()
+        dDM = (freq**-2.0 - nu_ref**-2.0) * (Dconst/P)
+        W = (pow(dCdp1, 2.0) + (Cdp * dCdp2))
+        W_n[nn] = W / (err**2.0 * p)
+        d2_phi += -2.0 * W / (err**2.0 * p)
+        d2_DM += -2.0 * W * dDM**2.0 / (err**2.0 * p)
+        d2_cross += -2.0 * W * dDM / (err**2.0 * p)
+    nu_zero = (W_n.sum() / np.sum(W_n * freqs**-2))**0.5
+    return (np.array([d2_phi, d2_DM, d2_cross]), nu_zero)
+
+def fit_portrait_function_2deriv_full(params, model=None, p_n=None, data=None,
+        errs=None, P=None, freqs=None, nu_ref=np.inf):
+    return 0
 
 def estimate_portrait(phase, DM, data, scales, P, freqs, nu_ref=np.inf):
     #here, all vars have additional epoch-index except nu_ref
@@ -783,30 +775,9 @@ def fit_gaussian_portrait(data, init_params, errs, fit_flags, phases, freqs,
         print "---------------------------------------------------------------"
     return fitted_params, chi_sq, dof
 
-def fit_portrait(data, model, init_params, P, freqs, nu_ref=np.inf,
-        bounds=[(None, None), (None, None)], id=None, quiet=True):
+def fit_portrait(data, model, init_params, P, freqs, nu_fit=np.inf,
+        nu_out=None, bounds=[(None, None), (None, None)], id=None, quiet=True):
     """
-    Fits a phase-frequency pulse portrait to data for a phase offset and
-    dispersion measure (DM) by minimizing the calculated chi**2 function using
-    scipy.optimize's truncated Netownian algorithm.
-    Returns the best-fit phase and DM values, an nchan array of scaling
-    amplitudes, a 2 + nchan array of parameter error estimates, the
-    zero-covariance frequency [MHz] used to estimate the errors, the covariance
-    between the phase and DM parameters (should be close to zero), the reduced
-    chi**2 value, the duration of the fit, the number of function calls, and
-    the fit's return code.
-
-    data and model are both nchan x nbin phase-frequency portraits.
-    init_params is the array containing the initial guesses for [phase, DM],
-    where phase has units [rot] and DM has units [cm**-3 pc].
-    P is the period [s] of the pulsar at the given epoch.
-    freqs in the array of frequencies [MHz] at which to calculate the model.
-    nu_ref is the frequency [MHz] that is designated to have zero delay from a
-    non-zero dispersion measure.
-    bounds is an array of two 2-tuples giving upper and lower bounds for the
-    two parameters (default is no bounds).
-    id is an option tag to identify this particular fit.
-    quiet=True suppresses output [default].
     """
     #tau = precision = 1/variance
     #FIX Need to use better filtering instead of frac in get_noise
@@ -823,14 +794,14 @@ def fit_portrait(data, model, init_params, P, freqs, nu_ref=np.inf,
         np.conj(dFFT)))))
     p_n = np.real(np.sum(mFFT * np.conj(mFFT), axis=1))
     #BEWARE BELOW! Order matters!
-    other_args = (mFFT, p_n, dFFT, errs, P, freqs, nu_ref)
+    other_args = (mFFT, p_n, dFFT, errs, P, freqs, nu_fit)
     minimize = opt.minimize
     #fmin_tnc seems to work best, fastest
     method = 'TNC'
     start = time.time()
     results = minimize(fit_portrait_function, init_params, args=other_args,
             method=method, jac=fit_portrait_function_deriv, bounds=bounds,
-            options={'disp':False})
+            options={'maxiter':1000, 'disp':False})
     duration = time.time() - start
     phi = results.x[0]
     DM = results.x[1]
@@ -858,17 +829,27 @@ def fit_portrait(data, model, init_params, P, freqs, nu_ref=np.inf,
                 %(results.status, rcstring))
     #Curvature matrix = 1/2 2deriv of chi2 (cf. Gregory sect 11.5)
     #Parameter errors are related to curvature matrix by **-0.5 
-    hessian, nu_zero = fit_portrait_function_2deriv(np.array([phi, DM]),
-        mFFT, p_n, dFFT, errs, P, freqs, nu_ref, True)
-    #These errors are only "accurate" for the zero-covariance esimates
-    param_errs = list(pow(0.5*hessian[:2], -0.5))
+    #Calculate nu_zero
+    nu_zero = fit_portrait_function_2deriv(np.array([phi, DM]), mFFT,
+            p_n, dFFT, errs, P, freqs, nu_fit)[1]
+    if nu_out is None:
+        nu_out = nu_zero
+    phi_out = phase_transform(phi, DM, nu_fit, nu_out, P)
+    #Calculate Hessian
+    hessian = fit_portrait_function_2deriv(np.array([phi_out, DM]),
+            mFFT, p_n, dFFT, errs, P, freqs, nu_out)[0]
+    hessian = np.array([[hessian[0], hessian[2]], [hessian[2], hessian[1]]])
+    covariance_matrix = np.linalg.inv(0.5*hessian)
+    covariance = covariance_matrix[0,1]
+    #These are true 1-sigma errors iff covariance = 0
+    param_errs = list(covariance_matrix.diagonal()**0.5)
     DoF = len(data.ravel()) - (len(freqs) + 2)
     red_chi2 = (d + results.fun) / DoF
-    scales = get_scales(data, model, phi, DM, P, freqs, nu_ref)
-    #Errors on scales, if ever needed
+    scales = get_scales(data, model, phi, DM, P, freqs, nu_fit)
+    #Errors on scales, if ever needed (these are wrong b/c of covariances)
     param_errs += list(pow(p_n / errs**2.0, -0.5))
     #The below should be changed to a DataBunch
-    return (phi, DM, scales, np.array(param_errs), nu_zero, hessian[2],
+    return (phi_out, DM, scales, np.array(param_errs), nu_out, covariance,
             red_chi2, duration, nfeval, return_code)
 
 def fit_phase_shift(data, model, bounds=[-0.5, 0.5]):
@@ -1101,11 +1082,13 @@ def DM_delay(DM, freq, freq2=np.inf, P=None):
     else:
         return delay
 
-def phase_transform(phi, DM, freq1=np.inf, freq2=np.inf, P=None, mod=True):
+def phase_transform(phi, DM, nu_ref1=np.inf, nu_ref2=np.inf, P=None, mod=True):
     """
+    From nu_ref1 --> nu_ref2
+    Default behavior is for P=1.0, i.e. transform delays [sec]
     """
-    if P is None: P= 1.0
-    phi_prime =  phi + (Dconst * DM * P**-1 * (freq2**-2.0 - freq1**-2.0))
+    if P is None: P = 1.0
+    phi_prime =  phi + (Dconst * DM * P**-1 * (nu_ref2**-2.0 - nu_ref1**-2.0))
     if mod:
         #phi_prime %= 1
         phi_prime = np.where(abs(phi_prime) >= 0.5, phi_prime % 1, phi_prime)
@@ -1466,14 +1449,12 @@ def write_archive(data, ephemeris, freqs, nu0=None, bw=None,
 
 def make_fake_pulsar(modelfile, ephemeris, outfile="fake_pulsar.fits", nsub=1,
         npol=1, nchan=512, nbin=1048, nu0=1500.0, bw=800.0, tsub=300.0,
-        phase=0.0, nu_ref=np.inf, dDM=0.0, start_MJD=None, weights=None,
-        noise_std=1.0, scale=1.0, dedisperse=False, t_scat=0.0,
-        alpha=scattering_alpha, bw_scint=None, state="Coherence", obs="GBT",
-        quiet=False):
+        phase=0.0, dDM=0.0, start_MJD=None, weights=None, noise_std=1.0,
+        scale=1.0, dedisperse=False, t_scat=0.0, alpha=scattering_alpha,
+        bw_scint=None, state="Coherence", obs="GBT", quiet=False):
     """
     Mostly written by PBD.
-    'phase' [rot] is an arbitrary rotation to all subints, with respect to
-        nu_ref.
+    'phase' [rot] is an arbitrary rotation to all subints, with respect to nu0.
     'dDM' [cm**-3 pc] is an additional DM to what is given in ephemeris.
     Dispersion occurs at infinite frequency.
     """
@@ -1564,8 +1545,7 @@ def make_fake_pulsar(modelfile, ephemeris, outfile="fake_pulsar.fits", nsub=1,
     for subint in arch:
         P = subint.get_folding_period()
         for ipol in xrange(npol):
-            rotmodel = rotate_portrait(model, -phase, -(DM+dDM), P, freqs,
-                    nu_ref)
+            rotmodel = rotate_portrait(model, -phase, -(DM+dDM), P, freqs, nu0)
             #rotmodel = model
             if t_scat:
                 sk = scattering_kernel(t_scat, nu0, freqs, phases, P,

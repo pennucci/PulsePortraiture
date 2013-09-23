@@ -318,7 +318,7 @@ class DataPortrait:
                         self.red_chi2, self.fit_duration, self.nfeval,
                         self.rc) = fit_portrait(self.portx, self.modelx,
                                 np.array([phase_guess, DM_guess]), self.Ps[0],
-                                self.freqsxs[0], self.nu_fit,
+                                self.freqsxs[0], self.nu_fit, None,
                                 bounds=[(None, None), (None, None)], id=None,
                                 quiet=True)
                 self.phierr = param_errs[0]

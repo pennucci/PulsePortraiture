@@ -21,7 +21,7 @@ class GetTOAs:
         self.obs = []
         self.nu0s = []
         self.nu_fits = []
-        self.nu_zeros = []
+        self.nu_refs = []
         self.nsubxs = []
         self.epochs = []
         self.MJDs = []
@@ -77,8 +77,8 @@ class GetTOAs:
             del(data)
 
     def get_TOAs(self, datafile=None, nu_ref=None, DM0=None, bary_DM=True,
-            fit_DM=True, bounds=[(None, None), (None, None)], show_plot=False,
-            quiet=False):
+            fit_DM=True, bounds=[(None, None), (None, None)], nu_fit=None,
+            show_plot=False, quiet=False):
         """
         """
         self.nu_ref = nu_ref
@@ -109,7 +109,7 @@ class GetTOAs:
             else:
                 model = self.model
             nu_fits = np.empty(nsubx, dtype=np.float)
-            nu_zeros = np.empty(nsubx, dtype=np.float)
+            nu_refs = np.empty(nsubx, dtype=np.float)
             phis = np.empty(nsubx, dtype=np.double)
             phi_errs = np.empty(nsubx, dtype=np.double)
             TOAs = np.empty(nsubx, dtype="object")
@@ -126,6 +126,7 @@ class GetTOAs:
             scale_errs = []
             red_chi2s = np.empty(nsubx)
             covariances = np.empty(nsubx)
+            #PSRCHIVE epochs are *midpoint* of the integration
             MJDs = np.array([epochs[isub].in_days()
                 for isub in xrange(nsub)], dtype=np.double)
             DM_stored = arch.get_dispersion_measure()
@@ -157,13 +158,16 @@ class GetTOAs:
                     freqsx = np.compress(tot_weights, freqs)
                     portx = np.compress(tot_weights, subints[isub][0], axis=0)
                     modelx = np.compress(tot_weights, model, axis=0)
-                #A proxy for SNR, hopefully proportional:
+                #A proxy for SNR:
                 channel_SNRs = portx.std(axis=1) / get_noise(portx, chans=True)
-                #This is the frequency used in the fit for DM and phase, which
-                #minimizes the covariance.  The zero-covariance frequency,
-                #nu_zero is calculated after.
-                nu_fit = guess_fit_freq(freqsx, channel_SNRs)
-                #nu_fit = freqsx[-1]
+                #nu_fit is a guess at nu_zero, the zero-covariance frequency,
+                #which is calculated after. This attempts to minimize the
+                #number of function calls.  Lower frequencies mean more calls,
+                #and the discrepancy in the phase estimates is at the sub-1ns
+                #level, and sub-micro-DM level; the covariances are also
+                #different, but all very similar as well.
+                if nu_fit is None:
+                    nu_fit = guess_fit_freq(freqsx, channel_SNRs)
                 nu_fits[isubx] = nu_fit
 
                 ####################
@@ -177,74 +181,53 @@ class GetTOAs:
                 #nu0 = doppler_correct_freqs(nu0, df)
                 ####################
 
-                #Initial guess; have to be careful, since the subints are 
+                ###############
+                #INITIAL GUESS#
+                ###############
+                #Having only one initial guess doesn't speed things up (at all)
+                #Having multiple initial guesses is better for generality,
+                #eg. binary systems with poorly determined parameters.
+                #One may envision a system that uses the previous phase
+                #estimate as the next guess, but that could be bad, if one
+                #subint is contaminated or very poorly determined.
+                #Also have to be careful below, since the subints are 
                 #dedispersed at different nu_fit
-                if isubx == 0:
-                    mean_port = np.transpose(weights.mean(axis=0) *
-                            np.transpose(subints.mean(axis=0)[0]))
-                    rot_port = rotate_portrait(mean_port, 0.0,
-                            DM_stored, P, freqs, nu_fit)
-                    #PSRCHIVE Dedisperses w.r.t. center of band, which is
-                    #different, in general, from nu_fit; this results in an
-                    #(appropriate) phase offset w.r.t to what would be seen
-                    #in the PSRCHIVE dedispersed portrait.
-                    #A single phase_guess per file may not be appropriate if
-                    #the pulsar is in a short-period binary...
-                    phase_guess = fit_phase_shift(rot_port.mean(axis=0),
-                            model.mean(axis=0)).phase
-                    DM_guess = DM_stored
-                    #Currently, fit_phase_shift returns an unbounded phase,
-                    #so here we transform to be on the interval [-0.5, 0.5]
-                    phase_guess_0 = phase_guess % 1
-                    if phase_guess_0 > 0.5:
-                        phase_guess_0 -= 1.0
-                phase_guess = phase_transform(phase_guess_0, DM_guess,
-                        nu_fits[0], nu_fit, P)
-                #    if not quiet: print "Phase guess: %.8f ; DM guess: %.5f"%(
-                #            phase_guess, DM_guess)
-                #The below else clause might not be a good idea if RFI or
-                #something throws it completely off, whereas first phase_guess
-                #only depends on pulse profile...but there may be special cases
-                #when invidual guesses are needed.
-                #else:
-                #    phase_guess = phis[isubx-1]
-                #    DM_guess = DMs[isubx-1]
-                #   if not quiet:
-                #       print """
-                #       Phase guess: %.8f
-                #       DM guess:    %.5f"""%(phase_guess, DM_guess)
-                #
+                rot_port = rotate_portrait(portx, 0.0,
+                        DM_stored, P, freqsx, nu_fit)
+                #PSRCHIVE Dedisperses w.r.t. center of band, which is
+                #different, in general, from nu_fit; this results in a
+                #phase offset w.r.t to what would be seen in the PSRCHIVE
+                #dedispersed portrait.
+                phase_guess = fit_phase_shift(rot_port.mean(axis=0),
+                        model.mean(axis=0)).phase
+                #Currently, fit_phase_shift returns an unbounded phase,
+                #so here we transform to be on the interval [-0.5, 0.5]
+                #This may not be needed, but hasn't proved dangerous yet...
+                phase_guess = phase_guess % 1
+                if phase_guess > 0.5:
+                    phase_guess -= 1.0
+                DM_guess = DM_stored
                 #Need a status bar?
 
                 ####################
                 #      THE FIT     #
                 ####################
-                if not quiet: print "Fitting for TOA %d"%(isubx)
-                (phi, DM, scalex, param_errs, nu_zero, covariance, red_chi2,
+                if not quiet:
+                    print "Fitting for TOA %d"%(isubx)
+                (phi, DM, scalex, param_errs, nu_ref, covariance, red_chi2,
                         duration, nfeval, rc) = fit_portrait(portx, modelx,
                                 np.array([phase_guess, DM_guess]), P, freqsx,
-                                nu_fit, bounds=bounds, id = id, quiet=quiet)
+                                nu_fit, self.nu_ref, bounds=bounds, id = id,
+                                quiet=quiet)
                 phi_err, DM_err = param_errs[0], param_errs[1]
                 fit_duration += duration
 
                 ####################
                 #  CALCULATE  TOA  #
                 ####################
-                if self.nu_ref is None:
-                    #nu_ref = nu0
-                    nu_ref = nu_zero
-                elif self.nu_ref == "nu_fit":
-                    nu_ref = nu_fit
-                else:
-                    nu_ref = self.nu_ref
-                #Phase conversion
-                #The pre-Doppler corrected DM must be used
-                #See calculate_TOA; I avoid the external function call here.
-                #TOA = calculate_TOA(epochs[isubx], P, phi, DM, nu_fit, nu_ref)
-                phi_prime = phase_transform(phi, DM, nu_fit, nu_ref, P)
-                TOA = epochs[isubx] + pr.MJD((phi_prime * P) / (3600 * 24.))
-                #Do errors change? YES
+                TOA = epochs[isubx] + pr.MJD((phi * P) / (3600 * 24.))
                 TOA_err = phi_err * P * 1e6 # [us]
+
                 ##########################
                 #DOPPLER CORRECTION OF DM#
                 ##########################
@@ -257,7 +240,7 @@ class GetTOAs:
                 else:
                     doppler_fs[isubx] = 1.0
 
-                nu_zeros[isubx] = nu_zero
+                nu_refs[isubx] = nu_ref
                 phis[isubx] = phi
                 phi_errs[isubx] = phi_err
                 TOAs[isubx] = TOA
@@ -295,14 +278,15 @@ class GetTOAs:
             self.obs.append(arch.get_telescope())
             self.nu0s.append(nu0)
             self.nu_fits.append(nu_fits)
-            self.nu_zeros.append(nu_zeros)
+            self.nu_refs.append(nu_refs)
             self.nsubxs.append(nsubx)
             self.epochs.append(np.take(epochs, ok_isubs))
             self.MJDs.append(np.take(MJDs, ok_isubs))
             self.Ps.append(np.take(Ps, ok_isubs))
-            #NB: phis are w.r.t. nu_fit!!!
+            #NB: phis are w.r.t. nu_ref!!!
             self.phis.append(phis)
             self.phi_errs.append(phi_errs)
+            #NB: TOAs are w.r.t. nu_ref!!!
             self.TOAs.append(TOAs)
             self.TOA_errs.append(TOA_errs)
             #NB: DMs are Doppler corrected, if bary_DM is set!!!
@@ -357,23 +341,15 @@ class GetTOAs:
             nsubx = self.nsubxs[ifile]
             DM0 = self.DM0s[ifile]
             if nu_ref is None:
-                #Default to self.nu_ref
-                #Default to self.nu_zeros
+                #Default to self.nu_refs
                 if self.nu_ref is None:
-                    #nu_refs = self.nu0s[ifile] * np.ones(nsubx)
-                    nu_refs = self.nu_zeros[ifile]
-                elif self.nu_ref == "nu_fit":
-                    nu_refs = self.nu_fits[ifile]
+                    nu_refs = self.nu_refs[ifile]
                 else:
                     nu_refs = self.nu_ref * np.ones(nsubx)
                 TOAs = self.TOAs[ifile]
                 TOA_errs = self.TOA_errs[ifile]
             else:
-                if nu_ref == "nu_fit":
-                    nu_refs = self.nu_fits[ifile]
-                else:
-                    nu_refs = nu_ref * np.ones(nsubx)
-                nu_fits = self.nu_fits[ifile]
+                nu_refs = nu_ref * np.ones(nsubx)
                 epochs = self.epochs[ifile]
                 Ps = self.Ps[ifile]
                 phis = self.phis[ifile]
@@ -381,11 +357,10 @@ class GetTOAs:
                 TOA_errs = self.TOA_errs[ifile]
                 DMs = self.DMs[ifile]
                 DMs_fitted = DMs / self.doppler_fs[ifile]
-                isubx=0
                 for isubx in range(nsubx):
                     TOAs[isubx] = calculate_TOA(epochs[isubx], Ps[isubx],
-                            phis[isubx], DMs_fitted[isubx], nu_fits[isubx],
-                            nu_refs[isubx])
+                            phis[isubx], DMs_fitted[isubx],
+                            self.nu_refs[ifile][isubx], nu_refs[isubx])
             try:
                 obs_code = obs_codes["%s"%self.obs[ifile].lower()]
             except KeyError:
@@ -686,7 +661,7 @@ if __name__ == "__main__":
     parser.add_option("--nu_ref",
                       action="store", metavar="nu_ref", dest="nu_ref",
                       default=None,
-                      help="Frequency [MHz] to which the fitted TOAs/DMs are referenced, i.e. the frequency that has zero delay from a non-zero DM. 'inf' is used for inifite frequency.  If the special string 'nu_fit' is used, the TOAs will be referenced to the frequency used in the fit. [default=nu_zero (zero-covariance frequency, recommended)]")
+                      help="Frequency [MHz] to which the output TOAs are referenced, i.e. the frequency that has zero delay from a non-zero DM. 'inf' is used for inifite frequency.  [default=nu_zero (zero-covariance frequency, recommended)]")
     parser.add_option("--DM",
                       action="store", metavar="DM", dest="DM0", default=None,
                       help="Nominal DM [cm**-3 pc] (float) from which to measure offset.  If unspecified, will use the DM stored in the archive.")
@@ -732,8 +707,6 @@ if __name__ == "__main__":
     if nu_ref:
         if nu_ref == "inf":
             nu_ref = np.inf
-        elif nu_ref == "nu_fit":
-            pass
         else:
             nu_ref = float(nu_ref)
     DM0 = options.DM0
