@@ -1259,10 +1259,14 @@ def unpack_dict(data):
     for key in data.keys():
         exec(key + " = data['" + key + "']")
 
-def write_model(filenm, name, nu_ref, model_params, fit_flags):
+def write_model(filenm, name, nu_ref, model_params, fit_flags, append=False,
+        quiet=False):
     """
     """
-    outfile = open(filenm, "a")
+    if append:
+        outfile = open(filenm, "a")
+    else:
+        outfile = open(filenm, "w")
     outfile.write("MODEL  %s\n"%name)
     outfile.write("FREQ   %.4f\n"%nu_ref)
     outfile.write("DC     %.8f  %d\n"%(model_params[0], fit_flags[0]))
@@ -1274,7 +1278,7 @@ def write_model(filenm, name, nu_ref, model_params, fit_flags):
         line = (igauss + 1, ) + tuple(np.array(zip(comp, fit_comp)).ravel())
         outfile.write("COMP%02d %1.8f  %d  % 10.8f  %d  % 10.8f  %d  % 10.8f  %d  % 12.8f  %d  % 12.8f  %d\n"%line)
     outfile.close()
-    print "%s written."%filenm
+    if not quiet: print "%s written."%filenm
 
 def read_model(modelfile, phases=None, freqs=None, P=None, quiet=False):
     """
@@ -1609,6 +1613,30 @@ def quick_add_archs(metafile, outfile, rotate=False, fiducial=0.5,
     arch.dedisperse()
     arch.unload()
     print "\nUnloaded %s"%outfile
+
+def add_scintillation(port, params=None, random=False, nsin=2, amax=1.0,
+        wmax=3.0):
+    """
+    Should be used before adding noise.
+    params are triplets of "amps", "freqs" [cycles], and "phases" [cycles]
+    """
+    nchan = len(port)
+    pattern = np.zeros(nchan)
+    if params is None and random is False:
+        return port
+    elif params is not None:
+        nsin = len(params)/3
+        for isin in xrange(nsin):
+            a,w,p = params[isin*3:isin*3 + 3]
+            pattern += a * np.sin(np.linspace(0, w * np.pi, nchan) +
+                    p*np.pi)**2
+    else:
+        for isin in range(nsin):
+            (a,w,p) = (np.random.uniform(0,amax),
+                    np.random.chisquare(wmax), np.random.uniform(0,1))
+            pattern += a * np.sin(np.linspace(0, w * np.pi, nchan) +
+                    p*np.pi)**2
+    return np.transpose(np.transpose(port) * pattern)
 
 def write_princeton_TOA(TOA_MJDi, TOA_MJDf, TOA_err, nu_ref, dDM, obs='@',
         name=' ' * 13):

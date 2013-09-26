@@ -58,6 +58,7 @@ class DataPortrait:
                     self.join_nchans.append(self.nchan)
                     self.join_nchanxs.append(self.nchanx)
                     prof = data.prof
+                    #Why is this negative?
                     phi = -fit_phase_shift(prof, refprof).phase
                     self.join_params.append(phi)
                     self.join_fit_flags.append(1)
@@ -236,6 +237,8 @@ class DataPortrait:
         iterator = self.model_iteration(quiet)
         iterator.next()
         self.cnvrgnc = self.check_convergence(efac=1.0, quiet=quiet)
+        if writemodel:
+            self.write_model(outfile=outfile, quiet=quiet)
         while (self.niter and not self.cnvrgnc):
             if self.cnvrgnc:
                 break
@@ -256,6 +259,9 @@ class DataPortrait:
                 print "Fitting gaussian model portrait..."
             iterator.next()
             self.niter -= 1
+            #For safety, write model after each iteration
+            if writemodel:
+                self.write_model(outfile=outfile, quiet=quiet)
             self.cnvrgnc = self.check_convergence(efac=1.0, quiet=quiet)
         if not quiet:
             print "Residuals mean: %.2e"%(self.portx - self.modelx).mean()
@@ -264,16 +270,6 @@ class DataPortrait:
             print "Total fit time: %.2f min"%(self.total_time / 60.0)
             print "Total time:     %.2f min\n"%((time.time() - self.start) /
                     60.0)
-        if writemodel:
-            if outfile is None:
-                outfile = self.datafile + ".gmodel"
-            model_params = np.copy(self.model_params)
-            #Aesthetic mod?
-            model_params[2::6] = np.where(model_params[2::6] >= 1.0,
-                    model_params[2::6] % 1, model_params[2::6])
-            model_params[1] *= self.Ps[0] / self.nbin
-            write_model(outfile, self.model_name, self.nu_ref, model_params,
-                    self.fit_flags)
         if residplot:
             resids = self.port - self.model_masked
             titles = ("%s"%self.datafile, "%s"%self.model_name, "Residuals")
@@ -291,6 +287,7 @@ class DataPortrait:
                         self.freqsxs[0], self.nu_ref, self.all_join_params,
                         self.Ps[0], quiet=quiet))
             if self.njoin:
+                #FIX, convergence can be based on residuals
                 self.model_params = self.fitted_params[:-self.njoin*2]
                 self.join_params = self.fitted_params[-self.njoin*2:]
                 self.phi = 0.5
@@ -345,6 +342,17 @@ class DataPortrait:
                 return 1
         else:
             return 0
+
+    def write_model(self, outfile=None, append=False, quiet=False):
+        if outfile is None:
+            outfile = self.datafile + ".gmodel"
+        model_params = np.copy(self.model_params)
+        #Aesthetic mod?
+        model_params[2::6] = np.where(model_params[2::6] >= 1.0,
+                model_params[2::6] % 1, model_params[2::6])
+        model_params[1] *= self.Ps[0] / self.nbin
+        write_model(outfile, self.model_name, self.nu_ref, model_params,
+                self.fit_flags, append=append, quiet=quiet)
 
     def show_data_portrait(self):
         """
@@ -594,9 +602,9 @@ if __name__ == "__main__":
     parser.add_option("--tau",
                       action="store", metavar="tau", dest="tau", default=0.0,
                       help="Scattering timescale [sec] at nu_ref, assuming alpha=-4.0 (which can be changed internally).  [default=0]")
-    parser.add_option("--fixloc",
-                      action="store_true", dest="fixloc", default=False,
-                      help="Fix locations of gaussians across frequency. [default=False]")
+    parser.add_option("--fitloc",
+                      action="store_false", dest="fixloc", default=True,
+                      help="Do not fix locations of gaussians across frequency. Use this flag to allow gaussian components to drift with frequency. [default=False]")
     parser.add_option("--fixwid",
                       action="store_true", dest="fixwid", default=False,
                       help="Fix widths of gaussians across frequency. [default=False]")

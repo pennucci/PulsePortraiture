@@ -459,6 +459,7 @@ class GetTOAs:
         scales = self.scales[ifile][isubx]
         freqs = data.freqs
         nu_fit = self.nu_fits[ifile][isubx]
+        nu_ref = self.nu_refs[ifile][isubx]
         P = data.Ps[isubx]
         phases = data.phases
         weights = data.weights[isubx]
@@ -471,7 +472,7 @@ class GetTOAs:
                     freqs, data.Ps.mean(), quiet=quiet)
                     #freqs, data.Ps[isubx], quiet=quiet)
         port = rotate_portrait(data.subints[isubx,0], phi, DM_fitted, P, freqs,
-                nu_fit)
+                nu_ref)
         port = np.transpose(weights * np.transpose(port))
         model_scaled = np.transpose(scales * np.transpose(model))
         titles = ("%s\nSubintegrationx %d"%(datafile, isubx),
@@ -490,6 +491,7 @@ class GetTOAs:
             ifile = 0
         nsubx = self.nsubxs[ifile]
         nu_fits = self.nu_fits[ifile]
+        nu_refs = self.nu_refs[ifile]
         MJDs = self.MJDs[ifile]
         Ps = self.Ps[ifile]
         phis = self.phis[ifile]
@@ -507,7 +509,7 @@ class GetTOAs:
         pf = np.polynomial.polynomial.polyfit
         #This is to obtain the TOA phase offsets w.r.t. nu_ref
         #Apparently, changing phis in place changes self.phis ???
-        phi_primes = phase_transform(phis, DMs_fitted, nu_fits,
+        phi_primes = phase_transform(phis, DMs_fitted, nu_refs,
                     self.nu0s[ifile], Ps)
         #phi_primes may have N rotations incorporated...
         milli_sec_shifts = (phi_primes) * Ps * 1e3
