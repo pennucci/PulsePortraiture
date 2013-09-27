@@ -58,7 +58,6 @@ class DataPortrait:
                     self.join_nchans.append(self.nchan)
                     self.join_nchanxs.append(self.nchanx)
                     prof = data.prof
-                    #Why is this negative?
                     phi = -fit_phase_shift(prof, refprof).phase
                     self.join_params.append(phi)
                     self.join_fit_flags.append(1)
@@ -98,6 +97,7 @@ class DataPortrait:
             self.weights = np.array(self.weights)[self.isort]
             self.weights = [self.weights]
             self.port = np.array(self.port)[self.isort]
+            show_portrait(self.port)
             self.portx = np.array(self.portx)[self.isortx]
             self.freqs.sort()
             self.freqsxs.sort()

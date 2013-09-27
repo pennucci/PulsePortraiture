@@ -317,6 +317,30 @@ def add_scattering(data, kernel, repeat=3):
                 np.fft.rfft(d))[:, mid * nbin : (mid+1) * nbin]
     return scattered_data
 
+def add_scintillation(port, params=None, random=False, nsin=2, amax=1.0,
+        wmax=3.0):
+    """
+    Should be used before adding noise.
+    params are triplets of "amps", "freqs" [cycles], and "phases" [cycles]
+    """
+    nchan = len(port)
+    pattern = np.zeros(nchan)
+    if params is None and random is False:
+        return port
+    elif params is not None:
+        nsin = len(params)/3
+        for isin in xrange(nsin):
+            a,w,p = params[isin*3:isin*3 + 3]
+            pattern += a * np.sin(np.linspace(0, w * np.pi, nchan) +
+                    p*np.pi)**2
+    else:
+        for isin in range(nsin):
+            (a,w,p) = (np.random.uniform(0,amax),
+                    np.random.chisquare(wmax), np.random.uniform(0,1))
+            pattern += a * np.sin(np.linspace(0, w * np.pi, nchan) +
+                    p*np.pi)**2
+    return np.transpose(np.transpose(port) * pattern)
+
 def fit_powlaw_function(params, freqs, nu_ref, data=None, errs=None):
     """
     Function to pass to minimizer in fit_powlaw that returns residuals weighted    by errs**-1.
@@ -375,6 +399,8 @@ def fit_gaussian_portrait_function(params, phases, freqs, nu_ref, data=None,
 
 def fit_phase_shift_function(phase, model=None, data=None, err=None):
     """
+    Returns phase-offset such that data would have to be rotated (with
+    rotate_data or similar) by phase amount to match model.
     """
     harmind = np.arange(len(model))
     phasor = np.exp(harmind * 2.0j * np.pi * phase)
@@ -818,9 +844,9 @@ def fit_portrait(data, model, init_params, P, freqs, nu_fit=np.inf,
             ii += 1
             jj = ii + id[:-ii][::-1].index("_")
             isub = id[-jj:-ii]
-            filenm = id[:-jj-1]
+            filename = id[:-jj-1]
             sys.stderr.write(
-                    "Fit failed with return code %d -- %s; %s subint %s subintx %s\n"%(results.status, rcstring, filenm, isub, isubx))
+                    "Fit failed with return code %d -- %s; %s subint %s subintx %s\n"%(results.status, rcstring, filename, isub, isubx))
         else:
             sys.stderr.write(
                     "Fit failed with return code %d -- %s"%(results.status, rcstring))
@@ -968,7 +994,8 @@ def rotate_data(data, phase=0.0, DM=0.0, Ps=None, freqs=None,
     faxis, freqs needed if rotating for DM != 0.0
     taxis needed if len(Ps) > 1, for DM != 0.0
 
-    ***Need to change this convention***
+    ***Need to change this convention.  Seems intuituve to have positive phase
+    rotate to later, and positive DM rotate to later.***
     """
     shape = data.shape
     ndim = len(shape)
@@ -1131,7 +1158,7 @@ def calculate_TOA(epoch, P, phi, DM=0.0, nu_ref1=np.inf, nu_ref2=np.inf):
     TOA = epoch + pr.MJD((phi_prime * P) / (3600 * 24.))
     return TOA
 
-def load_data(filenm, dedisperse=False, dededisperse=False, tscrunch=False,
+def load_data(filename, dedisperse=False, dededisperse=False, tscrunch=False,
         pscrunch=False, fscrunch=False, rm_baseline=True, flux_prof=False,
         norm_weights=True, quiet=False):
     """
@@ -1140,10 +1167,10 @@ def load_data(filenm, dedisperse=False, dededisperse=False, tscrunch=False,
     Perhaps should have default to not returning arch (poten. memory problem)
     """
     #Load archive
-    arch = pr.Archive_load(filenm)
+    arch = pr.Archive_load(filename)
     source = arch.get_source()
     if not quiet:
-        print "\nReading data from %s on source %s..."%(filenm, source)
+        print "\nReading data from %s on source %s..."%(filename, source)
     #De/dedisperse?
     if dedisperse: arch.dedisperse()
     if dededisperse: arch.dededisperse()
@@ -1242,7 +1269,7 @@ def load_data(filenm, dedisperse=False, dededisperse=False, tscrunch=False,
     if norm_weights:
         weights = weights_norm
     #Return getitem/attribute-accessible class!
-    data = DataBunch(arch=arch, bw=bw, DM=DM, epochs=epochs,
+    data = DataBunch(arch=arch, bw=bw, DM=DM, epochs=epochs, filename=filename,
             flux_prof=flux_prof, flux_profx=flux_profx, freqs=freqs,
             freqsxs=freqsxs, masks=masks, nbin=nbin, nchan=nchan,
             nchanx=nchanx, noise_std=noise_std, nsub=nsub, nsubx=nsubx,
@@ -1259,14 +1286,14 @@ def unpack_dict(data):
     for key in data.keys():
         exec(key + " = data['" + key + "']")
 
-def write_model(filenm, name, nu_ref, model_params, fit_flags, append=False,
+def write_model(filename, name, nu_ref, model_params, fit_flags, append=False,
         quiet=False):
     """
     """
     if append:
-        outfile = open(filenm, "a")
+        outfile = open(filename, "a")
     else:
-        outfile = open(filenm, "w")
+        outfile = open(filename, "w")
     outfile.write("MODEL  %s\n"%name)
     outfile.write("FREQ   %.4f\n"%nu_ref)
     outfile.write("DC     %.8f  %d\n"%(model_params[0], fit_flags[0]))
@@ -1278,7 +1305,7 @@ def write_model(filenm, name, nu_ref, model_params, fit_flags, append=False,
         line = (igauss + 1, ) + tuple(np.array(zip(comp, fit_comp)).ravel())
         outfile.write("COMP%02d %1.8f  %d  % 10.8f  %d  % 10.8f  %d  % 10.8f  %d  % 12.8f  %d  % 12.8f  %d\n"%line)
     outfile.close()
-    if not quiet: print "%s written."%filenm
+    if not quiet: print "%s written."%filename
 
 def read_model(modelfile, phases=None, freqs=None, P=None, quiet=False):
     """
@@ -1613,30 +1640,6 @@ def quick_add_archs(metafile, outfile, rotate=False, fiducial=0.5,
     arch.dedisperse()
     arch.unload()
     print "\nUnloaded %s"%outfile
-
-def add_scintillation(port, params=None, random=False, nsin=2, amax=1.0,
-        wmax=3.0):
-    """
-    Should be used before adding noise.
-    params are triplets of "amps", "freqs" [cycles], and "phases" [cycles]
-    """
-    nchan = len(port)
-    pattern = np.zeros(nchan)
-    if params is None and random is False:
-        return port
-    elif params is not None:
-        nsin = len(params)/3
-        for isin in xrange(nsin):
-            a,w,p = params[isin*3:isin*3 + 3]
-            pattern += a * np.sin(np.linspace(0, w * np.pi, nchan) +
-                    p*np.pi)**2
-    else:
-        for isin in range(nsin):
-            (a,w,p) = (np.random.uniform(0,amax),
-                    np.random.chisquare(wmax), np.random.uniform(0,1))
-            pattern += a * np.sin(np.linspace(0, w * np.pi, nchan) +
-                    p*np.pi)**2
-    return np.transpose(np.transpose(port) * pattern)
 
 def write_princeton_TOA(TOA_MJDi, TOA_MJDf, TOA_err, nu_ref, dDM, obs='@',
         name=' ' * 13):
