@@ -158,12 +158,8 @@ class GetTOAs:
                     freqsx = np.compress(tot_weights, freqs)
                     portx = np.compress(tot_weights, subints[isub][0], axis=0)
                     modelx = np.compress(tot_weights, model, axis=0)
-                #A proxy for SNR (change this):
-                channel_SNRs = portx.std(axis=1) / get_noise(portx, chans=True)
-                #Adopted from Lorimer & Kramer '05
-                #Weq = portx.sum(axis=1) / portx.max(axis=1)
-                #channel_SNRs = portx.sum(axis=1) / (Weq**0.5 *
-                #        get_noise(portx, chans=True))
+                channel_SNRs = np.array([get_snr(portx[ichan]) for ichan in
+                    range(nchanx)])
                 #nu_fit is a guess at nu_zero, the zero-covariance frequency,
                 #which is calculated after. This attempts to minimize the
                 #number of function calls.  Lower frequencies mean more calls,

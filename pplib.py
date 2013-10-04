@@ -317,7 +317,7 @@ def add_scattering(data, kernel, repeat=3):
                 np.fft.rfft(d))[:, mid * nbin : (mid+1) * nbin]
     return scattered_data
 
-def add_scintillation(port, params=None, random=False, nsin=2, amax=1.0,
+def add_scintillation(port, params=None, random=True, nsin=2, amax=1.0,
         wmax=3.0):
     """
     Should be used before adding noise.
@@ -551,23 +551,18 @@ def estimate_portrait(phase, DM, data, scales, P, freqs, nu_ref=np.inf):
 
     cf. PBD's autotoa, PhDT
     """
-    #Next lines should be done just as in fit_portrait
     dFFT = fft.rfft(data, axis=2)
-    #Below is Precision FIX
-    unnorm_errs = np.real(dFFT[:, :, -len(dFFT[0,0])/4:]).std(axis=2)**-2.0
-    #norm_dFFT = np.transpose((unnorm_errs**0.5) * np.transpose(dFFT))
-    #norm_errs = np.real(norm_dFFT[:, :, -len(norm_dFFT[0,0])/4:]
-    #        ).std(axis=2)**-2.
-    errs = unnorm_errs
+    #errs = np.real(dFFT[:, :, -len(dFFT[0,0])/4:]).std(axis=2)**-2.0
+    errs = get_noise(data, chans=True) * np.sqrt(len(data[0])/2.0)
     D = Dconst * DM / P
     freqs2 = freqs**-2.0 - nu_ref**-2.0
     phiD = np.outer(D, freqs2)
     phiprime = np.outer(phase, np.ones(len(freqs))) + phiD
-    weight = np.sum(pow(scales, 2.0) * errs, axis=0)**-1
+    weight = np.sum(pow(scales, 2.0) / errs**2.0, axis=0)**-1
     phasor = np.array([np.exp(2.0j * np.pi * kk * phiprime) for kk in xrange(
         len(dFFT[0,0]))]).transpose(1,2,0)
-    p = np.sum(np.transpose(np.transpose(scales * errs) * np.transpose(phasor *
-        dFFT)), axis=0)
+    p = np.sum(np.transpose(np.transpose(scales / errs**2.0) *
+        np.transpose(phasor * dFFT)), axis=0)
     wp = np.transpose(weight * np.transpose(p))
     return wp
 
@@ -584,7 +579,6 @@ def wiener_filter(prof, noise):
     cf. PBD's PhDT
     """
     FFT = fft.rfft(prof)
-    #Check Normalization below
     pows = np.real(FFT * np.conj(FFT)) / len(prof)
     return pows / (pows + (noise**2))
     #return (pows - (noise**2)) / pows
@@ -805,17 +799,10 @@ def fit_portrait(data, model, init_params, P, freqs, nu_fit=np.inf,
         nu_out=None, bounds=[(None, None), (None, None)], id=None, quiet=True):
     """
     """
-    #tau = precision = 1/variance
-    #FIX Need to use better filtering instead of frac in get_noise
-    #FIX get_noise is not right
-    #errs = get_noise(data, tau=True, chans=True, fd=True, frac=4) 
     dFFT = fft.rfft(data, axis=1)
     mFFT = fft.rfft(model, axis=1)
-    #Precision FIX
-    unnorm_errs = np.real(dFFT[:, -len(dFFT[0])/4:]).std(axis=1)
-    norm_dFFT = np.transpose(unnorm_errs * np.transpose(dFFT))
-    norm_errs = np.real(norm_dFFT[:, -len(norm_dFFT[0])/4:]).std(axis=1)
-    errs = unnorm_errs
+    #errs = np.real(dFFT[:, -len(dFFT[0])/4:]).std(axis=1)
+    errs = get_noise(data, chans=True) * np.sqrt(len(data[0])/2.0)
     d = np.real(np.sum(np.transpose(errs**-2.0 * np.transpose(dFFT *
         np.conj(dFFT)))))
     p_n = np.real(np.sum(mFFT * np.conj(mFFT), axis=1))
@@ -883,8 +870,8 @@ def fit_phase_shift(data, model, bounds=[-0.5, 0.5]):
     """
     dFFT = fft.rfft(data)
     mFFT = fft.rfft(model)
-    #Substitute get_noise below when ready
-    err = np.real(dFFT[-len(dFFT)/4:]).std()
+    #err = np.real(dFFT[-len(dFFT)/4:]).std()
+    err = get_noise(data) * np.sqrt(len(data)/2.0)
     d = np.real(np.sum(dFFT * np.conj(dFFT))) / err**2.0
     p = np.real(np.sum(mFFT * np.conj(mFFT))) / err**2.0
     other_args = (mFFT, dFFT, err)
@@ -902,72 +889,37 @@ def fit_phase_shift(data, model, bounds=[-0.5, 0.5]):
     return DataBunch(errors=errors, phase=phase, red_chi2=red_chi2,
             scale=scale)
 
-def get_noise(data, frac=4, tau=False, chans=False, fd=False):
-    #FIX: Make sure to use on portraits w/o zapped freq. channels
-    #i.e. portxs
-    #FIX: MAKE SIMPLER!!!
-    #FIX: Implement k_max from wiener/brick-wall filter fit
-    #FIX This is not right 
+def get_noise(data, frac=4, chans=False):
     """
     """
-    shape = data.shape
-    if len(shape) == 1:
-        prof = data
-    elif shape[0] == 1:
-        prof = data[0]
-    elif shape[1] == 1:
-        prof = data[:,0]
-    else: pass
-    try:
-        FFT = fft.rfft(prof)
-        if fd:
-            if tau: return np.std(np.real(FFT)[-len(FFT)/frac:])**-2
-            #if tau: return (np.std(np.real(FFT)[-len(FFT)/frac:])**-2,
-            #        np.std(np.imag(FFT)[-len(FFT)/frac:])**-2)
-            else: return np.std(np.real(FFT)[-len(FFT)/frac:])
-            #else: return (np.std(np.real(FFT)[-len(FFT)/frac:]), np.std(
-            #    np.imag(FFT)[-len(FFT)/frac:]))
-        else:
-            #!!!CHECK NORMALIZATION BELOW
-            pows = np.real(FFT * np.conj(FFT)) / len(prof)
-            if tau:
-                return (np.mean(pows[-len(pows)/frac:]))**-1
-            else:
-                return np.sqrt(np.mean(pows[-len(pows)/frac:]))
-    except NameError:
+    if chans:
         noise = np.zeros(len(data))
-        if fd:
-            for ichan in xrange(len(noise)):
-                    prof = data[ichan]
-                    FFT = fft.rfft(prof)
-                    noise[ichan] = np.std(np.real(FFT)[-len(FFT)/frac:])
-            if chans:
-                if tau: return noise**-2
-                else: return noise
-            else:
-                if tau:
-                    #not statistically rigorous
-                    return np.median(noise)**-2
-                else:
-                    return np.median(noise)
-        else:
-            for ichan in xrange(len(noise)):
-                prof = data[ichan]
-                FFT = fft.rfft(prof)
-                #!!!CHECK NORMALIZATION BELOW
-                pows = np.real(FFT * np.conj(FFT)) / len(prof)
-                noise[ichan] = np.sqrt(np.mean(pows[-len(pows)/frac:]))
-            if chans:
-                if tau:
-                    return noise**-2
-                else:
-                    return noise
-            else:
-                if tau:
-                    #not statistically rigorous
-                    return np.median(noise)**-2
-                else:
-                    return np.median(noise)
+        for ichan in xrange(len(noise)):
+            prof = data[ichan]
+            FFT = fft.rfft(prof)
+            pows = np.real(FFT * np.conj(FFT)) / len(prof)
+            noise[ichan] = np.sqrt(np.mean(pows[-len(pows)/frac:]))
+        return noise
+    else:
+        raveld = data.ravel()
+        FFT = fft.rfft(raveld)
+        pows = np.real(FFT * np.conj(FFT)) / len(raveld)
+        return np.sqrt(np.mean(pows[-len(pows)/frac:]))
+
+def get_snr(prof, fudge=3.25):
+    """
+    From Lorimer & Kramer (2005).
+    Assuming baseline removed!
+    """
+    noise = get_noise(prof)
+    nbin = len(prof)
+    #dc = np.real(np.fft.rfft(data))[0]
+    dc = 0
+    Weq = (prof - dc).sum() / (prof - dc).max()
+    mask = np.where(Weq <= 0.0, 0.0, 1.0)
+    Weq = np.where(Weq <= 0.0, 1.0, Weq)
+    snr = (prof - dc).sum() / (noise * Weq**0.5)
+    return (snr * mask) / fudge
 
 def get_scales(data, model, phase, DM, P, freqs, nu_ref=np.inf):
     """
@@ -1229,7 +1181,7 @@ def load_data(filename, dedisperse=False, dededisperse=False, tscrunch=False,
     freqsxs = [np.compress(weights_norm[isub], freqs) for isub in xrange(nsub)]
     #The rest is now ignoring npol...
     arch.pscrunch()
-    #Estimate noise -- FIX needs improvement
+    #Estimate noise
     noise_std = np.array([get_noise(subints[isub,0]) for isub in xrange(nsub)])
     if flux_prof:
         #Flux profile

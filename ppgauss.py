@@ -222,7 +222,8 @@ class DataPortrait:
         #The noise...
         self.portx_noise = np.outer(get_noise(self.portx, chans=True),
                 np.ones(self.nbin))
-        channel_SNRs = self.portx.std(axis=1) / self.portx_noise[:, 0]
+        channel_SNRs = np.array([get_snr(self.portx[ichan]) for ichan in
+            range(self.nchanx)])
         self.nu_fit = guess_fit_freq(self.freqsxs[0], channel_SNRs)
         #Here's the loop
         if niter < 0: niter = 0
