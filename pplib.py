@@ -69,6 +69,12 @@ Dconst = Dconst_trad
 #Power-law index for scattering law
 scattering_alpha = -4.0
 
+#Default get_noise method
+default_noise_method = "quarter"
+
+#Ignore DC component in Fourier fit if zero_DC == 0, else zero_DC == 1.
+zero_DC = 0
+
 class DataBunch(dict):
     """
     This class is a great little recipe!  Creates a simple class instance
@@ -539,7 +545,7 @@ def fit_portrait_function_2deriv_full(params, model=None, p_n=None, data=None,
         errs=None, P=None, freqs=None, nu_ref=np.inf):
     return 0
 
-def estimate_portrait(phase, DM, data, scales, P, freqs, nu_ref=np.inf):
+def estimate_portrait(phase, DM, scales, data, errs, P, freqs, nu_ref=np.inf):
     #here, all vars have additional epoch-index except nu_ref
     #i.e. all have to be arrays of at least len 1; errs are precision
     """
@@ -552,8 +558,9 @@ def estimate_portrait(phase, DM, data, scales, P, freqs, nu_ref=np.inf):
     cf. PBD's autotoa, PhDT
     """
     dFFT = fft.rfft(data, axis=2)
+    dFFT[:, :, 0] *= zero_DC
     #errs = np.real(dFFT[:, :, -len(dFFT[0,0])/4:]).std(axis=2)**-2.0
-    errs = get_noise(data, chans=True) * np.sqrt(len(data[0])/2.0)
+    #errs = get_noise(data, chans=True) * np.sqrt(len(data[0])/2.0)
     D = Dconst * DM / P
     freqs2 = freqs**-2.0 - nu_ref**-2.0
     phiD = np.outer(D, freqs2)
@@ -592,7 +599,7 @@ def brickwall_filter(N, kc):
     fk[:kc] = 1.0
     return fk
 
-def find_kc(prof, noise):
+def fit_brickwall(prof, noise):
     """
     Attempts to find the critical harmonic bin index given a noisey pulse
     profile, beyond which there is no signal.
@@ -606,6 +613,27 @@ def find_kc(prof, noise):
     for ii in xrange(N):
         X2[ii] = np.sum((wf - brickwall_filter(N, ii))**2)
     return X2.argmin()
+
+def half_triangle_function(a, b, dc, N):
+    fn = np.zeros(N) + dc
+    a = int(np.floor(a))
+    fn[:a] += -(float(b)/a)*np.arange(a) + b
+    return fn
+
+def find_kc_function(params, data):
+    a, b, dc = params[0], params[1], params[2]
+    return np.sum((data - half_triangle_function(a, b, dc, len(data)))**2.0)
+
+def find_kc(pows):
+    """
+    """
+    data = np.log10(pows)
+    other_args = [data]
+    results = opt.brute(find_kc_function, [tuple((1, len(data))),
+        tuple((0, data.max()-data.min())), tuple((data.min(), data.max()))],
+        args=other_args, Ns=10, full_output=False, finish=None)
+    a, b, dc = results[0], results[1], results[2]
+    return int(np.floor(a))
 
 def fit_powlaw(data, init_params, errs, freqs, nu_ref):
     """
@@ -622,7 +650,6 @@ def fit_powlaw(data, init_params, errs, freqs, nu_ref):
     nu_ref is the frequency at which the amplitude is referenced.
 
     """
-    nparam = len(init_params)
     #Generate the parameter structure
     params = lm.Parameters()
     params.add('amp', init_params[0], vary=True, min=None, max=None)
@@ -796,13 +823,17 @@ def fit_gaussian_portrait(data, init_params, errs, fit_flags, phases, freqs,
     return fitted_params, chi_sq, dof
 
 def fit_portrait(data, model, init_params, P, freqs, nu_fit=np.inf,
-        nu_out=None, bounds=[(None, None), (None, None)], id=None, quiet=True):
+        nu_out=None, errs=None, bounds=[(None, None), (None, None)], id=None,
+        quiet=True):
     """
     """
     dFFT = fft.rfft(data, axis=1)
+    dFFT[:, 0] *= zero_DC
     mFFT = fft.rfft(model, axis=1)
-    #errs = np.real(dFFT[:, -len(dFFT[0])/4:]).std(axis=1)
-    errs = get_noise(data, chans=True) * np.sqrt(len(data[0])/2.0)
+    mFFT[:, 0] *= zero_DC
+    if errs is None:
+        #errs = np.real(dFFT[:, -len(dFFT[0])/4:]).std(axis=1)
+        errs = get_noise(data, chans=True) * np.sqrt(len(data[0])/2.0)
     d = np.real(np.sum(np.transpose(errs**-2.0 * np.transpose(dFFT *
         np.conj(dFFT)))))
     p_n = np.real(np.sum(mFFT * np.conj(mFFT), axis=1))
@@ -865,13 +896,16 @@ def fit_portrait(data, model, init_params, P, freqs, nu_fit=np.inf,
     return (phi_out, DM, scales, np.array(param_errs), nu_out, covariance,
             red_chi2, duration, nfeval, return_code)
 
-def fit_phase_shift(data, model, bounds=[-0.5, 0.5]):
+def fit_phase_shift(data, model, err=None, bounds=[-0.5, 0.5]):
     """
     """
     dFFT = fft.rfft(data)
+    dFFT[0] *= zero_DC
     mFFT = fft.rfft(model)
-    #err = np.real(dFFT[-len(dFFT)/4:]).std()
-    err = get_noise(data) * np.sqrt(len(data)/2.0)
+    mFFT[0] *= zero_DC
+    if err is None:
+        #err = np.real(dFFT[-len(dFFT)/4:]).std()
+        err = get_noise(data) * np.sqrt(len(data)/2.0)
     d = np.real(np.sum(dFFT * np.conj(dFFT))) / err**2.0
     p = np.real(np.sum(mFFT * np.conj(mFFT))) / err**2.0
     other_args = (mFFT, dFFT, err)
@@ -889,7 +923,18 @@ def fit_phase_shift(data, model, bounds=[-0.5, 0.5]):
     return DataBunch(errors=errors, phase=phase, red_chi2=red_chi2,
             scale=scale)
 
-def get_noise(data, frac=4, chans=False):
+def get_noise(data, method=default_noise_method, **kwargs):
+    """
+    """
+    if method == "quarter":
+        return get_noise_quarter(data, **kwargs)
+    elif method == "fit":
+        return get_noise_fit(data, **kwargs)
+    else:
+        print "Unknown get_noise method."
+        return 0
+
+def get_noise_quarter(data, frac=4, chans=False):
     """
     """
     if chans:
@@ -898,18 +943,47 @@ def get_noise(data, frac=4, chans=False):
             prof = data[ichan]
             FFT = fft.rfft(prof)
             pows = np.real(FFT * np.conj(FFT)) / len(prof)
-            noise[ichan] = np.sqrt(np.mean(pows[-len(pows)/frac:]))
+            kc = (1 - frac**-1)*len(pows)
+            noise[ichan] = np.sqrt(np.mean(pows[kc:]))
         return noise
     else:
         raveld = data.ravel()
         FFT = fft.rfft(raveld)
         pows = np.real(FFT * np.conj(FFT)) / len(raveld)
-        return np.sqrt(np.mean(pows[-len(pows)/frac:]))
+        kc = (1 - frac**-1)*len(pows)
+        return np.sqrt(np.mean(pows[kc:]))
 
-def get_snr(prof, fudge=3.25):
+def get_noise_fit(data, fact=1.1, chans=False):
+    """
+    Relatively slow; could use a speed up.
+    """
+    if chans:
+        noise = np.zeros(len(data))
+        for ichan in xrange(len(noise)):
+            prof = data[ichan]
+            FFT = fft.rfft(prof)
+            pows = np.real(FFT * np.conj(FFT)) / len(prof)
+            k_crit = fact * find_kc(pows)
+            if k_crit >= len(pows):
+                #Will only matter in unresolved or super narrow, high SNR cases
+                k_crit = min(int(0.99*len(pows)), k_crit)
+            noise[ichan] = np.sqrt(np.mean(pows[k_crit:]))
+        return noise
+    else:
+        raveld = data.ravel()
+        FFT = fft.rfft(raveld)
+        pows = np.real(FFT * np.conj(FFT)) / len(raveld)
+        k_crit = fact * find_kc(pows)
+        if k_crit >= len(pows):
+            #Will only matter in unresolved or super narrow, high SNR cases
+            k_crit = min(int(0.99*len(pows)), k_crit)
+        return np.sqrt(np.mean(pows[k_crit:]))
+
+def get_SNR(prof, fudge=3.25):
     """
     From Lorimer & Kramer (2005).
     Assuming baseline removed!
+    fudge is factor in a (bad) attempt to match PSRCHIVE
     """
     noise = get_noise(prof)
     nbin = len(prof)
@@ -918,15 +992,17 @@ def get_snr(prof, fudge=3.25):
     Weq = (prof - dc).sum() / (prof - dc).max()
     mask = np.where(Weq <= 0.0, 0.0, 1.0)
     Weq = np.where(Weq <= 0.0, 1.0, Weq)
-    snr = (prof - dc).sum() / (noise * Weq**0.5)
-    return (snr * mask) / fudge
+    SNR = (prof - dc).sum() / (noise * Weq**0.5)
+    return (SNR * mask) / fudge
 
 def get_scales(data, model, phase, DM, P, freqs, nu_ref=np.inf):
     """
     """
     scales = np.zeros(len(freqs))
     dFFT = fft.rfft(data, axis=1)
+    dFFT[:, 0] *= zero_DC
     mFFT = fft.rfft(model, axis=1)
+    mFFT[:, 0] *= zero_DC
     p_n = np.real(np.sum(mFFT * np.conj(mFFT), axis=1))
     D = Dconst * DM / P
     harmind = np.arange(len(mFFT[0]))
@@ -1179,10 +1255,20 @@ def load_data(filename, dedisperse=False, dededisperse=False, tscrunch=False,
             isub in xrange(nsub)]
     #The channel center frequencies for the non-zapped subints
     freqsxs = [np.compress(weights_norm[isub], freqs) for isub in xrange(nsub)]
+    SNRs = np.zeros([nsub, npol, nchan])
+    for isub in range(nsub):
+        for ipol in range(npol):
+            for ichan in range(nchan):
+                SNRs[isub, ipol, ichan] = \
+                        arch.get_Integration(isub).get_Profile(ipol,
+                                ichan).snr()
+    noise_stds = np.array([arch.get_Integration(isub).baseline_stats()[1]**0.5
+        for isub in xrange(nsub)])
     #The rest is now ignoring npol...
     arch.pscrunch()
     #Estimate noise
-    noise_std = np.array([get_noise(subints[isub,0]) for isub in xrange(nsub)])
+    #noise_stds = np.array([get_noise(subints[isub,0]) for isub in xrange(
+    #nsub)])
     if flux_prof:
         #Flux profile
         #The below is about equal to bscrunch to ~6 places
@@ -1198,6 +1284,8 @@ def load_data(filename, dedisperse=False, dededisperse=False, tscrunch=False,
     arch.tscrunch()
     arch.fscrunch()
     prof = arch.get_data()[0,0,0]
+    prof_noise = arch.get_Integration(0).baseline_stats()[1][0,0]**0.5
+    prof_SNR = arch.get_Integration(0).get_Profile(0,0).snr()
     #Number unzapped channels, subints
     nchanx = int(round(np.mean([subintsxs[isub].shape[1] for isub in
         xrange(nsub)])))
@@ -1224,10 +1312,11 @@ def load_data(filename, dedisperse=False, dededisperse=False, tscrunch=False,
     data = DataBunch(arch=arch, bw=bw, DM=DM, epochs=epochs, filename=filename,
             flux_prof=flux_prof, flux_profx=flux_profx, freqs=freqs,
             freqsxs=freqsxs, masks=masks, nbin=nbin, nchan=nchan,
-            nchanx=nchanx, noise_std=noise_std, nsub=nsub, nsubx=nsubx,
+            nchanx=nchanx, noise_stds=noise_stds, nsub=nsub, nsubx=nsubx,
             nu0=nu0, okichan=okichan, okisub=okisub, phases=phases, prof=prof,
-            Ps=Ps, source=source, state=state, subints=subints,
-            subintsxs=subintsxs, weights=weights)
+            prof_noise=prof_noise, prof_SNR=prof_SNR, Ps=Ps, SNRs=SNRs,
+            source=source, state=state, subints=subints, subintsxs=subintsxs,
+            weights=weights)
     return data
 
 def unpack_dict(data):
@@ -1434,7 +1523,7 @@ def make_fake_pulsar(modelfile, ephemeris, outfile="fake_pulsar.fits", nsub=1,
         npol=1, nchan=512, nbin=1048, nu0=1500.0, bw=800.0, tsub=300.0,
         phase=0.0, dDM=0.0, start_MJD=None, weights=None, noise_std=1.0,
         scale=1.0, dedisperse=False, t_scat=0.0, alpha=scattering_alpha,
-        bw_scint=None, state="Coherence", obs="GBT", quiet=False):
+        scint=None, state="Coherence", obs="GBT", quiet=False):
     """
     Mostly written by PBD.
     'phase' [rot] is an arbitrary rotation to all subints, with respect to nu0.
@@ -1519,6 +1608,12 @@ def make_fake_pulsar(modelfile, ephemeris, outfile="fake_pulsar.fits", nsub=1,
     #Now finally, fill in the data!
     #NB the different pols are not realistic: same model, same noise_std
     name, ngauss, model = read_model(modelfile, phases, freqs, P0, quiet)
+    if scint is not None:
+        if scint is True:
+            model = add_scintillation(model, random=True, nsin=2, amax=1.0,
+                    wmax=5.0)
+        else:
+            model = add_scintillation(model, scint)
     #If wanting to use PSRCHIVE's rotation scheme, uncomment the dedisperse and
     #dededisperse lines, and set rotmodel = model.
     arch.set_dedispersed(False)
@@ -1763,7 +1858,8 @@ def show_residual_plot(port, model, resids=None, phases=None, freqs=None,
     portx = np.compress(weights, port, axis=0)
     residsx = np.compress(weights, resids, axis=0)
     text =  "Residuals mean ~ %.2e\nResiduals std ~ %.2e\nData std ~ %.2e"%(
-            residsx.mean(), residsx.std(), get_noise(portx))
+            residsx.mean(), residsx.std(), np.median(get_noise(portx,
+                chans=True)))
     ax4.text(0.5, 0.5, text, ha="center", va="center")
     ax4.set_xticklabels(())
     ax4.set_xticks(())

@@ -158,8 +158,9 @@ class GetTOAs:
                     freqsx = np.compress(tot_weights, freqs)
                     portx = np.compress(tot_weights, subints[isub][0], axis=0)
                     modelx = np.compress(tot_weights, model, axis=0)
-                channel_SNRs = np.array([get_snr(portx[ichan]) for ichan in
-                    range(nchanx)])
+                errs = noise_stds[isub, 0, okichan] * np.sqrt(nbin/2.0)
+                #channel_SNRs = np.array([get_SNR(portx[ichan]) for ichan in
+                #    range(nchanx)])
                 #nu_fit is a guess at nu_zero, the zero-covariance frequency,
                 #which is calculated after. This attempts to minimize the
                 #number of function calls.  Lower frequencies mean more calls,
@@ -167,7 +168,8 @@ class GetTOAs:
                 #level, and sub-micro-DM level; the covariances are also
                 #different, but all very similar as well.
                 if nu_fit is None:
-                    nu_fit = guess_fit_freq(freqsx, channel_SNRs)
+                    #nu_fit = guess_fit_freq(freqsx, channel_SNRs)
+                    nu_fit = guess_fit_freq(freqsx, SNRs[isub, 0, okichan])
                 nu_fits[isubx] = nu_fit
 
                 ####################
@@ -217,8 +219,8 @@ class GetTOAs:
                 (phi, DM, scalex, param_errs, nu_ref, covariance, red_chi2,
                         duration, nfeval, rc) = fit_portrait(portx, modelx,
                                 np.array([phase_guess, DM_guess]), P, freqsx,
-                                nu_fit, self.nu_ref, bounds=bounds, id = id,
-                                quiet=quiet)
+                                nu_fit, self.nu_ref, errs, bounds=bounds,
+                                id = id, quiet=quiet)
                 phi_err, DM_err = param_errs[0], param_errs[1]
                 fit_duration += duration
 

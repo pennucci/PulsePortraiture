@@ -35,7 +35,10 @@ class DataPortrait:
             self.freqsxs = []
             self.port = []
             self.portx = []
-            self.noise_std = 0.0
+            self.noise_stds = []
+            self.noise_stdsxs = []
+            self.SNRs = []
+            self.SNRsxs = []
             self.weights = []
             for ifile in range(len(self.datafiles)):
                 datafile = self.datafiles[ifile]
@@ -75,10 +78,12 @@ class DataPortrait:
                 self.weights.extend(data.weights[0])
                 self.port.extend(data.subints[0,0])
                 self.portx.extend(data.subintsxs[0][0])
-                self.noise_std += data.noise_std
+                self.noise_stds.extend(data.noise_stds[0,0])
+                self.noise_stdsxs.extend(data.noise_stds[0,0][data.okichan])
+                self.SNRs.extend(data.SNRs[0,0])
+                self.SNRsxs.extend(data.SNRs[0,0][data.okichan])
             self.Ps /= len(self.datafiles)
-            self.Ps = [self.Ps] #This line and the next are toys
-            self.noise_std /= len(self.datafiles)
+            self.Ps = [self.Ps] #This line is a toy
             self.bw = self.hifreq - self.lofreq
             self.freqs = np.array(self.freqs)
             self.freqsxs = np.array(self.freqsxs)
@@ -99,6 +104,10 @@ class DataPortrait:
             self.port = np.array(self.port)[self.isort]
             show_portrait(self.port)
             self.portx = np.array(self.portx)[self.isortx]
+            self.noise_stds = np.array(self.noise_stds)[self.isort]
+            self.noise_stdsxs = np.array(self.noise_stdsxs)[self.isortx]
+            self.SNRs = np.array(self.SNRs)[self.isort]
+            self.SNRsxs = np.array(self.SNRsxs)[self.isortx]
             self.freqs.sort()
             self.freqsxs.sort()
             self.freqsxs = [self.freqsxs]
@@ -123,14 +132,16 @@ class DataPortrait:
             if self.source is None: self.source = "noname"
             self.port = (self.masks * self.subints)[0,0]
             self.portx = self.subintsxs[0][0]
+            self.noise_stdsxs = self.noise_stds[0,0,self.okichan]
+            self.SNRsxs = self.SNRs[0,0,self.okichan]
 
     def fit_profile(self, profile, tau=0.0, fixscat=True):
         """
         """
         fig = plt.figure()
         profplot = fig.add_subplot(211)
-        #Maybe can do better than self.noise_std below
-        interactor = GaussianSelector(profplot, profile, self.noise_std,
+        #Noise below may be off
+        interactor = GaussianSelector(profplot, profile, get_noise(profile),
                 tau=tau, fixscat=fixscat, minspanx=None, minspany=None,
                 useblit=True)
         plt.show()
@@ -145,9 +156,10 @@ class DataPortrait:
         will show obvious scintles.
         """
         if fit:
+            #Noise level below may be off
             params, param_errs, chi2, dof, residuals = fit_powlaw(
                     self.flux_profx, np.array([guessA,guessalpha]),
-                    self.noise_std, self.freqsxs[0], self.nu0)
+                    np.median(self.noise_stdsxs), self.freqsxs[0], self.nu0)
             if not quiet:
                 print ""
                 print "Flux-density power-law fit"
@@ -220,11 +232,13 @@ class DataPortrait:
             self.fit_flags[5::6] *= not(fixwid)
             self.fit_flags[7::6] *= not(fixamp)
         #The noise...
-        self.portx_noise = np.outer(get_noise(self.portx, chans=True),
-                np.ones(self.nbin))
-        channel_SNRs = np.array([get_snr(self.portx[ichan]) for ichan in
-            range(self.nchanx)])
-        self.nu_fit = guess_fit_freq(self.freqsxs[0], channel_SNRs)
+        self.portx_noise = np.outer(self.noise_stdsxs, np.ones(self.nbin))
+        #self.portx_noise = np.outer(get_noise(self.portx, chans=True),
+        #        np.ones(self.nbin))
+        #channel_SNRs = np.array([get_SNR(self.portx[ichan]) for ichan in
+        #    range(self.nchanx)])
+        #self.nu_fit = guess_fit_freq(self.freqsxs[0], channel_SNRs)
+        self.nu_fit = guess_fit_freq(self.freqsxs[0], self.SNRsxs)
         #Here's the loop
         if niter < 0: niter = 0
         self.niter = niter
@@ -267,7 +281,7 @@ class DataPortrait:
         if not quiet:
             print "Residuals mean: %.2e"%(self.portx - self.modelx).mean()
             print "Residuals std:  %.2e"%(self.portx - self.modelx).std()
-            print "Data std:       %.2e\n"%self.noise_std
+            print "Data std:       %.2e\n"%np.median(self.noise_stdsxs)
             print "Total fit time: %.2f min"%(self.total_time / 60.0)
             print "Total time:     %.2f min\n"%((time.time() - self.start) /
                     60.0)
@@ -316,7 +330,7 @@ class DataPortrait:
                         self.red_chi2, self.fit_duration, self.nfeval,
                         self.rc) = fit_portrait(self.portx, self.modelx,
                                 np.array([phase_guess, DM_guess]), self.Ps[0],
-                                self.freqsxs[0], self.nu_fit, None,
+                                self.freqsxs[0], self.nu_fit, None, None,
                                 bounds=[(None, None), (None, None)], id=None,
                                 quiet=True)
                 self.phierr = param_errs[0]
