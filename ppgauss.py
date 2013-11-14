@@ -35,6 +35,8 @@ class DataPortrait:
             self.freqsxs = []
             self.port = []
             self.portx = []
+            self.flux_prof = []
+            self.flux_profx = []
             self.noise_stds = []
             self.noise_stdsxs = []
             self.SNRs = []
@@ -43,7 +45,8 @@ class DataPortrait:
             for ifile in range(len(self.datafiles)):
                 datafile = self.datafiles[ifile]
                 data = load_data(datafile, dedisperse=True, tscrunch=True,
-                        pscrunch=True, norm_weights=True, quiet=quiet)
+                        pscrunch=True, flux_prof=True, norm_weights=True,
+                        quiet=quiet)
                 self.nchan += data.nchan
                 self.nchanx += data.nchanx
                 if ifile == 0:
@@ -78,6 +81,8 @@ class DataPortrait:
                 self.weights.extend(data.weights[0])
                 self.port.extend(data.subints[0,0])
                 self.portx.extend(data.subintsxs[0][0])
+                self.flux_prof.extend(data.flux_prof)
+                self.flux_profx.extend(data.flux_profx)
                 self.noise_stds.extend(data.noise_stds[0,0])
                 self.noise_stdsxs.extend(data.noise_stds[0,0][data.okichan])
                 self.SNRs.extend(data.SNRs[0,0])
@@ -102,8 +107,9 @@ class DataPortrait:
             self.weights = np.array(self.weights)[self.isort]
             self.weights = [self.weights]
             self.port = np.array(self.port)[self.isort]
-            show_portrait(self.port)
             self.portx = np.array(self.portx)[self.isortx]
+            self.flux_prof = np.array(self.flux_prof)[self.isort]
+            self.flux_profx = np.array(self.flux_profx)[self.isortx]
             self.noise_stds = np.array(self.noise_stds)[self.isort]
             self.noise_stdsxs = np.array(self.noise_stdsxs)[self.isortx]
             self.SNRs = np.array(self.SNRs)[self.isort]
@@ -115,6 +121,7 @@ class DataPortrait:
             self.join_fit_flags = np.array(self.join_fit_flags)
             self.all_join_params = [self.join_ichanxs, self.join_params,
                     self.join_fit_flags]
+            show_portrait(self.port, self.phases, self.freqs)
         else:
             self.njoin = 0
             self.join_params = []
@@ -184,7 +191,10 @@ class DataPortrait:
                     plt.title("Residuals")
                     plt.plot(self.freqsxs[0], residuals, 'r+')
                 plt.show()
+            self.spect_A = params[0]
+            self.spect_A_err = param_errs[0]
             self.spect_index = params[1]
+            self.spect_index_err = param_errs[1]
 
 
     def make_gaussian_model(self, modelfile=None,
@@ -278,6 +288,27 @@ class DataPortrait:
             if writemodel:
                 self.write_model(outfile=outfile, quiet=quiet)
             self.cnvrgnc = self.check_convergence(efac=1.0, quiet=quiet)
+        if self.njoin:
+            for ii in range(self.njoin):
+                jic = self.join_ichans[ii]
+                self.port[jic] = rotate_data(self.port[jic],
+                        -self.join_params[0::2][ii],
+                        -self.join_params[1::2][ii], self.Ps[0],
+                        self.freqs[jic], self.nu_ref)
+                jicx = self.join_ichanxs[ii]
+                self.portx[jicx] = rotate_data(self.port[jicx],
+                        -self.join_params[0::2][ii],
+                        -self.join_params[1::2][ii], self.Ps[0],
+                        self.freqsxs[0][jicx], self.nu_ref)
+                self.model[jic] = rotate_data(self.model[jic],
+                        -self.join_params[0::2][ii],
+                        -self.join_params[1::2][ii], self.Ps[0],
+                        self.freqs[jic], self.nu_ref)
+            self.model_masked = np.transpose(self.weights[0] *
+                    np.transpose(self.model))
+            self.modelx = np.compress(self.weights[0], self.model, axis=0)
+            ###HACK
+            print "JOIN PARAMS", self.join_params
         if not quiet:
             print "Residuals mean: %.2e"%(self.portx - self.modelx).mean()
             print "Residuals std:  %.2e"%(self.portx - self.modelx).std()
@@ -305,6 +336,7 @@ class DataPortrait:
                 #FIX, convergence can be based on residuals
                 self.model_params = self.fitted_params[:-self.njoin*2]
                 self.join_params = self.fitted_params[-self.njoin*2:]
+                self.all_join_params[1] = self.join_params
                 self.phi = 0.5
                 self.phierr = 0.0
                 self.DM = 1.0
@@ -599,7 +631,7 @@ if __name__ == "__main__":
                       help="PSRCHIVE archive from which to generate gaussian model.")
     parser.add_option("-M", "--metafile",
                       action="store", metavar="metafile", dest="metafile",
-                      help="Experimental.  Not recommended for your use.  Will be able to fit several obs. from different bands.")
+                      help="Experimental.  Not recommended for your use.  Will be able to fit several obs. from different bands.  NB: First file in metafile MUST also be the one that contains nu_ref.")
     parser.add_option("-o", "--outfile",
                       action="store", metavar="outfile", dest="outfile",
                       help="Name of output model file name. [default=archive.gmodel]")

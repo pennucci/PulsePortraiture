@@ -153,12 +153,15 @@ class GetTOAs:
                     freqsx = freqsxs[isub]
                     portx = subintsxs[isub][0]
                     modelx = np.compress(weights[isub], model, axis=0)
+                    SNRsx = np.compress(weights[isub], SNRs[isub, 0])
+                    errs = np.compress(weights[isub], noise_stds[isub, 0] * \
+                            np.sqrt(nbin/2.0))
                 else:
                     tot_weights = weights[isub] + self.model_weights
                     freqsx = np.compress(tot_weights, freqs)
                     portx = np.compress(tot_weights, subints[isub][0], axis=0)
                     modelx = np.compress(tot_weights, model, axis=0)
-                errs = noise_stds[isub, 0, okichan] * np.sqrt(nbin/2.0)
+                #errs = noise_stds[isub, 0, okichan] * np.sqrt(nbin/2.0)
                 #channel_SNRs = np.array([get_SNR(portx[ichan]) for ichan in
                 #    range(nchanx)])
                 #nu_fit is a guess at nu_zero, the zero-covariance frequency,
@@ -169,7 +172,7 @@ class GetTOAs:
                 #different, but all very similar as well.
                 if nu_fit is None:
                     #nu_fit = guess_fit_freq(freqsx, channel_SNRs)
-                    nu_fit = guess_fit_freq(freqsx, SNRs[isub, 0, okichan])
+                    nu_fit = guess_fit_freq(freqsx, SNRsx)
                 nu_fits[isubx] = nu_fit
 
                 ####################
@@ -482,6 +485,7 @@ class GetTOAs:
         show_residual_plot(port=port, model=model_scaled, resids=None,
                 phases=phases, freqs=freqs, titles=titles,
                 rvrsd=bool(data.bw < 0))
+        return port, model_scaled
 
     def show_results(self, datafile=None):
         """
@@ -651,7 +655,7 @@ if __name__ == "__main__":
     #                  help="Show this help message and exit.")
     parser.add_option("-d", "--datafile",
                       action="store", metavar="archive", dest="datafile",
-                      help="PSRCHIVE archive from which to measure TOAs/DMs.")
+                      help="PSRCHIVE archive from which to measure TOAs/DMs.  ***NB: Files should be de-dedispersed!***")
     parser.add_option("-M", "--metafile",
                       action="store",metavar="metafile", dest="metafile",
                       help="File containing list of archive filenames from which to measure TOAs/DMs.")

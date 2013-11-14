@@ -72,8 +72,8 @@ scattering_alpha = -4.0
 #Default get_noise method
 default_noise_method = "quarter"
 
-#Ignore DC component in Fourier fit if zero_DC == 0, else zero_DC == 1.
-zero_DC = 0
+#Ignore DC component in Fourier fit if DC_fact == 0, else DC_fact == 1.
+DC_fact = 0
 
 class DataBunch(dict):
     """
@@ -558,7 +558,7 @@ def estimate_portrait(phase, DM, scales, data, errs, P, freqs, nu_ref=np.inf):
     cf. PBD's autotoa, PhDT
     """
     dFFT = fft.rfft(data, axis=2)
-    dFFT[:, :, 0] *= zero_DC
+    dFFT[:, :, 0] *= DC_fact
     #errs = np.real(dFFT[:, :, -len(dFFT[0,0])/4:]).std(axis=2)**-2.0
     #errs = get_noise(data, chans=True) * np.sqrt(len(data[0])/2.0)
     D = Dconst * DM / P
@@ -828,9 +828,9 @@ def fit_portrait(data, model, init_params, P, freqs, nu_fit=np.inf,
     """
     """
     dFFT = fft.rfft(data, axis=1)
-    dFFT[:, 0] *= zero_DC
+    dFFT[:, 0] *= DC_fact
     mFFT = fft.rfft(model, axis=1)
-    mFFT[:, 0] *= zero_DC
+    mFFT[:, 0] *= DC_fact
     if errs is None:
         #errs = np.real(dFFT[:, -len(dFFT[0])/4:]).std(axis=1)
         errs = get_noise(data, chans=True) * np.sqrt(len(data[0])/2.0)
@@ -900,9 +900,9 @@ def fit_phase_shift(data, model, err=None, bounds=[-0.5, 0.5]):
     """
     """
     dFFT = fft.rfft(data)
-    dFFT[0] *= zero_DC
+    dFFT[0] *= DC_fact
     mFFT = fft.rfft(model)
-    mFFT[0] *= zero_DC
+    mFFT[0] *= DC_fact
     if err is None:
         #err = np.real(dFFT[-len(dFFT)/4:]).std()
         err = get_noise(data) * np.sqrt(len(data)/2.0)
@@ -1000,9 +1000,9 @@ def get_scales(data, model, phase, DM, P, freqs, nu_ref=np.inf):
     """
     scales = np.zeros(len(freqs))
     dFFT = fft.rfft(data, axis=1)
-    dFFT[:, 0] *= zero_DC
+    dFFT[:, 0] *= DC_fact
     mFFT = fft.rfft(model, axis=1)
-    mFFT[:, 0] *= zero_DC
+    mFFT[:, 0] *= DC_fact
     p_n = np.real(np.sum(mFFT * np.conj(mFFT), axis=1))
     D = Dconst * DM / P
     harmind = np.arange(len(mFFT[0]))
@@ -1225,7 +1225,8 @@ def load_data(filename, dedisperse=False, dededisperse=False, tscrunch=False,
         ichan in xrange(nchan)])
     #Again, for the negative BW cases.  Good fix?
     #freqs.sort()
-    #By-hand frequency calculation, equivalent to above from PSRCHIVE
+    #By-hand frequency calculation, equivalent to above from PSRCHIVE for
+    #native resolution
     #chanwidth = bw / nchan
     #lofreq = nu0 - (bw/2)
     #freqs = np.linspace(lofreq + (chanwidth/2.0), lofreq + bw -
@@ -1432,9 +1433,11 @@ def file_is_ASCII(filename):
 
 def write_archive(data, ephemeris, freqs, nu0=None, bw=None,
         outfile="pparchive.fits", tsub=1.0, start_MJD=None, weights=None,
-        dedispersed=True, state="Coherence", obs="GBT", quiet=False):
+        dedispersed=False, state="Coherence", obs="GBT", quiet=False):
     """
     Mostly written by PBD.
+    Takes dedispersed data, please.  If dedispersed=True, will save archive
+    this way.
     """
     nsub, npol, nchan, nbin = data.shape
     if nu0 is None:
@@ -1523,7 +1526,7 @@ def make_fake_pulsar(modelfile, ephemeris, outfile="fake_pulsar.fits", nsub=1,
         npol=1, nchan=512, nbin=1048, nu0=1500.0, bw=800.0, tsub=300.0,
         phase=0.0, dDM=0.0, start_MJD=None, weights=None, noise_std=1.0,
         scale=1.0, dedisperse=False, t_scat=0.0, alpha=scattering_alpha,
-        scint=None, state="Coherence", obs="GBT", quiet=False):
+        scint=False, state="Coherence", obs="GBT", quiet=False):
     """
     Mostly written by PBD.
     'phase' [rot] is an arbitrary rotation to all subints, with respect to nu0.
@@ -1608,7 +1611,7 @@ def make_fake_pulsar(modelfile, ephemeris, outfile="fake_pulsar.fits", nsub=1,
     #Now finally, fill in the data!
     #NB the different pols are not realistic: same model, same noise_std
     name, ngauss, model = read_model(modelfile, phases, freqs, P0, quiet)
-    if scint is not None:
+    if scint is not False:
         if scint is True:
             model = add_scintillation(model, random=True, nsin=2, amax=1.0,
                     wmax=5.0)
