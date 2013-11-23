@@ -1,6 +1,16 @@
 #!/usr/bin/env python
 
+#############
+#Coming soon#
+#############
+
 from pplib import *
+
+#See DC_fact in pplib.py
+if DC_fact:
+    rm_baseline = True
+else:
+    rm_baseline = False
 
 class GetTOAs:
     """
@@ -49,7 +59,7 @@ class GetTOAs:
         if len(self.datafiles) == 1 or self.common is True:
             data = load_data(self.datafiles[0], dedisperse=False,
                     dededisperse=False, tscrunch=True, pscrunch=True,
-                    fscrunch=False, rm_baseline=True, flux_prof=False,
+                    fscrunch=False, rm_baseline=rm_baseline, flux_prof=False,
                     norm_weights=True, quiet=True)
             if self.is_gauss_model:
                 self.model_name, self.ngauss, self.model = read_model(
@@ -58,8 +68,8 @@ class GetTOAs:
             else:
                 self.model_data = load_data(self.modelfile, dedisperse=True,
                         dededisperse=False, tscrunch=True, pscrunch=True,
-                        fscrunch=False, rm_baseline=True, flux_prof=False,
-                        norm_weights=True, quiet=True)
+                        fscrunch=False, rm_baseline=rm_baseline,
+                        flux_prof=False, norm_weights=True, quiet=True)
                 self.model_name = self.model_data.source
                 self.ngauss = 0
                 self.model_weights = self.model_data.weights[0]
@@ -95,7 +105,7 @@ class GetTOAs:
             #Load data
             data = load_data(datafile, dedisperse=False,
                     dededisperse=False, tscrunch=False, pscrunch=True,
-                    fscrunch=False, rm_baseline=True, flux_prof=False,
+                    fscrunch=False, rm_baseline=rm_baseline, flux_prof=False,
                     norm_weights=True, quiet=quiet)
             #Unpack the data dictionary into the local namespace; see load_data
             #for dictionary keys.
@@ -438,6 +448,7 @@ class GetTOAs:
         ifile = self.datafiles.index(datafile)
         data = load_data(datafile, dedisperse=True,
                 dededisperse=False, tscrunch=False,
+                #pscrunch=True, fscrunch=False, rm_baseline=rm_baseline,
                 pscrunch=True, fscrunch=False, rm_baseline=True,
                 flux_prof=False, norm_weights=True, quiet=quiet)
         title = "%s ; subintx %d"%(datafile, isubx)
@@ -456,6 +467,7 @@ class GetTOAs:
         ifile = self.datafiles.index(datafile)
         data = load_data(datafile, dedisperse=False,
                 dededisperse=False, tscrunch=False,
+                #pscrunch=True, fscrunch=False, rm_baseline=rm_baseline,
                 pscrunch=True, fscrunch=False, rm_baseline=True,
                 flux_prof=False, norm_weights=True, quiet=quiet)
         phi = self.phis[ifile][isubx]

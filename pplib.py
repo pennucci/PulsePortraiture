@@ -1,5 +1,9 @@
 #!/usr/bin/env python
 
+#############
+#Coming soon#
+#############
+
 #To be used with PSRCHIVE Archive files
 
 #This fitting algorithm lays on the bed of Procrustes all too comfortably.
@@ -74,6 +78,10 @@ default_noise_method = "quarter"
 
 #Ignore DC component in Fourier fit if DC_fact == 0, else DC_fact == 1.
 DC_fact = 0
+
+#Upper limit on the width of a Gaussian component to "help" in fitting.  Should
+#be either None or > 0.0.
+wid_max = 0.1
 
 class DataBunch(dict):
     """
@@ -701,7 +709,7 @@ def fit_gaussian_profile(data, init_params, errs, fit_scattering=False,
                     min=None, max=None, expr=None)
         elif ii in range(nparam)[3::3]:
             params.add('wid%s'%str((ii-3)/3 + 1), init_params[ii], vary=True,
-                    min=0.0, max=None, expr=None)
+                    min=0.0, max=wid_max, expr=None)
         elif ii in range(nparam)[4::3]:
             params.add('amp%s'%str((ii-4)/3 + 1), init_params[ii], vary=True,
                     min=0.0, max=None, expr=None)
@@ -773,7 +781,7 @@ def fit_gaussian_portrait(data, init_params, errs, fit_flags, phases, freqs,
                     vary=bool(fit_flags[ii]), min=None, max=None, expr=None)
         elif ii%6 == 4:     #wid limits, limited by 0
             params.add('wid%s'%str((ii-4)/6 + 1), init_params[ii],
-                    vary=bool(fit_flags[ii]), min=0.0, max=None, expr=None)
+                    vary=bool(fit_flags[ii]), min=0.0, max=wid_max, expr=None)
         elif ii%6 == 5:     #wid slope limits
             params.add('m_wid%s'%str((ii-5)/6 + 1), init_params[ii],
                     vary=bool(fit_flags[ii]), min=None, max=None, expr=None)
@@ -1294,7 +1302,7 @@ def load_data(filename, dedisperse=False, dededisperse=False, tscrunch=False,
         xrange(nsub)], np.ones(nsub)).sum())
     if not quiet:
         P = arch.get_Integration(0).get_folding_period()*1000.0
-        print "\tP [ms]             = %.1f\n\
+        print "\tP [ms]             = %.3f\n\
         DM [cm**-3 pc]     = %.6f\n\
         center freq. [MHz] = %.4f\n\
         bandwidth [MHz]    = %.1f\n\
@@ -1345,7 +1353,7 @@ def write_model(filename, name, nu_ref, model_params, fit_flags, append=False,
         comp = model_params[(2 + igauss*6):(8 + igauss*6)]
         fit_comp = fit_flags[(2 + igauss*6):(8 + igauss*6)]
         line = (igauss + 1, ) + tuple(np.array(zip(comp, fit_comp)).ravel())
-        outfile.write("COMP%02d %1.8f  %d  % 10.8f  %d  % 10.8f  %d  % 10.8f  %d  % 12.8f  %d  % 12.8f  %d\n"%line)
+        outfile.write("COMP%02d % .8f %d  % .8f %d  % .8f %d  % .8f %d  % .8f %d  % .8f %d\n"%line)
     outfile.close()
     if not quiet: print "%s written."%filename
 
@@ -1358,6 +1366,8 @@ def read_model(modelfile, phases=None, freqs=None, P=None, quiet=False):
         read_only = False
     ngauss = 0
     comps = []
+    if not quiet:
+        print "Reading model from %s..."%modelfile
     modeldata = open(modelfile, "r").readlines()
     for line in modeldata:
         info = line.split()

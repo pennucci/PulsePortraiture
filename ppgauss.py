@@ -1,5 +1,8 @@
 #!/usr/bin/env python
 
+#############
+#Coming soon#
+#############
 
 from matplotlib.patches import Rectangle
 from pplib import *
@@ -121,7 +124,7 @@ class DataPortrait:
             self.join_fit_flags = np.array(self.join_fit_flags)
             self.all_join_params = [self.join_ichanxs, self.join_params,
                     self.join_fit_flags]
-            show_portrait(self.port, self.phases, self.freqs)
+            self.show_data_portrait()
         else:
             self.njoin = 0
             self.join_params = []
@@ -199,8 +202,9 @@ class DataPortrait:
 
     def make_gaussian_model(self, modelfile=None,
             ref_prof=(None, None), tau=0.0, fixloc=False, fixwid=False,
-            fixamp=False, fixscat=True, niter=0, writemodel=False,
-            outfile=None, model_name=None, residplot=None, quiet=False):
+            fixamp=False, fixscat=True, niter=0, fiducial_gaussian=False,
+            writemodel=False, outfile=None, model_name=None, residplot=None,
+            quiet=False):
         """
         """
         if modelfile:
@@ -241,6 +245,10 @@ class DataPortrait:
             self.fit_flags[3::6] *= not(fixloc)
             self.fit_flags[5::6] *= not(fixwid)
             self.fit_flags[7::6] *= not(fixamp)
+            if fiducial_gaussian:
+                ifgauss = self.init_params[4::3].argmax()
+                self.fit_flags[3::6] = 1
+                self.fit_flags[3::6][ifgauss] = 0
         #The noise...
         self.portx_noise = np.outer(self.noise_stdsxs, np.ones(self.nbin))
         #self.portx_noise = np.outer(get_noise(self.portx, chans=True),
@@ -307,8 +315,6 @@ class DataPortrait:
             self.model_masked = np.transpose(self.weights[0] *
                     np.transpose(self.model))
             self.modelx = np.compress(self.weights[0], self.model, axis=0)
-            ###HACK
-            print "JOIN PARAMS", self.join_params
         if not quiet:
             print "Residuals mean: %.2e"%(self.portx - self.modelx).mean()
             print "Residuals std:  %.2e"%(self.portx - self.modelx).std()
@@ -342,6 +348,8 @@ class DataPortrait:
                 self.DM = 1.0
                 self.DMerr = 0.0
                 self.red_chi2 = 0.0
+                ###HACK
+                print "JOIN PARAMS", self.join_params
             else:
                 self.model_params = self.fitted_params[:]
             self.model = gen_gaussian_portrait(self.fitted_params,
@@ -405,8 +413,8 @@ class DataPortrait:
         """
         """
         title = "%s Portrait"%self.source
-        show_portrait(self.port, self.phases, self.freqs, title, True, True,
-                bool(self.bw < 0))
+        show_portrait(np.transpose(self.weights) * self.port, self.phases,
+                self.freqs, title, True, True, bool(self.bw < 0))
 
     def show_model_fit(self):
         """
@@ -664,6 +672,9 @@ if __name__ == "__main__":
     parser.add_option("--niter",
                       action="store", metavar="int", dest="niter", default=0,
                       help="Number of iterations to loop for generating better model. [default=0]")
+    parser.add_option("--fgauss",
+                      action="store_true", dest="fgauss", default=False,
+                      help="Sets fitloc=True except for the largest gaussian component based on the intial parameters at nu_ref.  i.e. sets a 'fiducial gaussian'.")
     parser.add_option("--figure", metavar="figurename",
                       action="store", dest="figure", default=False,
                       help="Save PNG figure of final fit to figurename. [default=Not saved]")
@@ -694,6 +705,7 @@ if __name__ == "__main__":
     fixamp = options.fixamp
     fixscat = not options.fitscat
     niter = int(options.niter)
+    fgauss = options.fgauss
     figure = options.figure
     quiet = options.quiet
 
@@ -702,5 +714,5 @@ if __name__ == "__main__":
     dp.make_gaussian_model(modelfile = None,
             ref_prof=(nu_ref, bw_ref), tau=tau, fixloc=fixloc, fixwid=fixwid,
             fixamp=fixamp, fixscat=fixscat, niter=niter,
-            writemodel=True, outfile=outfile, model_name=model_name,
-            residplot=figure, quiet=quiet)
+            fiducial_gaussian=fgauss, writemodel=True, outfile=outfile,
+            model_name=model_name, residplot=figure, quiet=quiet)
