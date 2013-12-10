@@ -67,9 +67,9 @@ dp = pg.DataPortrait(datafile)
 dp.show_data_portrait()
 #Fit a model; see ppgauss.py for all options
 dp.make_gaussian_model(ref_prof=(nu0, bw/4), tau=(t_scat * dp.nbin) / dp.Ps[0],
-        fixloc=True, fixscat= not bool(t_scat), niter=3, writemodel=True,
-        outfile="example-fit.gmodel", model_name="Example_Fit",
-        residplot="example.png", quiet=False)
+        fixloc=True, fixscat= not bool(t_scat), niter=3,
+        fiducial_gaussian=True, writemodel=True, outfile="example-fit.gmodel",
+        model_name="Example_Fit", residplot="example.png", quiet=False)
 #You can always then continue iterations using:
 #niter = # 
 #modelfile = example-fit.gmodel

@@ -76,12 +76,16 @@ scattering_alpha = -4.0
 #Default get_noise method
 default_noise_method = "quarter"
 
-#Ignore DC component in Fourier fit if DC_fact == 0, else DC_fact == 1.
+#Ignore DC component in Fourier fit if DC_fact == 0, else set DC_fact == 1.
 DC_fact = 0
 
 #Upper limit on the width of a Gaussian component to "help" in fitting.  Should
 #be either None or > 0.0.
 wid_max = 0.1
+
+#If PL_model == True, the wid and loc of the gaussian parameters will be
+#modeled with power-law functions instead of linear ones.
+PL_model = False
 
 class DataBunch(dict):
     """
@@ -136,7 +140,7 @@ def gaussian_profile(nbin, loc, wid, norm=False, abs_wid=False, zeroout=True):
         return 0
     sigma = wid / (2 * np.sqrt(2 * np.log(2)))
     mean = loc % 1.0
-    locval = np.arange(nbin, dtype='d') / float(nbin)
+    locval = np.arange(nbin, dtype='d') / np.float64(nbin)
     if (mean < 0.5):
         locval = np.where(np.greater(locval, mean + 0.5), locval - 1.0, locval)
     else:
@@ -221,11 +225,19 @@ def gen_gaussian_portrait(params, phases, freqs, nu_ref, join_ichans=[],
     #Scattering term - first make unscattered portrait
     gparams[:,1] = refparams[1]
     #Locs
-    gparams[:,2::3] = np.outer(freqs - nu_ref, locparams) + np.outer(np.ones(
-        nchan), refparams[2::3])
+    if PL_model:
+        gparams[:,2::3] = np.exp(np.outer(np.log(freqs) - np.log(nu_ref),
+            locparams) + np.outer(np.ones(nchan), np.log(refparams[2::3])))
+    else:
+        gparams[:,2::3] = np.outer(freqs - nu_ref, locparams) + \
+                np.outer(np.ones(nchan), refparams[2::3])
     #Wids
-    gparams[:,3::3] = np.outer(freqs - nu_ref, widparams) + np.outer(np.ones(
-        nchan), refparams[3::3])
+    if PL_model:
+        gparams[:,3::3] = np.exp(np.outer(np.log(freqs) - np.log(nu_ref),
+            widparams) + np.outer(np.ones(nchan), np.log(refparams[3::3])))
+    else:
+        gparams[:,3::3] = np.outer(freqs - nu_ref, widparams) + \
+                np.outer(np.ones(nchan), refparams[3::3])
     #Amps
     gparams[:,4::3] = np.exp(np.outer(np.log(freqs) - np.log(nu_ref),
         ampparams) + np.outer(np.ones(nchan), np.log(refparams[4::3])))
@@ -263,7 +275,7 @@ def powlaw_integral(nu2, nu1, nu_ref, A, alpha):
 
     cf. powlaw(...)
     """
-    alpha = np.float(alpha)
+    alpha = np.float64(alpha)
     if alpha == -1.0:
         return A * nu_ref * np.log(nu2/nu1)
     else:
@@ -282,7 +294,7 @@ def powlaw_freqs(lo, hi, N, alpha, mid=False):
 
     cf. powlaw(...)
     """
-    alpha = np.float(alpha)
+    alpha = np.float64(alpha)
     nus = np.zeros(N + 1)
     if alpha == -1.0:
         nus = np.exp(np.linspace(np.log(lo), np.log(hi), N+1))
@@ -291,8 +303,8 @@ def powlaw_freqs(lo, hi, N, alpha, mid=False):
                 (1+alpha)**-1)
         #Equivalently:
         #for ii in xrange(N+1):
-        #    nus[ii] = ((ii / np.float(N)) * (hi**(1+alpha)) + (1 - (ii /
-        #        np.float(N))) * (lo**(1+alpha)))**(1 / (1+alpha))
+        #    nus[ii] = ((ii / np.float64(N)) * (hi**(1+alpha)) + (1 - (ii /
+        #        np.float64(N))) * (lo**(1+alpha)))**(1 / (1+alpha))
     if mid:
         midnus = np.zeros(N)
         for ii in xrange(N):
@@ -316,6 +328,9 @@ def scattering_kernel(tau, nu_ref, freqs, phases, P, alpha=scattering_alpha):
     return sk
 
 def add_scattering(data, kernel, repeat=3):
+    """
+    repeat should maybe be 5?
+    """
     mid = repeat/2
     d = np.array(list(data.transpose()) * repeat).transpose()
     k = np.array(list(kernel.transpose()) * repeat).transpose()
@@ -625,7 +640,7 @@ def fit_brickwall(prof, noise):
 def half_triangle_function(a, b, dc, N):
     fn = np.zeros(N) + dc
     a = int(np.floor(a))
-    fn[:a] += -(float(b)/a)*np.arange(a) + b
+    fn[:a] += -(np.float64(b)/a)*np.arange(a) + b
     return fn
 
 def find_kc_function(params, data):
@@ -893,7 +908,7 @@ def fit_portrait(data, model, init_params, P, freqs, nu_fit=np.inf,
     hessian = np.array([[hessian[0], hessian[2]], [hessian[2], hessian[1]]])
     covariance_matrix = np.linalg.inv(0.5*hessian)
     covariance = covariance_matrix[0,1]
-    #These are true 1-sigma errors iff covariance = 0
+    #These are true 1-sigma errors iff covariance == 0
     param_errs = list(covariance_matrix.diagonal()**0.5)
     DoF = len(data.ravel()) - (len(freqs) + 2)
     red_chi2 = (d + results.fun) / DoF
@@ -1128,8 +1143,9 @@ def fft_rotate(arr, bins):
     The resulting vector will have the same length as the original.
     """
     arr = np.asarray(arr)
-    freqs = np.arange(arr.size/2 + 1, dtype=np.float)
-    phasor = np.exp(complex(0.0, 2*np.pi) * freqs * bins / float(arr.size))
+    freqs = np.arange(arr.size/2 + 1, dtype=np.float64)
+    phasor = np.exp(complex(0.0, 2*np.pi) * freqs * bins /
+            np.float64(arr.size))
     return np.fft.irfft(phasor * np.fft.rfft(arr), arr.size)
 
 def DM_delay(DM, freq, freq2=np.inf, P=None):
@@ -1188,11 +1204,25 @@ def calculate_TOA(epoch, P, phi, DM=0.0, nu_ref1=np.inf, nu_ref2=np.inf):
     DM [cm**-3 pc], nu_ref1 and nu_ref2 [MHz] will calculate the TOA w.r.t
     nu_ref2.
     """
-    #Phase conversion (hopefully, the signs are correct)...
     #The pre-Doppler corrected DM must be used
     phi_prime = phase_transform(phi, DM, nu_ref1, nu_ref2, P)
     TOA = epoch + pr.MJD((phi_prime * P) / (3600 * 24.))
     return TOA
+
+def get_channel_TOAs(freqs, Ps, epochs, phase, phase_error, DM, nu_ref, obs):
+    """
+    Currently does not get errors "right"...
+    """
+    channel_phases = phase_transform(phase, DM, nu_ref, freqs, Ps, mod=True)
+    channel_TOAs = np.array([calculate_TOA(epochs[ichan], Ps[ichan],
+        channel_phases[ichan]) for ichan in xrange(len(freqs))])
+    for iTOA in range(len(freqs)):
+        TOA_MJDi = channel_TOAs[iTOA].intday()
+        TOA_MJDf = channel_TOAs[iTOA].fracday()
+        #Should calculate error from covariance matrix...
+        TOA_err = phase_error*Ps[iTOA]*1e6
+        freq = freqs[iTOA]
+        write_princeton_TOA(TOA_MJDi, TOA_MJDf, TOA_err, freq, 0.0, obs)
 
 def load_data(filename, dedisperse=False, dededisperse=False, tscrunch=False,
         pscrunch=False, fscrunch=False, rm_baseline=True, flux_prof=False,
@@ -1375,12 +1405,12 @@ def read_model(modelfile, phases=None, freqs=None, P=None, quiet=False):
             if info[0] == "MODEL":
                 name = info[1]
             elif info[0] == "FREQ":
-                nu_ref = float(info[1])
+                nu_ref = np.float64(info[1])
             elif info[0] == "DC":
-                dc = float(info[1])
+                dc = np.float64(info[1])
                 fit_dc = int(info[2])
             elif info[0] == "TAU":
-                tau = float(info[1])
+                tau = np.float64(info[1])
                 fit_tau = int(info[2])
             elif info[0][:4] == "COMP":
                 comps.append(line)
@@ -1396,7 +1426,7 @@ def read_model(modelfile, phases=None, freqs=None, P=None, quiet=False):
     fit_flags[0] = fit_dc
     fit_flags[1] = fit_tau
     for igauss in xrange(ngauss):
-        comp = map(float, comps[igauss].split()[1::2])
+        comp = map(np.float64, comps[igauss].split()[1::2])
         fit_comp = map(int, comps[igauss].split()[2::2])
         params[2 + igauss*6 : 8 + (igauss*6)] = comp
         fit_flags[2 + igauss*6 : 8 + (igauss*6)] = fit_comp
@@ -1488,7 +1518,7 @@ def write_archive(data, ephemeris, freqs, nu0=None, bw=None,
             elif param[0] == "DECJ":
                 DECJ = param[1]
             elif param[0] == "DM":
-                DM = float(param[1])
+                DM = np.float64(param[1])
             else:
                 pass
     #Dec needs to have a sign for the following sky_coord call
@@ -1574,6 +1604,7 @@ def make_fake_pulsar(modelfile, ephemeris, outfile="fake_pulsar.fits", nsub=1,
         DECJ = par.DECJ
         RAJ = par.RAJ
         P0 = par.P0
+        PEPOCH = par.PEPOCH
         DM = par.DM
     except ImportError:
         parfile = open(ephemeris,"r").readlines()
@@ -1586,11 +1617,13 @@ def make_fake_pulsar(modelfile, ephemeris, outfile="fake_pulsar.fits", nsub=1,
             elif param[0] == "DECJ":
                 DECJ = param[1]
             elif param[0] == "F0":
-                P0 = float(param[1])**-1
+                P0 = np.float64(param[1])**-1
             elif param[0] == "P0":
-                P0 = float(param[1])
+                P0 = np.float64(param[1])
+            elif param[0] == "PEPOCH":
+                PEPOCH = np.float64(param[1])
             elif param[0] == "DM":
-                DM = float(line[1])
+                DM = np.float64(line[1])
             else:
                 pass
     #Dec needs to have a sign for the following sky_coord call
@@ -1607,7 +1640,9 @@ def make_fake_pulsar(modelfile, ephemeris, outfile="fake_pulsar.fits", nsub=1,
         arch.set_state(state) #Could also do 'Stokes' here
     #Fill in some subintegration attributes
     if start_MJD is None:
-        start_MJD = pr.MJD(50000, 0, 0.0)
+        start_MJD = pr.MJD(PEPOCH)
+    else:
+        start_MJD = pr.MJD(start_MJD)
     epoch = start_MJD
     epoch += tsub/2.0
     for subint in arch:
@@ -1620,13 +1655,15 @@ def make_fake_pulsar(modelfile, ephemeris, outfile="fake_pulsar.fits", nsub=1,
     arch.set_ephemeris(ephemeris)
     #Now finally, fill in the data!
     #NB the different pols are not realistic: same model, same noise_std
-    name, ngauss, model = read_model(modelfile, phases, freqs, P0, quiet)
-    if scint is not False:
-        if scint is True:
-            model = add_scintillation(model, random=True, nsin=2, amax=1.0,
-                    wmax=5.0)
-        else:
-            model = add_scintillation(model, scint)
+#This has to be redone; using P0 is not correct.
+#    name, ngauss, model = read_model(modelfile, phases, freqs, P0, quiet)
+    dummy1, dummy2, dummy3 = read_model(modelfile, phases, freqs, P0, quiet)
+#    if scint is not False:
+#        if scint is True:
+#            model = add_scintillation(model, random=True, nsin=2, amax=1.0,
+#                    wmax=5.0)
+#        else:
+#            model = add_scintillation(model, scint)
     #If wanting to use PSRCHIVE's rotation scheme, uncomment the dedisperse and
     #dededisperse lines, and set rotmodel = model.
     arch.set_dedispersed(False)
@@ -1636,6 +1673,8 @@ def make_fake_pulsar(modelfile, ephemeris, outfile="fake_pulsar.fits", nsub=1,
     for subint in arch:
         P = subint.get_folding_period()
         for ipol in xrange(npol):
+            name, ngauss, model = read_model(modelfile, phases, freqs, P,
+                    quiet=True)
             rotmodel = rotate_portrait(model, -phase, -(DM+dDM), P, freqs, nu0)
             #rotmodel = model
             if t_scat:
@@ -1683,8 +1722,8 @@ def quick_add_archs(metafile, outfile, rotate=False, fiducial=0.5,
             totweights = np.zeros(nchan)
         if rotate:
             maxbin = data.prof.argmax()
-            rotport = rotate_portrait(data.subints[0,0], maxbin/float(nbin) -
-                    fiducial)
+            rotport = rotate_portrait(data.subints[0,0],
+                    maxbin/np.float64(nbin) - fiducial)
         else:
             rotport = data.subints[0,0]
         totport += rotport

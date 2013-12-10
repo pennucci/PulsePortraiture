@@ -118,18 +118,18 @@ class GetTOAs:
                         self.modelfile, phases, freqs, Ps.mean(), quiet=quiet)
             else:
                 model = self.model
-            nu_fits = np.empty(nsubx, dtype=np.float)
-            nu_refs = np.empty(nsubx, dtype=np.float)
+            nu_fits = np.empty(nsubx, dtype=np.float64)
+            nu_refs = np.empty(nsubx, dtype=np.float64)
             phis = np.empty(nsubx, dtype=np.double)
             phi_errs = np.empty(nsubx, dtype=np.double)
             TOAs = np.empty(nsubx, dtype="object")
             TOA_errs = np.empty(nsubx, dtype="object")
-            DMs = np.empty(nsubx, dtype=np.float)
-            DM_errs = np.empty(nsubx, dtype=np.float)
-            doppler_fs = np.empty(nsubx, dtype=np.float)
+            DMs = np.empty(nsubx, dtype=np.float64)
+            DM_errs = np.empty(nsubx, dtype=np.float64)
+            doppler_fs = np.empty(nsubx, dtype=np.float64)
             nfevals = np.empty(nsubx, dtype="int")
             rcs = np.empty(nsubx, dtype="int")
-            scales = np.empty([nsubx, nchan], dtype=np.float)
+            scales = np.empty([nsubx, nchan], dtype=np.float64)
             #These next two are lists because in principle,
             #the subints could have different numbers of zapped channels.
             scalesx = []
@@ -399,7 +399,8 @@ class GetTOAs:
                     TOA_MJDi = TOAs[isubx].intday()
                     TOA_MJDf = TOAs[isubx].fracday()
                     TOA = "%5d"%int(TOA_MJDi) + ("%.13f"%TOA_MJDf)[1:]
-                    dmerrs.write("%s\t%.8f\t%.6f\n"%(TOA, DM0, DM_err))
+                    dmerrs.write("%s\t%.8f\t%.6f\n"%(TOA,
+                        self.DMs[ifile][isubx], DM_err))
         if dmerrfile is not None:
             dmerrs.close()
         sys.stdout = sys.__stdout__
@@ -497,7 +498,8 @@ class GetTOAs:
         show_residual_plot(port=port, model=model_scaled, resids=None,
                 phases=phases, freqs=freqs, titles=titles,
                 rvrsd=bool(data.bw < 0))
-        return port, model_scaled
+        return (port, model_scaled, weights, data.freqs,
+                data.noise_stds[isubx,0])
 
     def show_results(self, datafile=None):
         """
@@ -728,9 +730,9 @@ if __name__ == "__main__":
         if nu_ref == "inf":
             nu_ref = np.inf
         else:
-            nu_ref = float(nu_ref)
+            nu_ref = np.float64(nu_ref)
     DM0 = options.DM0
-    if DM0: DM0 = float(DM0)
+    if DM0: DM0 = np.float64(DM0)
     bary_DM = options.bary_DM
     one_DM = options.one_DM
     fit_DM = options.fit_DM

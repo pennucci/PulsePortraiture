@@ -246,7 +246,8 @@ class DataPortrait:
             self.fit_flags[5::6] *= not(fixwid)
             self.fit_flags[7::6] *= not(fixamp)
             if fiducial_gaussian:
-                ifgauss = self.init_params[4::3].argmax()
+                #ifgauss = self.init_params[4::3].argmax()
+                ifgauss = 0
                 self.fit_flags[3::6] = 1
                 self.fit_flags[3::6][ifgauss] = 0
         #The noise...
@@ -674,7 +675,7 @@ if __name__ == "__main__":
                       help="Number of iterations to loop for generating better model. [default=0]")
     parser.add_option("--fgauss",
                       action="store_true", dest="fgauss", default=False,
-                      help="Sets fitloc=True except for the largest gaussian component based on the intial parameters at nu_ref.  i.e. sets a 'fiducial gaussian'.")
+                      help="Sets fitloc=True except for the first gaussian component fitted in the initial profile fit.  i.e. sets a 'fiducial gaussian'.")
     parser.add_option("--figure", metavar="figurename",
                       action="store", dest="figure", default=False,
                       help="Save PNG figure of final fit to figurename. [default=Not saved]")
@@ -695,11 +696,11 @@ if __name__ == "__main__":
     if metafile is not None: datafile = metafile
     outfile = options.outfile
     model_name = options.model_name
-    if options.nu_ref: nu_ref = float(options.nu_ref)
+    if options.nu_ref: nu_ref = np.float64(options.nu_ref)
     else: nu_ref = options.nu_ref
-    if options.bw_ref: bw_ref = float(options.bw_ref)
+    if options.bw_ref: bw_ref = np.float64(options.bw_ref)
     else: bw_ref = options.bw_ref
-    tau = float(options.tau)
+    tau = np.float64(options.tau)
     fixloc = options.fixloc
     fixwid = options.fixwid
     fixamp = options.fixamp
