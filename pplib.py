@@ -85,7 +85,7 @@ wid_max = 0.1
 
 #If PL_model == True, the wid and loc of the gaussian parameters will be
 #modeled with power-law functions instead of linear ones.
-PL_model = False
+PL_model = True
 
 class DataBunch(dict):
     """
@@ -369,6 +369,30 @@ def add_scintillation(port, params=None, random=True, nsin=2, amax=1.0,
             pattern += a * np.sin(np.linspace(0, w * np.pi, nchan) +
                     p*np.pi)**2
     return np.transpose(np.transpose(port) * pattern)
+
+def mean_C2N(nu, D, bw_scint):
+    """
+    mean_C2N [m**(-20/3)
+    For use with scattering measure.
+    nu is frequency [MHz]
+    D is distance [kpc]
+    bw_scint is scintillation bandwidth [MHz]
+    cf. Foster, Fairhead, and Backer (1991)
+    """
+    return 2e-14 * nu**(11/3.0) * D**(-11/6.0) * bw_scint**(-5/6.0)
+
+def dDM(D, D_screen, nu, bw_scint):
+    """
+    Frequency dependent delta-DM [cm**-3 pc] from multipath screen averaging
+    D is the distance to the pulsar [kpc]
+    D_screen is the distance from the Earth to the scattering screen [kpc]
+    nu1 is the frequency [MHz]
+    bw_scint is scintillation bandwidth at nu [MHz]
+    cf. Foster, Fairhead, and Backer (1991); Cordes & Shannon (2010)
+    """
+    #SM is the scattering measure [m**(-20/3) kpc]
+    SM = mean_C2N(nu, D, bw_scint) * D
+    return 10**4.45 * SM * D_screen**(5/6.0) * nu**(-11/6.0)
 
 def fit_powlaw_function(params, freqs, nu_ref, data=None, errs=None):
     """
