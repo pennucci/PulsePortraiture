@@ -81,7 +81,7 @@ DC_fact = 0
 
 #Upper limit on the width of a Gaussian component to "help" in fitting.  Should
 #be either None or > 0.0.
-wid_max = 0.1
+wid_max = 0.2
 
 #If PL_model == True, the wid and loc of the gaussian parameters will be
 #modeled with power-law functions instead of linear ones.
@@ -945,6 +945,7 @@ def fit_portrait(data, model, init_params, P, freqs, nu_fit=np.inf,
 
 def fit_phase_shift(data, model, err=None, bounds=[-0.5, 0.5]):
     """
+    err is time-domain noise-level.
     """
     dFFT = fft.rfft(data)
     dFFT[0] *= DC_fact
@@ -953,6 +954,8 @@ def fit_phase_shift(data, model, err=None, bounds=[-0.5, 0.5]):
     if err is None:
         #err = np.real(dFFT[-len(dFFT)/4:]).std()
         err = get_noise(data) * np.sqrt(len(data)/2.0)
+    else:
+        err *= np.sqrt(len(data)/2.0)
     d = np.real(np.sum(dFFT * np.conj(dFFT))) / err**2.0
     p = np.real(np.sum(mFFT * np.conj(mFFT))) / err**2.0
     other_args = (mFFT, dFFT, err)
@@ -1235,6 +1238,7 @@ def calculate_TOA(epoch, P, phi, DM=0.0, nu_ref1=np.inf, nu_ref2=np.inf):
 
 def get_channel_TOAs(freqs, Ps, epochs, phase, phase_error, DM, nu_ref, obs):
     """
+    Experimental, probably wrong.
     Currently does not get errors "right"...
     """
     channel_phases = phase_transform(phase, DM, nu_ref, freqs, Ps, mod=True)
@@ -1471,7 +1475,7 @@ def read_model(modelfile, phases=None, freqs=None, P=None, quiet=False):
             bw = (freqs[-1] - freqs[0]) + ((freqs[-1] - freqs[-2]))
         else:
             bw = 0.0
-        print "%d frequency channels, %.0f MHz bandwidth, centered near %.3f MHz,"%(nchan, abs(bw), freqs.mean())
+        print "%d frequency channels, %.0f MHz bandwidth, centered near ~%.3f MHz,"%(nchan, abs(bw), freqs.mean())
         print "with model parameters referenced at %.3f MHz."%nu_ref
     if read_only:
         return name, nu_ref, ngauss, params, fit_flags

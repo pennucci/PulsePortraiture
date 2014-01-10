@@ -96,6 +96,7 @@ class GetTOAs:
         self.bary_DM = bary_DM
         start = time.time()
         tot_duration = 0.0
+        nu_fit_default = nu_fit
         if datafile is None:
             datafiles = self.datafiles
         else:
@@ -180,9 +181,11 @@ class GetTOAs:
                 #and the discrepancy in the phase estimates is at the sub-1ns
                 #level, and sub-micro-DM level; the covariances are also
                 #different, but all very similar as well.
-                if nu_fit is None:
+                if nu_fit_default is None:
                     #nu_fit = guess_fit_freq(freqsx, channel_SNRs)
                     nu_fit = guess_fit_freq(freqsx, SNRsx)
+                else:
+                    nu_fit = nu_fit_default
                 nu_fits[isubx] = nu_fit
 
                 ####################
@@ -705,7 +708,7 @@ if __name__ == "__main__":
                       help='Append pam commands to file "pam_cmd."')
     parser.add_option("--common",
                       action="store_true", dest="common", default=False,
-                      help="If supplying a metafile, use this flag if the data are homogenous (i.e. have the same nu0, bw, nchan, nbin)")
+                      help="If supplying a metafile, use this flag if the data are homogenous (i.e. have the same nu0, bw, nchan, nbin).  Not recommended for use...")
     parser.add_option("--showplot",
                       action="store_true", dest="showplot", default=False,
                       help="Plot fit results for each epoch. Only useful if nsubint > 1.")
