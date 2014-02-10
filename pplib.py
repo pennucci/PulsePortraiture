@@ -558,9 +558,6 @@ def fit_portrait_function_2deriv(params, model=None, p_n=None, data=None,
     function (this function).
     The covariance matrix is the inverse of the curvature matrix.
 
-    If transform is True, return the diagonalized Hessian values, i.e. the
-    zero-covariance values.
-
     cf. fit_portrait, fit_portrait_function
     """
     phase = params[0]
@@ -761,6 +758,8 @@ def fit_gaussian_profile(data, init_params, errs, fit_scattering=False,
             kws=other_args)
     fitted_params = np.array([param.value for param in
         results.params.itervalues()])
+    fit_errs = np.array([param.stderr for param in
+        results.params.itervalues()])
     dof = results.nfree
     redchi_sq = results.redchi
     residuals = results.residual
@@ -775,7 +774,7 @@ def fit_gaussian_profile(data, init_params, errs, fit_scattering=False,
         print "residuals mean: %.3g" % np.mean(residuals)
         print "residuals stdev: %.3g" % np.std(residuals)
         print "---------------------------------------------------------------"
-    return fitted_params, redchi_sq, dof, residuals
+    return fitted_params, fit_errs, redchi_sq, dof, residuals
 
 def fit_gaussian_portrait(data, init_params, errs, fit_flags, phases, freqs,
         nu_ref, join_params=[], P=None, quiet=True):
@@ -852,6 +851,8 @@ def fit_gaussian_portrait(data, init_params, errs, fit_flags, phases, freqs,
             kws=other_args)
     fitted_params = np.array([param.value for param in
         results.params.itervalues()])
+    fit_errs = np.array([param.stderr for param in
+        results.params.itervalues()])
     dof = results.nfree
     chi_sq = results.chisqr
     redchi_sq = results.redchi
@@ -867,7 +868,7 @@ def fit_gaussian_portrait(data, init_params, errs, fit_flags, phases, freqs,
         print "residuals mean: %.3g" %np.mean(residuals)
         print "residuals stdev: %.3g" %np.std(residuals)
         print "---------------------------------------------------------------"
-    return fitted_params, chi_sq, dof
+    return fitted_params, fit_errs, chi_sq, dof
 
 def fit_portrait(data, model, init_params, P, freqs, nu_fit=np.inf,
         nu_out=None, errs=None, bounds=[(None, None), (None, None)], id=None,
@@ -1312,6 +1313,12 @@ def load_data(filename, dedisperse=False, dededisperse=False, tscrunch=False,
     weights = arch.get_weights()
     weights_norm = np.where(weights == 0.0, np.zeros(weights.shape),
             np.ones(weights.shape))
+    #Get off-pulse noise
+    noise_stds = np.array([arch.get_Integration(isub).baseline_stats()[1]**0.5
+        for isub in xrange(nsub)])
+#If weights are not set...?
+#    weights = np.where(noise_stds[0],weights,0)
+#    weights_norm = np.where(noise_stds[0],weights_norm,0)
     okisub = np.compress(weights_norm.mean(axis=1), np.arange(nsub))
     okichan = np.compress(weights_norm.mean(axis=0), np.arange(nchan))
     #np.einsum is AWESOME
@@ -1329,13 +1336,8 @@ def load_data(filename, dedisperse=False, dededisperse=False, tscrunch=False,
                 SNRs[isub, ipol, ichan] = \
                         arch.get_Integration(isub).get_Profile(ipol,
                                 ichan).snr()
-    noise_stds = np.array([arch.get_Integration(isub).baseline_stats()[1]**0.5
-        for isub in xrange(nsub)])
     #The rest is now ignoring npol...
     arch.pscrunch()
-    #Estimate noise
-    #noise_stds = np.array([get_noise(subints[isub,0]) for isub in xrange(
-    #nsub)])
     if flux_prof:
         #Flux profile
         #The below is about equal to bscrunch to ~6 places

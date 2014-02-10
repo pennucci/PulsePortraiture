@@ -48,7 +48,8 @@ class DataPortrait:
             for ifile in range(len(self.datafiles)):
                 datafile = self.datafiles[ifile]
                 data = load_data(datafile, dedisperse=True, tscrunch=True,
-                        pscrunch=True, flux_prof=True, norm_weights=True,
+                        pscrunch=True, fscrunch=False, rm_baseline=True,
+                        flux_prof=True, norm_weights=True,
                         quiet=quiet)
                 self.nchan += data.nchan
                 self.nchanx += data.nchanx
@@ -203,10 +204,12 @@ class DataPortrait:
     def make_gaussian_model(self, modelfile=None,
             ref_prof=(None, None), tau=0.0, fixloc=False, fixwid=False,
             fixamp=False, fixscat=True, niter=0, fiducial_gaussian=False,
-            writemodel=False, outfile=None, model_name=None, residplot=None,
-            quiet=False):
+            writemodel=False, outfile=None, writeerrfile=False, errfile=None,
+            model_name=None, residplot=None, quiet=False):
         """
         """
+        if errfile is None and outfile is not None:
+            errfile = outfile + "_err"
         if modelfile:
             (self.model_name, self.nu_ref, self.ngauss, self.init_model_params,
                     self.fit_flags) = read_model(modelfile)
@@ -273,6 +276,8 @@ class DataPortrait:
         self.cnvrgnc = self.check_convergence(efac=1.0, quiet=quiet)
         if writemodel:
             self.write_model(outfile=outfile, quiet=quiet)
+        if writeerrfile:
+            self.write_errfile(errfile=errfile, quiet=quiet)
         while (self.niter and not self.cnvrgnc):
             if self.cnvrgnc:
                 break
@@ -297,6 +302,8 @@ class DataPortrait:
             if writemodel:
                 self.write_model(outfile=outfile, quiet=quiet)
             self.cnvrgnc = self.check_convergence(efac=1.0, quiet=quiet)
+            if writeerrfile:
+                self.write_errfile(errfile=errfile, quiet=quiet)
         if self.njoin:
             for ii in range(self.njoin):
                 jic = self.join_ichans[ii]
@@ -334,7 +341,7 @@ class DataPortrait:
         """
         while (1):
             start = time.time()
-            self.fitted_params, self.chi_sq, self.dof = (
+            self.fitted_params, self.fit_errs, self.chi_sq, self.dof = (
                     fit_gaussian_portrait(self.portx, self.model_params,
                         self.portx_noise, self.fit_flags, self.phases,
                         self.freqsxs[0], self.nu_ref, self.all_join_params,
@@ -342,7 +349,9 @@ class DataPortrait:
             if self.njoin:
                 #FIX, convergence can be based on residuals
                 self.model_params = self.fitted_params[:-self.njoin*2]
+                self.model_param_errs = self.fit_errs[:-self.njoin*2]
                 self.join_params = self.fitted_params[-self.njoin*2:]
+                self.join_param_errs = self.fit_errs[-self.njoin*2:]
                 self.all_join_params[1] = self.join_params
                 self.phi = 0.5
                 self.phierr = 0.0
@@ -353,6 +362,7 @@ class DataPortrait:
                 print "JOIN PARAMS", self.join_params
             else:
                 self.model_params = self.fitted_params[:]
+                self.model_param_errs = self.fit_errs[:]
             self.model = gen_gaussian_portrait(self.fitted_params,
                     self.phases, self.freqs, self.nu_ref,
                     self.join_ichans, self.Ps[0])
@@ -406,9 +416,19 @@ class DataPortrait:
         #Aesthetic mod?
         model_params[2::6] = np.where(model_params[2::6] >= 1.0,
                 model_params[2::6] % 1, model_params[2::6])
+        #Convert tau (scattering timescale) to sec
         model_params[1] *= self.Ps[0] / self.nbin
         write_model(outfile, self.model_name, self.nu_ref, model_params,
                 self.fit_flags, append=append, quiet=quiet)
+
+    def write_errfile(self, errfile=None, append=False, quiet=False):
+        if errfile is None:
+            errfile = self.datafile + ".gmodel_errs"
+        model_param_errs = np.copy(self.fit_errs)
+        #Convert tau (scattering timescale) to sec
+        model_param_errs[1] *= self.Ps[0] / self.nbin
+        write_model(errfile, self.model_name+"_errors", self.nu_ref,
+                model_param_errs, self.fit_flags, append=append, quiet=quiet)
 
     def show_data_portrait(self):
         """
@@ -587,10 +607,12 @@ class GaussianSelector:
         # Middle mouse button = fit the gaussians
         elif event1.button == event2.button == 2:
             print "Fitting reference gaussian profile..."
-            fitted_params, chi_sq, dof, residuals = fit_gaussian_profile(
-                    self.profile, self.init_params, np.zeros(self.proflen) +
-                    self.errs, self.fit_scattering, quiet=True)
+            fitted_params, fit_errs, chi_sq, dof, residuals = (
+                    fit_gaussian_profile(self.profile, self.init_params,
+                        np.zeros(self.proflen) + self.errs,
+                        self.fit_scattering, quiet=True))
             self.fitted_params = fitted_params
+            self.fit_errs = fit_errs
             # scaled uncertainties
             #scaled_fit_errs = fit_errs * np.sqrt(chi_sq / dof)
 
@@ -644,6 +666,9 @@ if __name__ == "__main__":
     parser.add_option("-o", "--outfile",
                       action="store", metavar="outfile", dest="outfile",
                       help="Name of output model file name. [default=archive.gmodel]")
+    parser.add_option("-e", "--errfile",
+                      action="store", metavar="errfile", dest="errfile",
+                      help="Name of parameter error file name. [default=outfile_err]")
     parser.add_option("-m", "--model_name",
                       action="store", metavar="model_name", dest="model_name",
                       help="Name given to model. [default=PSRCHIVE Source name]")
@@ -695,6 +720,7 @@ if __name__ == "__main__":
     metafile = options.metafile
     if metafile is not None: datafile = metafile
     outfile = options.outfile
+    errfile = options.errfile
     model_name = options.model_name
     if options.nu_ref: nu_ref = np.float64(options.nu_ref)
     else: nu_ref = options.nu_ref
@@ -716,4 +742,5 @@ if __name__ == "__main__":
             ref_prof=(nu_ref, bw_ref), tau=tau, fixloc=fixloc, fixwid=fixwid,
             fixamp=fixamp, fixscat=fixscat, niter=niter,
             fiducial_gaussian=fgauss, writemodel=True, outfile=outfile,
-            model_name=model_name, residplot=figure, quiet=quiet)
+            writeerrfile=True, errfile=errfile, model_name=model_name,
+            residplot=figure, quiet=quiet)
