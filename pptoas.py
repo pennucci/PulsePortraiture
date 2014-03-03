@@ -337,7 +337,7 @@ class GetTOAs:
             tot_duration = time.time() - start
         if not quiet:
             print "--------------------------"
-            print "Total time: %.2f, ~%.2f min/TOA"%(tot_duration / 60,
+            print "Total time: %.2f min, ~%.2f min/TOA"%(tot_duration / 60,
                     tot_duration / (60 * np.sum(np.array(self.nsubxs))))
 
     def write_TOAs(self, datafile=None, outfile=None, nu_ref=None,
@@ -403,7 +403,7 @@ class GetTOAs:
                     TOA_MJDf = TOAs[isubx].fracday()
                     TOA = "%5d"%int(TOA_MJDi) + ("%.13f"%TOA_MJDf)[1:]
                     dmerrs.write("%s\t%.8f\t%.6f\n"%(TOA,
-                        self.DMs[ifile][isubx], DM_err))
+                        self.DMs[ifile][isubx], self.DM_errs[ifile][isubx]))
         if dmerrfile is not None:
             dmerrs.close()
         sys.stdout = sys.__stdout__
