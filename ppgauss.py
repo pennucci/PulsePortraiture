@@ -652,7 +652,7 @@ if __name__ == "__main__":
 
     from optparse import OptionParser
 
-    usage = "usage: %prog [Options]"
+    usage = "usage: %prog [options]"
     parser = OptionParser(usage)
     #parser.add_option("-h", "--help",
     #                  action="store_true", dest="help", default=False,
