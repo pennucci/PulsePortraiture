@@ -1,1 +1,9 @@
-This is Tim's wideband timing code
+For use with PSRCHIVE-compatible folded archives.
+
+Full documentation/docstrings coming soon.
+
+ppgauss will build a model; pptoas will measure TOAs and DMs.
+
+examples/example.py can be run as a demonstration.
+
+See arxiv:1402:1672 for a technical description.

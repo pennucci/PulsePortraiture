@@ -94,12 +94,12 @@ gt.show_fit()
 #Write TOAs
 gt.write_TOAs(outfile="example.tim")
 #See fitted versus injected DMs
-print ""
-print "Injected DMs, mean, std:"
-print dDMs, dDM_mean, dDM_std
-print "Measured average DM offsets, mean, std:"
+#print ""
+#print "Injected DMs, mean, std:"
+#print dDMs, dDM_mean, dDM_std
+#print "Measured average DM offsets, mean, std:"
 dDM_fit = pt.np.array(gt.DeltaDM_means)
-print dDM_fit, dDM_fit.mean(), dDM_fit.std()
+#print dDM_fit, dDM_fit.mean(), dDM_fit.std()
 diff = dDMs - dDM_fit
-print "Difference, mean, std:"
-print diff, diff.mean(), diff.std()
+#print "Difference, mean, std:"
+#print diff, diff.mean(), diff.std()
