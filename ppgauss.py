@@ -146,17 +146,19 @@ class DataPortrait:
             self.noise_stdsxs = self.noise_stds[0,0,self.okichan]
             self.SNRsxs = self.SNRs[0,0,self.okichan]
 
-    def fit_profile(self, profile, tau=0.0, fixscat=True):
+    def fit_profile(self, profile, tau=0.0, fixscat=True, auto_gauss=0.0,
+            show=True):
         """
         """
         fig = plt.figure()
         profplot = fig.add_subplot(211)
         #Noise below may be off
-        interactor = GaussianSelector(profplot, profile, get_noise(profile),
-                tau=tau, fixscat=fixscat, minspanx=None, minspany=None,
+        self.interactor = GaussianSelector(profplot, profile,
+                get_noise(profile), tau=tau, fixscat=fixscat,
+                auto_gauss=auto_gauss, minspanx=None, minspany=None,
                 useblit=True)
-        plt.show()
-        self.init_params = interactor.fitted_params
+        if show: plt.show()
+        self.init_params = self.interactor.fitted_params
         self.ngauss = (len(self.init_params) - 2) / 3
 
     def fit_flux_profile(self, guessA=1.0, guessalpha=0.0, fit=True, plot=True,
@@ -204,8 +206,8 @@ class DataPortrait:
     def make_gaussian_model(self, modelfile=None,
             ref_prof=(None, None), tau=0.0, fixloc=False, fixwid=False,
             fixamp=False, fixscat=True, niter=0, fiducial_gaussian=False,
-            writemodel=False, outfile=None, writeerrfile=False, errfile=None,
-            model_name=None, residplot=None, quiet=False):
+            auto_gauss=0.0, writemodel=False, outfile=None, writeerrfile=False,
+            errfile=None, model_name=None, residplot=None, quiet=False):
         """
         """
         if errfile is None and outfile is not None:
@@ -232,7 +234,8 @@ class DataPortrait:
                 #values for the profile than self.profile, if given the full
                 #band and center frequency.  Unsure why; shouldn't matter.
                 profile = np.take(self.port, okinds, axis=0).mean(axis=0)
-                self.fit_profile(profile, tau=tau, fixscat=fixscat)
+                self.fit_profile(profile, tau=tau, fixscat=fixscat,
+                        auto_gauss=auto_gauss)
             #All slopes, spectral indices start at 0.0
             locparams = widparams = ampparams = np.zeros(self.ngauss)
             self.init_model_params = np.empty([self.ngauss, 6])
@@ -292,7 +295,7 @@ class DataPortrait:
                             self.DM, self.Ps[0], self.freqsxs[0], self.nu_fit)
                 else:
                     if not quiet:
-                        print "\...iteration %d..."%(self.itern - self.niter +
+                        print "...iteration %d..."%(self.itern - self.niter +
                                 1)
             if not quiet:
                 print "Fitting gaussian model portrait..."
@@ -447,15 +450,16 @@ class DataPortrait:
 
 class GaussianSelector:
     def __init__(self, ax, profile, errs, tau=0.0, fixscat=True, minspanx=None,
-            minspany=None, useblit=True):
+            minspany=None, useblit=True, auto_gauss=0.1):
         """
         Ripped and altered from SMR's pygaussfit.py
         """
-        print ""
-        print "============================================="
-        print "Left mouse click to draw a Gaussian component"
-        print "Middle mouse click to fit components to data"
-        print "Right mouse click to remove a component"
+        if not auto_gauss:
+            print ""
+            print "============================================="
+            print "Left mouse click to draw a Gaussian component"
+            print "Middle mouse click to fit components to data"
+            print "Right mouse click to remove a component"
         print "============================================="
         print "Press 'q' or close window when done fitting"
         print "============================================="
@@ -491,6 +495,46 @@ class GaussianSelector:
         # will save the data (pos. at mouserelease)
         self.eventrelease = None
         self.plot_gaussians(self.init_params)
+        self.auto_gauss = auto_gauss
+        if self.auto_gauss:
+            amp = self.profile.max()
+            wid = self.auto_gauss
+            first_gauss = amp*gaussian_profile(self.proflen, 0.5, wid)
+            loc = 0.5 + fit_phase_shift(self.profile, first_gauss,
+                    self.errs).phase
+            self.init_params += [loc, wid, amp]
+            self.ngauss += 1
+            self.plot_gaussians(self.init_params)
+            print "Auto-fitting single gaussian profile..."
+            fitted_params, fit_errs, chi_sq, dof, residuals = (
+                    fit_gaussian_profile(self.profile, self.init_params,
+                        np.zeros(self.proflen) + self.errs,
+                        self.fit_scattering, quiet=True))
+            self.fitted_params = fitted_params
+            self.fit_errs = fit_errs
+            self.chi_sq = chi_sq
+            self.dof = dof
+            self.residuals = residuals
+            # scaled uncertainties
+            #scaled_fit_errs = fit_errs * np.sqrt(chi_sq / dof)
+
+            # Plot the best-fit profile
+            self.plot_gaussians(fitted_params)
+            fitprof = gen_gaussian_profile(fitted_params, self.proflen)
+            plt.plot(self.phases, fitprof, c='black', lw=1)
+            plt.draw()
+
+            # Plot the residuals
+            plt.subplot(212)
+            plt.cla()
+            residuals = self.profile - fitprof
+            plt.plot(self.phases, residuals,'k')
+            plt.xlabel('Pulse Phase')
+            plt.ylabel('Data-Fit Residuals')
+            plt.draw()
+            self.eventpress = None
+            # will save the data (pos. at mouserelease)
+            self.eventrelease = None
 
     def update_background(self, event):
         'force an update of the background'
@@ -613,6 +657,9 @@ class GaussianSelector:
                         self.fit_scattering, quiet=True))
             self.fitted_params = fitted_params
             self.fit_errs = fit_errs
+            self.chi_sq = chi_sq
+            self.dof = dof
+            self.residuals = residuals
             # scaled uncertainties
             #scaled_fit_errs = fit_errs * np.sqrt(chi_sq / dof)
 
@@ -701,6 +748,9 @@ if __name__ == "__main__":
     parser.add_option("--fgauss",
                       action="store_true", dest="fgauss", default=False,
                       help="Sets fitloc=True except for the first gaussian component fitted in the initial profile fit.  i.e. sets a 'fiducial gaussian'.")
+    parser.add_option("--autogauss",
+                      action="store", dest="auto_gauss", default=0.0,
+                      help="Automatically fit one gaussian to initial profile with initial width [rot] given as the argument.")
     parser.add_option("--figure", metavar="figurename",
                       action="store", dest="figure", default=False,
                       help="Save PNG figure of final fit to figurename. [default=Not saved]")
@@ -733,6 +783,7 @@ if __name__ == "__main__":
     fixscat = not options.fitscat
     niter = int(options.niter)
     fgauss = options.fgauss
+    auto_gauss = float(options.auto_gauss)
     figure = options.figure
     quiet = options.quiet
 
@@ -741,6 +792,6 @@ if __name__ == "__main__":
     dp.make_gaussian_model(modelfile = None,
             ref_prof=(nu_ref, bw_ref), tau=tau, fixloc=fixloc, fixwid=fixwid,
             fixamp=fixamp, fixscat=fixscat, niter=niter,
-            fiducial_gaussian=fgauss, writemodel=True, outfile=outfile,
-            writeerrfile=True, errfile=errfile, model_name=model_name,
-            residplot=figure, quiet=quiet)
+            fiducial_gaussian=fgauss, auto_gauss=auto_gauss, writemodel=True,
+            outfile=outfile, writeerrfile=True, errfile=errfile,
+            model_name=model_name, residplot=figure, quiet=quiet)
