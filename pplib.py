@@ -761,6 +761,7 @@ def fit_gaussian_profile(data, init_params, errs, fit_scattering=False,
     fit_errs = np.array([param.stderr for param in
         results.params.itervalues()])
     dof = results.nfree
+    chi_sq = results.chisqr
     redchi_sq = results.redchi
     residuals = results.residual
     if not quiet:
@@ -774,7 +775,7 @@ def fit_gaussian_profile(data, init_params, errs, fit_scattering=False,
         print "residuals mean: %.3g" % np.mean(residuals)
         print "residuals stdev: %.3g" % np.std(residuals)
         print "---------------------------------------------------------------"
-    return fitted_params, fit_errs, redchi_sq, dof, residuals
+    return fitted_params, fit_errs, chi_sq, dof, residuals
 
 def fit_gaussian_portrait(data, init_params, errs, fit_flags, phases, freqs,
         nu_ref, join_params=[], P=None, quiet=True):
