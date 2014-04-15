@@ -107,7 +107,7 @@ def set_colormap(colormap):
 
     if im is not None:
         exec("im.set_cmap(plt.cm.%s)"%colormap)
-    draw_if_interactive()
+    plt.draw_if_interactive()
 
 def gaussian_function(xs, loc, wid, norm=False):
     """
