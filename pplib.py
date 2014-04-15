@@ -1928,7 +1928,7 @@ def show_residual_plot(port, model, resids=None, phases=None, freqs=None,
         plt.title(titles[0])
     ax2 = plt.subplot(grid[:mm, -mm:])
     im = plt.imshow(model, aspect=aspect, origin=origin, extent=extent,
-            interpolation=interpolation, **kwargs)
+            interpolation=interpolation, vmin=im.properties()['clim'], **kwargs)
     if colorbar: plt.colorbar(im, ax=ax2, use_gridspec=False)
     plt.xlabel(xlabel)
     plt.ylabel(ylabel)
