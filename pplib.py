@@ -34,11 +34,11 @@ else:
     plt.rc("image", cmap="pink")
 
 #List of colors
-cols = ['b', 'g', 'r', 'c', 'm', 'y',
-        'b', 'g', 'r', 'c', 'm', 'y',
-        'b', 'g', 'r', 'c', 'm', 'y',
-        'b', 'g', 'r', 'c', 'm', 'y',
-        'b', 'g', 'r', 'c', 'm', 'y']
+cols = ['b', 'g', 'r', 'c', 'm', 'y', 'k',
+        'b', 'g', 'r', 'c', 'm', 'y', 'k',
+        'b', 'g', 'r', 'c', 'm', 'y', 'k',
+        'b', 'g', 'r', 'c', 'm', 'y', 'k',
+        'b', 'g', 'r', 'c', 'm', 'y', 'k']
 
 #List of observatory codes; not sure what "0" corresponds to.
 #Cross-check against TEMPO's obsys.dat; need TEMPO2 codes
