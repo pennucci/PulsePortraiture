@@ -27,11 +27,25 @@ import psrchive as pr
 
 #Colormap preference
 #Comment these out for dispatching on nodes (not implemented yet)
-#plt.copper()
-#plt.gray()
-#plt.bone()
-#plt.summer()
-plt.pink()
+def cubehelix():
+    '''
+    Stolen from plt.pink() function.
+    set the default colormap to cubehelix and apply to current image if any.
+    See help(colormaps) for more information
+    '''
+    plt.rc('image', cmap='cubehelix')
+    im = plt.gci()
+    if im is not None:
+        im.set_cmap(cm.cubehelix)
+    plt.draw_if_interactive()
+if hasattr(plt.cm, "cubehelix"):
+    cubehelix()
+else:
+    #plt.copper()
+    #plt.gray()
+    #plt.bone()
+    #plt.summer()
+    plt.pink()   
 plt.close("all")
 
 #List of colors
