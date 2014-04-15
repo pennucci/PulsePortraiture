@@ -25,9 +25,8 @@ import scipy.signal as ss
 import lmfit as lm
 import psrchive as pr
 
-#Colormap preference -- cubehelix, pink, summer, bone, gray, copper are all decent.
+#Colormap preference -- cubehelix, pink, hot, terrain, spectral, gist_heat, seismic are all interesting....see plt.cm for list of available colormaps.
 default_colormap = "cubehelix"
-#Stolen from plt.pink() function; set the default colormap to colormap and apply to current image if any.
 if hasattr(plt.cm, default_colormap):
     plt.rc("image", cmap=default_colormap)
 else:
