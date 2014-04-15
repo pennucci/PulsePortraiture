@@ -25,28 +25,13 @@ import scipy.signal as ss
 import lmfit as lm
 import psrchive as pr
 
-#Colormap preference
-#Comment these out for dispatching on nodes (not implemented yet)
-def cubehelix():
-    '''
-    Stolen from plt.pink() function.
-    set the default colormap to cubehelix and apply to current image if any.
-    See help(colormaps) for more information
-    '''
-    plt.rc('image', cmap='cubehelix')
-    im = plt.gci()
-    if im is not None:
-        im.set_cmap(cm.cubehelix)
-    plt.draw_if_interactive()
-if hasattr(plt.cm, "cubehelix"):
-    cubehelix()
+#Colormap preference -- cubehelix, pink, summer, bone, gray, copper are all decent.
+default_colormap = "cubehelix"
+#Stolen from plt.pink() function; set the default colormap to colormap and apply to current image if any.
+if hasattr(plt.cm, default_colormap):
+    plt.rc("image", cmap=default_colormap)
 else:
-    #plt.copper()
-    #plt.gray()
-    #plt.bone()
-    #plt.summer()
-    plt.pink()   
-plt.close("all")
+    plt.rc("image", cmap="pink")
 
 #List of colors
 cols = ['b', 'g', 'r', 'c', 'm', 'y',
@@ -110,6 +95,19 @@ class DataBunch(dict):
     def __init__(self, **kwds):
         dict.__init__(self, kwds)
         self.__dict__ = self
+
+def set_colormap(colormap):
+    """
+    Stolen from plt.pink()
+    Set the default colormap to colormap and apply to current image if any.
+    See help(colormaps) for more information
+    """
+    plt.rc("image", cmap=colormap)
+    im = plt.gci()
+
+    if im is not None:
+        exec("im.set_cmap(plt.cm.%s)"%colormap)
+    draw_if_interactive()
 
 def gaussian_function(xs, loc, wid, norm=False):
     """
