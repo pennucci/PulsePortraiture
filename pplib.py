@@ -74,7 +74,7 @@ Dconst = Dconst_trad
 scattering_alpha = -4.0
 
 #Default get_noise method
-default_noise_method = "quarter"
+default_noise_method = "PS"
 
 #Ignore DC component in Fourier fit if DC_fact == 0, else set DC_fact == 1.
 DC_fact = 0
@@ -978,15 +978,15 @@ def fit_phase_shift(data, model, err=None, bounds=[-0.5, 0.5]):
 def get_noise(data, method=default_noise_method, **kwargs):
     """
     """
-    if method == "quarter":
-        return get_noise_quarter(data, **kwargs)
+    if method == "PS":
+        return get_noise_PS(data, **kwargs)
     elif method == "fit":
         return get_noise_fit(data, **kwargs)
     else:
         print "Unknown get_noise method."
         return 0
 
-def get_noise_quarter(data, frac=4, chans=False):
+def get_noise_PS(data, frac=4, chans=False):
     """
     """
     if chans:
