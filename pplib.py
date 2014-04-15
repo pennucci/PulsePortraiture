@@ -1654,7 +1654,7 @@ def make_fake_pulsar(modelfile, ephemeris, outfile="fake_pulsar.fits", nsub=1,
             elif param[0] == "PEPOCH":
                 PEPOCH = np.float64(param[1])
             elif param[0] == "DM":
-                DM = np.float64(line[1])
+                DM = np.float64(param[1])
             else:
                 pass
     #Dec needs to have a sign for the following sky_coord call
