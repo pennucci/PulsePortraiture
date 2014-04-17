@@ -980,7 +980,7 @@ def fit_phase_shift(data, model, err=None, bounds=[-0.5, 0.5]):
     #In the next two error equations, consult fit_portait for factors of 2
     phase_error = (scale * fit_phase_shift_function_2deriv(phase, mFFT, dFFT,
         err))**-0.5
-    scale_error = p**0.5
+    scale_error = p**-0.5
     errors = [phase_error, scale_error]
     red_chi2 = (d - ((fmin**2) / p)) / (len(data) - 2)
     return DataBunch(errors=errors, phase=phase, red_chi2=red_chi2,
