@@ -956,19 +956,19 @@ def fit_portrait(data, model, init_params, P, freqs, nu_fit=np.inf,
     return (phi_out, DM, scales, np.array(param_errs), nu_out, covariance,
             red_chi2, duration, nfeval, return_code)
 
-def fit_phase_shift(data, model, err=None, bounds=[-0.5, 0.5]):
+def fit_phase_shift(data, model, noise=None, bounds=[-0.5, 0.5]):
     """
-    err is time-domain noise-level.
+    noise is time-domain noise-level.
     """
     dFFT = fft.rfft(data)
     dFFT[0] *= DC_fact
     mFFT = fft.rfft(model)
     mFFT[0] *= DC_fact
-    if err is None:
+    if noise is None:
         #err = np.real(dFFT[-len(dFFT)/4:]).std()
         err = get_noise(data) * np.sqrt(len(data)/2.0)
     else:
-        err *= np.sqrt(len(data)/2.0)
+        err = noise * np.sqrt(len(data)/2.0)
     d = np.real(np.sum(dFFT * np.conj(dFFT))) / err**2.0
     p = np.real(np.sum(mFFT * np.conj(mFFT))) / err**2.0
     other_args = (mFFT, dFFT, err)
