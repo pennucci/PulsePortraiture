@@ -71,7 +71,7 @@ Dconst = Dconst_trad
 #Power-law index for scattering law
 scattering_alpha = -4.0
 
-#Default get_noise method
+#Default get_noise method; see functions get_noise_*.  To be improved.
 default_noise_method = "PS"
 
 #Ignore DC component in Fourier fit if DC_fact == 0, else set DC_fact == 1.
