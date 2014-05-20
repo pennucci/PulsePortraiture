@@ -172,17 +172,18 @@ class DataPortrait:
         """
         if fit:
             #Noise level below may be off
-            params, param_errs, chi2, dof, residuals = fit_powlaw(
-                    self.flux_profx, np.array([guessA,guessalpha]),
-                    np.median(self.noise_stdsxs), self.freqsxs[0], self.nu0)
+            fp = fit_powlaw(self.flux_profx, np.array([guessA,guessalpha]),
+                np.median(self.noise_stdsxs), self.freqsxs[0], self.nu0)
             if not quiet:
                 print ""
                 print "Flux-density power-law fit"
                 print "----------------------------------"
-                print "residual mean = %.2f"%residuals.mean()
-                print "residual std. = %.2f"%residuals.std()
-                print "A = %.3f (flux at %.2f MHz)"%(params[0], self.nu0)
-                print "alpha = %.3f "%params[1]
+                print "residual mean = %.2f"%fp.residuals.mean()
+                print "residual std. = %.2f"%fp.residuals.std()
+                print "reduced chi-squared = %.2f"%(fp.chi2 / fp.dof)
+                print "A = %.3f +/- %.3f (flux at %.2f MHz)"%(fp.amp,
+                        fp.amp_err, self.nu0)
+                print "alpha = %.3f +/- %.3f"%(fp.alpha, fp.alpha_err)
             if plot:
                 if fit: plt.subplot(211)
                 else: plt.subplot(111)
@@ -191,18 +192,18 @@ class DataPortrait:
                 plt.title("Average Flux Profile for %s"%self.source)
                 if fit:
                     plt.plot(self.freqs, powlaw(self.freqs, self.nu0,
-                        params[0], params[1]), 'k-')
+                        fp.amp, fp.alpha), 'k-')
                     plt.plot(self.freqsxs[0], self.flux_profx, 'r+')
                     plt.subplot(212)
                     plt.xlabel("Frequency [MHz]")
                     plt.ylabel("Flux Units")
                     plt.title("Residuals")
-                    plt.plot(self.freqsxs[0], residuals, 'r+')
+                    plt.plot(self.freqsxs[0], fp.residuals, 'r+')
                 plt.show()
-            self.spect_A = params[0]
-            self.spect_A_err = param_errs[0]
-            self.spect_index = params[1]
-            self.spect_index_err = param_errs[1]
+            self.spect_A = fp.amp
+            self.spect_A_err = fp.amp_err
+            self.spect_index = fp.alpha
+            self.spect_index_err = fp.alpha_err
 
 
     def make_gaussian_model(self, modelfile=None,
@@ -346,11 +347,12 @@ class DataPortrait:
         """
         while (1):
             start = time.time()
-            self.fitted_params, self.fit_errs, self.chi_sq, self.dof = (
-                    fit_gaussian_portrait(self.portx, self.model_params,
-                        self.portx_noise, self.fit_flags, self.phases,
-                        self.freqsxs[0], self.nu_ref, self.all_join_params,
-                        self.Ps[0], quiet=quiet))
+            fgp = fit_gaussian_portrait(self.portx, self.model_params,
+                    self.portx_noise, self.fit_flags, self.phases,
+                    self.freqsxs[0], self.nu_ref, self.all_join_params,
+                    self.Ps[0], quiet=quiet)
+            (self.fitted_params, self.fit_errs, self.chi2, self.dof) = (
+                    fgp.fitted_params, fgp.fit_errs, fgp.chi2, fgp.dof)
             if self.njoin:
                 #FIX, convergence can be based on residuals
                 self.model_params = self.fitted_params[:-self.njoin*2]
@@ -382,15 +384,14 @@ class DataPortrait:
                 if phase_guess > 0.5:
                     phase_guess -= 1.0
                 DM_guess = 0.0
-                results = fit_portrait(self.portx, self.modelx,
-                                np.array([phase_guess, DM_guess]), self.Ps[0],
-                                self.freqsxs[0], self.nu_fit, None, None,
-                                bounds=[(None, None), (None, None)], id=None,
-                                quiet=True)
-                self.fp_results = results
+                fp = fit_portrait(self.portx, self.modelx,
+                        np.array([phase_guess, DM_guess]), self.Ps[0],
+                        self.freqsxs[0], self.nu_fit, None, None,
+                        bounds=[(None, None), (None, None)], id=None,
+                        quiet=True)
+                self.fp_results = fp
                 (self.phi, self.phierr, self.DM, self.DMerr, self.red_chi2) = (
-                        results.phase, results.phase_err, results.DM,
-                        results.DM_err, results.red_chi2)
+                        fp.phase, fp.phase_err, fp.DM, fp.DM_err, fp.red_chi2)
             self.duration = time.time() - start
             self.total_time += self.duration
             yield
@@ -508,21 +509,20 @@ class GaussianSelector:
             self.ngauss += 1
             self.plot_gaussians(self.init_params)
             print "Auto-fitting single gaussian profile..."
-            fitted_params, fit_errs, chi_sq, dof, residuals = (
-                    fit_gaussian_profile(self.profile, self.init_params,
-                        np.zeros(self.proflen) + self.errs,
-                        self.fit_scattering, quiet=True))
-            self.fitted_params = fitted_params
-            self.fit_errs = fit_errs
-            self.chi_sq = chi_sq
-            self.dof = dof
-            self.residuals = residuals
+            fgp = fit_gaussian_profile(self.profile, self.init_params,
+                    np.zeros(self.proflen) + self.errs, self.fit_scattering,
+                    quiet=True)
+            self.fitted_params = fgp.fitted_params
+            self.fit_errs = fgp.fit_errs
+            self.chi2 = fgp.chi2
+            self.dof = fgp.dof
+            self.residuals = fgp.residuals
             # scaled uncertainties
             #scaled_fit_errs = fit_errs * np.sqrt(chi_sq / dof)
 
             # Plot the best-fit profile
-            self.plot_gaussians(fitted_params)
-            fitprof = gen_gaussian_profile(fitted_params, self.proflen)
+            self.plot_gaussians(self.fitted_params)
+            fitprof = gen_gaussian_profile(self.fitted_params, self.proflen)
             plt.plot(self.phases, fitprof, c='black', lw=1)
             plt.draw()
 
@@ -653,21 +653,20 @@ class GaussianSelector:
         # Middle mouse button = fit the gaussians
         elif event1.button == event2.button == 2:
             print "Fitting reference gaussian profile..."
-            fitted_params, fit_errs, chi_sq, dof, residuals = (
-                    fit_gaussian_profile(self.profile, self.init_params,
-                        np.zeros(self.proflen) + self.errs,
-                        self.fit_scattering, quiet=True))
-            self.fitted_params = fitted_params
-            self.fit_errs = fit_errs
-            self.chi_sq = chi_sq
-            self.dof = dof
-            self.residuals = residuals
+            fgp = fit_gaussian_profile(self.profile, self.init_params,
+                    np.zeros(self.proflen) + self.errs, self.fit_scattering,
+                    quiet=True)
+            self.fitted_params = fgp.fitted_params
+            self.fit_errs = fgp.fit_errs
+            self.chi2 = fgp.chi2
+            self.dof = fgp.dof
+            self.residuals = fgp.residuals
             # scaled uncertainties
             #scaled_fit_errs = fit_errs * np.sqrt(chi_sq / dof)
 
             # Plot the best-fit profile
-            self.plot_gaussians(fitted_params)
-            fitprof = gen_gaussian_profile(fitted_params, self.proflen)
+            self.plot_gaussians(self.fitted_params)
+            fitprof = gen_gaussian_profile(self.fitted_params, self.proflen)
             plt.plot(self.phases, fitprof, c='black', lw=1)
             plt.draw()
 
@@ -675,7 +674,7 @@ class GaussianSelector:
             plt.subplot(212)
             plt.cla()
             residuals = self.profile - fitprof
-            plt.plot(self.phases, residuals,'k')
+            plt.plot(self.phases, self.residuals,'k')
             plt.xlabel('Pulse Phase')
             plt.ylabel('Data-Fit Residuals')
             plt.draw()

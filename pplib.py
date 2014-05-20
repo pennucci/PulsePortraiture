@@ -776,12 +776,12 @@ def fit_powlaw(data, init_params, errs, freqs, nu_ref):
     Fit a power-law function to data.
 
     lmfit is used for the minimization.
-    Returns an array of fitted parameters, an array of parameter error
-    estimates, the chi-squared value, the degrees of freedom, and the residuals
-    between the best-fit model and the data.
+    Returns an object containing the fitted parameter values, the parameter
+    errors, an array of the residuals, the chi-squared value, and the number of
+    degrees of freedom.
 
     data is the input array of data values used in the fit.
-    init_params are the initial guesses for the [amplitude at nu_ref,
+    init_params is a list of initial parameter guesses = [amplitude at nu_ref,
     spectral index].
     errs is the array of uncertainties on the data values.
     freqs is an nchan array of frequencies.
@@ -794,15 +794,20 @@ def fit_powlaw(data, init_params, errs, freqs, nu_ref):
     other_args = {'freqs':freqs, 'nu_ref':nu_ref, 'data':data, 'errs':errs}
     #Now fit it
     results = lm.minimize(fit_powlaw_function, params, kws=other_args)
-    fitted_params = np.array([param.value for param in
-        results.params.itervalues()])
+    #fitted_params = np.array([param.value for param in
+    #    results.params.itervalues()])
     dof = results.nfree
-    chi_sq = results.chisqr
-    redchi_sq = results.redchi
+    chi2 = results.chisqr
+    red_chi2 = results.redchi
     residuals = results.residual
-    fit_errs = np.array([param.stderr for param in
-        results.params.itervalues()])
-    return fitted_params, fit_errs, chi_sq, dof, residuals
+    #fit_errs = np.array([param.stderr for param in
+    #    results.params.itervalues()])
+    results = DataBunch(alpha=results.params['alpha'].value,
+            alpha_err=results.params['alpha'].stderr,
+            amp=results.params['amp'].value,
+            amp_err=results.params['amp'].stderr, residuals=residuals,
+            chi2=chi2, dof=dof)
+    return results
 
 def fit_gaussian_profile(data, init_params, errs, fit_scattering=False,
         quiet=True):
@@ -810,12 +815,12 @@ def fit_gaussian_profile(data, init_params, errs, fit_scattering=False,
     Fit gaussian functions to a profile.
 
     lmfit is used for the minimization.
-    Returns an array of fitted parameters, the reduced chi-squared value, the
-    number of degrees of freedom, and the residuals between the best-fit model
-    and the data.
+    Returns an object containing an array of fitted parameter values, an array
+    of parameter errors, an array of the residuals, the chi-squared value, and
+    the number of degrees of freedom.
 
     data is the pulse profile array of length nbin used in the fit.
-    init_params is an array of initial guesses for the 1 + (ngauss*3) values;
+    init_params is a list of initial guesses for the 1 + (ngauss*3) values;
     the first value is the DC component.  Each remaining group of three
     represents the gaussians' loc (0-1), wid (i.e. FWHM) (0-1), and
     amplitude (>0.0).
@@ -855,8 +860,8 @@ def fit_gaussian_profile(data, init_params, errs, fit_scattering=False,
     fit_errs = np.array([param.stderr for param in
         results.params.itervalues()])
     dof = results.nfree
-    chi_sq = results.chisqr
-    redchi_sq = results.redchi
+    chi2 = results.chisqr
+    red_chi2 = results.redchi
     residuals = results.residual
     if not quiet:
         print "---------------------------------------------------------------"
@@ -865,11 +870,13 @@ def fit_gaussian_profile(data, init_params, errs, fit_scattering=False,
         print "lmfit status:", results.message
         print "gaussians:", ngauss
         print "DOF:", dof
-        print "reduced chi-sq: %.2f" % redchi_sq
+        print "reduced chi-sq: %.2f" % red_chi2
         print "residuals mean: %.3g" % np.mean(residuals)
         print "residuals stdev: %.3g" % np.std(residuals)
         print "---------------------------------------------------------------"
-    return fitted_params, fit_errs, chi_sq, dof, residuals
+    results = DataBunch(fitted_params=fitted_params, fit_errs=fit_errs,
+            residuals=residuals, chi2=chi2, dof=dof)
+    return results
 
 def fit_gaussian_portrait(data, init_params, errs, fit_flags, phases, freqs,
         nu_ref, join_params=[], P=None, quiet=True):
@@ -877,11 +884,12 @@ def fit_gaussian_portrait(data, init_params, errs, fit_flags, phases, freqs,
     Fit evolving gaussian components to a portrait.
 
     lmfit is used for the minimization.
-    Returns an array of fitted values, the chi-squared value, and the number of
-    degrees of freedom.
+    Returns an object containing an array of fitted parameter values, an array
+    of parameter errors, the chi-squared value, and the number of degrees of
+    freedom.
 
     data is the nchan x nbin phase-frequency data portrait used in the fit.
-    init_params is an array of initial guesses for the 1 + (ngauss*6)
+    init_params is a list of initial guesses for the 1 + (ngauss*6)
     parameters in the model; the first value is the DC component.  Each
     remaining group of six represent the gaussians loc (0-1), linear slope in
     loc, wid (i.e. FWHM) (0-1), linear slope in wid, amplitude (>0,0), and
@@ -951,8 +959,8 @@ def fit_gaussian_portrait(data, init_params, errs, fit_flags, phases, freqs,
     fit_errs = np.array([param.stderr for param in
         results.params.itervalues()])
     dof = results.nfree
-    chi_sq = results.chisqr
-    redchi_sq = results.redchi
+    chi2 = results.chisqr
+    red_chi2 = results.redchi
     residuals = results.residual
     if not quiet:
         print "---------------------------------------------------------------"
@@ -961,33 +969,80 @@ def fit_gaussian_portrait(data, init_params, errs, fit_flags, phases, freqs,
         print "lmfit status:", results.message
         print "gaussians:", ngauss
         print "DOF:", dof
-        print "reduced chi-sq: %.2f" %redchi_sq
+        print "reduced chi-sq: %.2f" %red_chi2
         print "residuals mean: %.3g" %np.mean(residuals)
         print "residuals stdev: %.3g" %np.std(residuals)
         print "---------------------------------------------------------------"
-    return fitted_params, fit_errs, chi_sq, dof
+    results = DataBunch(fitted_params=fitted_params, fit_errs=fit_errs,
+            chi2=chi2, dof=dof)
+    return results
 
-def fit_portrait(data, model, init_params, P, freqs, nu_fit=np.inf,
-        nu_out=None, errs=None, bounds=[(None, None), (None, None)], id=None,
-        quiet=True):
+def fit_phase_shift(data, model, noise=None, bounds=[-0.5, 0.5]):
+    """
+    Fit a phase shift between data and model.
+
+    This is a simple implementation of FFTFIT using a brute-force algorithm
+    Returns an object containing the fitted parameter values (phase and scale),
+    the parameter errors, and the reduced chi-squared value.
+
+    The returned phase is the phase of the data with respect to the model.
+    NB: the provided rotation functions rotate to earlier phases, given a
+    positive phase.
+
+    data is the array of data profile values.
+    model is the array of model profile values.
+    noise is time-domain noise-level; it is measured if None.
+    bounds is the list containing the bounds on the phase.
+    """
+    dFFT = fft.rfft(data)
+    dFFT[0] *= DC_fact
+    mFFT = fft.rfft(model)
+    mFFT[0] *= DC_fact
+    if noise is None:
+        #err = np.real(dFFT[-len(dFFT)/4:]).std()
+        err = get_noise(data) * np.sqrt(len(data)/2.0)
+    else:
+        err = noise * np.sqrt(len(data)/2.0)
+    d = np.real(np.sum(dFFT * np.conj(dFFT))) / err**2.0
+    p = np.real(np.sum(mFFT * np.conj(mFFT))) / err**2.0
+    other_args = (mFFT, dFFT, err)
+    results = opt.brute(fit_phase_shift_function, [tuple(bounds)],
+            args=other_args, Ns=100, full_output=True)
+    phase = results[0][0]
+    fmin = results[1]
+    scale = -fmin / p
+    #In the next two error equations, consult fit_portrait for factors of 2
+    phase_error = (scale * fit_phase_shift_function_2deriv(phase, mFFT, dFFT,
+        err))**-0.5
+    scale_error = p**-0.5
+    #errors = [phase_error, scale_error]
+    red_chi2 = (d - ((fmin**2) / p)) / (len(data) - 2)
+    return DataBunch(phase=phase, phase_err=phase_error, scale=scale,
+            scale_error, red_chi2=red_chi2)
+
+def fit_portrait(data, model, init_params, P, freqs, nu_fit=None, nu_out=None,
+        errs=None, bounds=[(None, None), (None, None)], id=None, quiet=True):
     """
     Fit a phase offset and DM between a data portrait and model portrait.
 
     A truncated Newtonian algorithm is used.
-    Returns  a 
-    n (phi_out, DM, scales, np.array(param_errs), nu_out, covariance,
-            red_chi2, duration, nfeval, return_code)
+    Returns an object containing the fitted parameter values, the parameter
+    errors, and other attributes.
 
     data is the nchan x nbin phase-frequency data portrait.
     model is the nchan x nbin phase-frequency model portrait.
-    init_params is an array = [phase, DM], with phase in [rot] and DM in
-    [cm**-3 pc].
+    init_params is a list of initial parameter guesses = [phase, DM], with
+    phase in [rot] and DM in [cm**-3 pc].
     P is the period [s] of the pulsar at the data epoch.
     freqs is an nchan array of frequencies [MHz].
-    nu_fit is the frequency [MHz] used as nu_ref in the fit.
+    nu_fit is the frequency [MHz] used as nu_ref in the fit.  Defaults to the
+    mean value of freqs.
     nu_out is the desired output reference frequency [MHz].  Defaults to the
     zero-covariance frequency calculated in the fit.
-    err is the nchan array of noise level estimates (in the Fourier domain).
+    errs is the array of uncertainties on the data values.
+    bounds is the list of 2 tuples containing the bounds on the phase and DM.
+    id provides a label for the TOA.
+    quiet = False produces more diagnostic output.
     """
     dFFT = fft.rfft(data, axis=1)
     dFFT[:, 0] *= DC_fact
@@ -999,6 +1054,7 @@ def fit_portrait(data, model, init_params, P, freqs, nu_fit=np.inf,
     d = np.real(np.sum(np.transpose(errs**-2.0 * np.transpose(dFFT *
         np.conj(dFFT)))))
     p_n = np.real(np.sum(mFFT * np.conj(mFFT), axis=1))
+    if nu_fit is None: nu_fit = freqs.mean()
     #BEWARE BELOW! Order matters!
     other_args = (mFFT, p_n, dFFT, errs, P, freqs, nu_fit)
     minimize = opt.minimize
@@ -1060,36 +1116,6 @@ def fit_portrait(data, model, init_params, P, freqs, nu_fit=np.inf,
             nu_ref=nu_out, covariance=covariance, red_chi2=red_chi2,
             duration=duration, nfeval=nfeval, return_code=return_code)
     return results
-
-def fit_phase_shift(data, model, noise=None, bounds=[-0.5, 0.5]):
-    """
-    noise is time-domain noise-level.
-    """
-    dFFT = fft.rfft(data)
-    dFFT[0] *= DC_fact
-    mFFT = fft.rfft(model)
-    mFFT[0] *= DC_fact
-    if noise is None:
-        #err = np.real(dFFT[-len(dFFT)/4:]).std()
-        err = get_noise(data) * np.sqrt(len(data)/2.0)
-    else:
-        err = noise * np.sqrt(len(data)/2.0)
-    d = np.real(np.sum(dFFT * np.conj(dFFT))) / err**2.0
-    p = np.real(np.sum(mFFT * np.conj(mFFT))) / err**2.0
-    other_args = (mFFT, dFFT, err)
-    results = opt.brute(fit_phase_shift_function, [tuple(bounds)],
-            args=other_args, Ns=100, full_output=True)
-    phase = results[0][0]
-    fmin = results[1]
-    scale = -fmin / p
-    #In the next two error equations, consult fit_portait for factors of 2
-    phase_error = (scale * fit_phase_shift_function_2deriv(phase, mFFT, dFFT,
-        err))**-0.5
-    scale_error = p**-0.5
-    errors = [phase_error, scale_error]
-    red_chi2 = (d - ((fmin**2) / p)) / (len(data) - 2)
-    return DataBunch(errors=errors, phase=phase, red_chi2=red_chi2,
-            scale=scale)
 
 def get_noise(data, method=default_noise_method, **kwargs):
     """
