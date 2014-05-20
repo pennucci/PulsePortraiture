@@ -1,52 +1,97 @@
 #!/usr/bin/env python
 
-#############
-#Coming soon#
-#############
+#######
+#pplib#
+#######
 
-#To be used with PSRCHIVE Archive files
+#Contains all necessary functions and definitions for the fitting routines, as
+#well as some additional functions used in the our wideband timing analysis.
 
-#This fitting algorithm lays on the bed of Procrustes all too comfortably.
-
+#Written by Timothy T. Pennucci (TTP)
 #Contributions by Scott M. Ransom (SMR) and Paul B. Demorest (PBD) 
 
-#Next two lines needed for dispatching on nodes (not implemented yet)
-#import matplotlib
-#matplotlib.use("Agg")
+#########
+#imports#
+#########
 
 import sys
 import time
-import matplotlib.pyplot as plt
-import matplotlib.gridspec as gs
 import numpy as np
 import numpy.fft as fft
 import scipy.optimize as opt
 import scipy.signal as ss
 import lmfit as lm
 import psrchive as pr
+nodes = False   #Used for MC testing...
+if nodes:
+    import matplotlib
+    matplotlib.use("Agg")
+else:
+    import matplotlib.pyplot as plt
+    import matplotlib.gridspec as gs
 
-#Colormap preference -- cubehelix, pink, hot, terrain, spectral, gist_heat, seismic are all interesting....see plt.cm for list of available colormaps.
+##########
+#settings#
+##########
+
+#Exact dispersion constant (e**2/(2*pi*m_e*c)) (used by PRESTO).
+Dconst_exact = 4.148808e3  #[MHz**2 cm**3 pc**-1 s]
+
+#"Traditional" dispersion constant (used by PSRCHIVE).
+Dconst_trad = 0.000241**-1 #[MHz**2 cm**3 pc**-1 s]
+
+#Fitted DM values will depend on this choice.  Choose wisely.
+Dconst = Dconst_trad
+
+#Power-law index for scattering law
+scattering_alpha = -4.0
+
+#Default get_noise method (see functions get_noise_*).
+#However, PSRCHIVE's baseline_stats is used in most cases (see load_data). 
+#_To_be_improved_.
+default_noise_method = "PS"
+
+#Ignore DC component in Fourier fit if DC_fact == 0, else set DC_fact == 1.
+DC_fact = 0
+
+#Upper limit on the width of a Gaussian component to "help" in fitting.
+#Should be either None or > 0.0.
+wid_max = 0.2
+
+#If PL_model == True, the wid and loc of the gaussian parameters will be
+#modeled with power-law functions instead of linear ones.
+PL_model = True
+
+#########
+#display#
+#########
+
+#Colormap preference -- cubehelix, pink, hot, terrain, spectral, gist_heat, seismic are all decent....see plt.cm for list of available colormaps.
 default_colormap = "cubehelix"
 if hasattr(plt.cm, default_colormap):
     plt.rc("image", cmap=default_colormap)
 else:
     plt.rc("image", cmap="pink")
 
-#List of colors
-cols = ['b', 'g', 'r', 'c', 'm', 'y', 'k',
-        'b', 'g', 'r', 'c', 'm', 'y', 'k',
-        'b', 'g', 'r', 'c', 'm', 'y', 'k',
-        'b', 'g', 'r', 'c', 'm', 'y', 'k',
-        'b', 'g', 'r', 'c', 'm', 'y', 'k']
+#List of colors; can do this better...
+cols = ['b', 'g', 'r', 'c', 'm', 'y', 'k', 'orange', 'brown', 'purple', 'pink',
+        'b', 'g', 'r', 'c', 'm', 'y', 'k', 'orange', 'brown', 'purple', 'pink',
+        'b', 'g', 'r', 'c', 'm', 'y', 'k', 'orange', 'brown', 'purple', 'pink',
+        'b', 'g', 'r', 'c', 'm', 'y', 'k', 'orange', 'brown', 'purple', 'pink']
+
+######
+#misc#
+######
 
 #List of observatory codes; not sure what "0" corresponds to.
-#Cross-check against TEMPO's obsys.dat; need TEMPO2 codes
+#These are used for TOA-writing, which may change soon...
 obs_codes = {"bary":"@", "???":"0", "gbt":"1", "atca":"2", "ao":"3",
              "arecibo":"3", "nanshan":"5", "tid43":"6", "pks":"7", "jb":"8",
              "vla":"c", "ncy":"f", "eff":"g", "jbdfb":"q", "wsrt":"i",
              "lofar":"t"}
 
-#RCSTRINGS dictionary, for the return codes given by scipy.optimize.fmin_tnc
+#RCSTRINGS dictionary, for the return codes given by scipy.optimize.fmin_tnc.
+#These are only needed for debugging.
 RCSTRINGS = {"-1":"INFEASIBLE: Infeasible (low > up).",
              "0":"LOCALMINIMUM: Local minima reach (|pg| ~= 0).",
              "1":"FCONVERGED: Converged (|f_n-f_(n-1)| ~= 0.)",
@@ -57,49 +102,34 @@ RCSTRINGS = {"-1":"INFEASIBLE: Infeasible (low > up).",
              "6":"NOPROGRESS: Unable to progress.",
              "7":"USERABORT: User requested end of minimization."}
 
-#Exact dispersion constant (e**2/(2*pi*m_e*c))
-#(used by PRESTO)
-Dconst_exact = 4.148808e3  #[MHz**2 cm**3 pc**-1 s]
-
-#"Traditional" dispersion constant
-#(used by PSRCHIVE)
-Dconst_trad = 0.000241**-1 #[MHz**2 cm**3 pc**-1 s]
-
-#Choose wisely.
-Dconst = Dconst_trad
-
-#Power-law index for scattering law
-scattering_alpha = -4.0
-
-#Default get_noise method
-default_noise_method = "PS"
-
-#Ignore DC component in Fourier fit if DC_fact == 0, else set DC_fact == 1.
-DC_fact = 0
-
-#Upper limit on the width of a Gaussian component to "help" in fitting.  Should
-#be either None or > 0.0.
-wid_max = 0.2
-
-#If PL_model == True, the wid and loc of the gaussian parameters will be
-#modeled with power-law functions instead of linear ones.
-PL_model = True
+#########
+#classes#
+#########
 
 class DataBunch(dict):
+
     """
-    This class is a great little recipe!  Creates a simple class instance
-    db = DataBunch(a=1, b=2,....) that has attributes a and b, which are
-    callable and update-able using either syntax db.a or db['a'].
+    Create a simple class instance of DataBunch.
+
+    db = DataBunch(a=1, b=2,....) has attributes a and b, which are callable
+    and update-able using either syntax db.a or db['a'].
     """
+
     def __init__(self, **kwds):
         dict.__init__(self, kwds)
         self.__dict__ = self
 
+###########
+#functions#
+###########
+
 def set_colormap(colormap):
     """
-    Stolen from plt.pink()
     Set the default colormap to colormap and apply to current image if any.
+
     See help(colormaps) for more information
+
+    Stolen from matplotlib.pyplot: plt.pink().
     """
     plt.rc("image", cmap=colormap)
     im = plt.gci()
@@ -110,7 +140,9 @@ def set_colormap(colormap):
 
 def gaussian_function(xs, loc, wid, norm=False):
     """
-    See gaussian_profile.
+    Evaluates a gaussian function with parameters loc and wid at values xs.
+
+    See gaussian_profile for details.
     """
     mean = loc
     sigma = wid / (2 * np.sqrt(2 * np.log(2)))
@@ -124,9 +156,8 @@ def gaussian_function(xs, loc, wid, norm=False):
 
 def gaussian_profile(nbin, loc, wid, norm=False, abs_wid=False, zeroout=True):
     """
-    Taken and tweaked from SMR's pygaussfit.py
+    Return a gaussian pulse profile with 'nbin' bins and peak amplitude of 1.
 
-    Return a gaussian pulse profile with 'N' bins and peak amplitude of 1.
     If norm=True, return the profile such that the integrated density = 1.
         'nbin' = the number of bins in the profile
         'loc' = the pulse phase location (0-1) [rot]
@@ -134,7 +165,9 @@ def gaussian_profile(nbin, loc, wid, norm=False, abs_wid=False, zeroout=True):
     If abs_wid=True, will use abs(wid).
     If zeroout=True and wid <= 0, return a zero array.
     Note: The FWHM of a gaussian is approx 2.35482 "sigma", or exactly
-          exactly 2*sqrt(2*ln(2)).
+          2*sqrt(2*ln(2)).
+
+    Taken and tweaked from SMR's pygaussfit.py
     """
     #Maybe should move these checks to gen_gaussian_portrait?
     if abs_wid:
@@ -178,15 +211,15 @@ def gaussian_profile(nbin, loc, wid, norm=False, abs_wid=False, zeroout=True):
 
 def gen_gaussian_profile(params, nbin):
     """
-    Taken and tweaked from SMR's pygaussfit.py
+    Return a model-profile with ngauss gaussian components.
 
-    Return a model of a DC-component + ngauss gaussian functions.
-    params is a sequence of 1 + (ngauss*3) values; the first value is the DC
-    component.  Each remaining group of three represents the gaussians
-    loc (0-1), wid (i.e. FWHM) (0-1), and amplitude (>0.0).
+    params is a sequence of 2 + (ngauss*3) values where the first value is
+    the DC component, the second value is the scattering timescale [bin]
+    and each remaining group of three represents the gaussians' loc (0-1),
+    wid (i.e. FWHM) (0-1), and amplitude (>0.0).
     nbin is the number of bins in the model.
 
-    cf. gaussian_profile(...)
+    Taken and tweaked from SMR's pygaussfit.py
     """
     ngauss = (len(params) - 2) / 3
     model = np.zeros(nbin, dtype='d') + params[0]
@@ -195,25 +228,35 @@ def gen_gaussian_profile(params, nbin):
         model += amp * gaussian_profile(nbin, loc, wid)
     if params[1] != 0.0:
         bins = np.arange(nbin)
-        sk = scattering_kernel(params[1], 1.0, np.array([1.0]), bins, P=1.0)[0]
+        sk = scattering_kernel(params[1], 1.0, np.array([1.0]), bins, P=1.0,
+                alpha=scattering_alpha)[0]
         model = add_scattering(model, sk, repeat=3)
     return model
 
 def gen_gaussian_portrait(params, phases, freqs, nu_ref, join_ichans=[],
         P=None):
     """
-    Build the gaussian model portrait based on params.
+    Return a gaussian-component model portrait based on input parameters.
 
-    params is an array of 2 + (ngauss*6) values; the first value is the DC
-    component.  Each remaining group of six represent the gaussians loc (0-1),
-    linear slope in loc, wid (i.e. FWHM) (0-1), linear slope in wid,
-    amplitude (>0,0), and spectral index alpha (no implicit negative).
+    join_ichans is used only in ppgauss.
+
+    params is an array of 2 + (ngauss*6) + 2*len(join_ichans) values.
+    The first value is the DC component, and the second value is the scattering
+    timescale [bin].  The next ngauss*6 values represent the gaussians' loc
+    (0-1), evolution parameter in loc, wid (i.e. FWHM) (0-1),
+    evolution parameter in wid, amplitude (>0,0), and spectral index alpha (no
+    implicit negative).  The remaining 2*len(join_ichans) parameters are pairs
+    of phase and DM.  The iith list of channels in join_ichans gets rotated in
+    the generated model by the iith pair of phase and DM.
     phases is the array of phase values (will pass nbin to
     gen_gaussian_profile).
     freqs in the array of frequencies at which to calculate the model.
-    nu_ref [MHz] is the frequency to which the locs, wids, and amps reference.
+    nu_ref is the frequency to which the locs, wids, and amps reference.
 
-    cf. gaussian_profile(...), gen_gaussian_profile(...)
+    The evolution parameters will either be linear slopes, or a power-law
+    indices, depending on the global settings in the header of pplib.py.
+    The units of the evolution parameters and the frequencies need to match
+    appropriately.
     """
     njoin = len(join_ichans)
     if njoin:
@@ -264,7 +307,7 @@ def gen_gaussian_portrait(params, phases, freqs, nu_ref, join_ichans=[],
                 alpha=scattering_alpha)
         gport = add_scattering(gport, sk, repeat=3)
     if njoin:
-        for ij in range(njoin):
+        for ij in xrange(njoin):
             join_ichan = join_ichans[ij]
             phi = join_params[0::2][ij]
             DM =  join_params[1::2][ij]
@@ -274,17 +317,15 @@ def gen_gaussian_portrait(params, phases, freqs, nu_ref, join_ichans=[],
 
 def powlaw(nu, nu_ref, A, alpha):
     """
-    Returns power-law 'spectrum' given by:
-    F(nu) = A*(nu/nu_ref)**alpha
+    Return a power-law 'spectrum' given by F(nu) = A*(nu/nu_ref)**alpha
     """
     return A * (nu/nu_ref)**alpha
 
 def powlaw_integral(nu2, nu1, nu_ref, A, alpha):
     """
-    Returns the integral over a powerlaw of form A*(nu/nu_ref)**alpha
-    from nu1 to nu2.
+    Return the definite integral of a powerlaw from nu1 to nu2.
 
-    cf. powlaw(...)
+    The powerlaw is of the form A*(nu/nu_ref)**alpha.
     """
     alpha = np.float64(alpha)
     if alpha == -1.0:
@@ -296,14 +337,13 @@ def powlaw_integral(nu2, nu1, nu_ref, A, alpha):
 
 def powlaw_freqs(lo, hi, N, alpha, mid=False):
     """
-    Returns frequencies such that a bandwidth from lo to hi frequencies
-    split into N channels contains the same amount of flux in each channel,
-    given a power-law across the band with spectral index alpha.  Default
-    behavior returns N+1 frequencies (includes both lo and hi freqs); if
-    mid=True, will return N frequencies, corresponding to the middle frequency
-    in each channel.
+    Return frequencies spaced such that each channel has equal flux.
 
-    cf. powlaw(...)
+    Given a bandwidth from lo to hi frequencies, split into N channels, and a
+    power-law index alpha, this function finds the frequencies such that each
+    channel contains the same amount of flux.  Default behavior returns N+1
+    frequencies (includes both lo and hi freqs); if mid=True, returns N
+    frequencies, corresponding to the center frequency in each channel.
     """
     alpha = np.float64(alpha)
     nus = np.zeros(N + 1)
@@ -325,7 +365,14 @@ def powlaw_freqs(lo, hi, N, alpha, mid=False):
 
 def scattering_kernel(tau, nu_ref, freqs, phases, P, alpha=scattering_alpha):
     """
-    Phase-bin centers...tau in [sec] or [bin]
+    Return a scattering kernel based on input parameters.
+
+    tau is the scattering timescale in [sec] or [bin].
+    nu_ref is the reference frequency for tau.
+    freqs is the array of center frequencies in the nchan x nbin kernel
+    phases gives the phase-bin centers of the nchan x nbin kernel
+    P is the period [sec]; use P = 1.0 if tau is in units of [bin].
+    alpha is the power-law index for the scattering evolution.
     """
     nchan = len(freqs)
     nbin = len(phases)
@@ -338,30 +385,41 @@ def scattering_kernel(tau, nu_ref, freqs, phases, P, alpha=scattering_alpha):
         sk = np.exp(-np.transpose(np.transpose(ts) * taus**-1.0))
     return sk
 
-def add_scattering(data, kernel, repeat=3):
+def add_scattering(port, kernel, repeat=3):
     """
-    repeat should maybe be 5?
+    Add scattering into a portrait.
+
+    port is the nchan x nbin portrait.
+    kernel is the scattering kernel to be used in the convolution with port.
+    repeat attempts to rid the convolution of edge effects by repeating the
+    port and kernel repeat times before convolution; the center portion is
+    returned.
     """
     mid = repeat/2
-    d = np.array(list(data.transpose()) * repeat).transpose()
+    d = np.array(list(port.transpose()) * repeat).transpose()
     k = np.array(list(kernel.transpose()) * repeat).transpose()
-    if len(data.shape) == 1:
-        nbin = data.shape[0]
+    if len(port.shape) == 1:
+        nbin = port.shape[0]
         norm_kernel = kernel / kernel.sum()
-        scattered_data = ss.convolve(norm_kernel, d)[mid * nbin : (mid+1) *
+        scattered_port = ss.convolve(norm_kernel, d)[mid * nbin : (mid+1) *
                 nbin]
     else:
-        nbin = data.shape[1]
+        nbin = port.shape[1]
         norm_kernel = np.transpose(np.transpose(k) * k.sum(axis=1)**-1)
-        scattered_data = np.fft.irfft(np.fft.rfft(norm_kernel) *
+        scattered_port = np.fft.irfft(np.fft.rfft(norm_kernel) *
                 np.fft.rfft(d))[:, mid * nbin : (mid+1) * nbin]
-    return scattered_data
+    return scattered_port
 
 def add_scintillation(port, params=None, random=True, nsin=2, amax=1.0,
         wmax=3.0):
     """
-    Should be used before adding noise.
-    params are triplets of "amps", "freqs" [cycles], and "phases" [cycles]
+    Add totally fake scintillation to a portrait based on sinusoids.
+
+    params are triplets of sinusoidal parameters: "amps", "freqs" [cycles],
+    and "phases" [cycles].
+    if params is None and random is True, random params for nsin sinusoids are
+    chosen from a uniform distribution on [0,amax], a chi-squared
+    distribution with wmax dof, and a uniform distribution on [0,1].
     """
     nchan = len(port)
     pattern = np.zeros(nchan)
@@ -383,23 +441,27 @@ def add_scintillation(port, params=None, random=True, nsin=2, amax=1.0,
 
 def mean_C2N(nu, D, bw_scint):
     """
-    mean_C2N [m**(-20/3)
+    Return mean_C2N [m**(-20/3)]
+
     For use with scattering measure.
-    nu is frequency [MHz]
-    D is distance [kpc]
-    bw_scint is scintillation bandwidth [MHz]
-    cf. Foster, Fairhead, and Backer (1991)
+    nu is the frequency [MHz]
+    D is the distance [kpc]
+    bw_scint is the scintillation bandwidth [MHz]
+
+    Reference: Foster, Fairhead, and Backer (1991)
     """
     return 2e-14 * nu**(11/3.0) * D**(-11/6.0) * bw_scint**(-5/6.0)
 
 def dDM(D, D_screen, nu, bw_scint):
     """
-    Frequency dependent delta-DM [cm**-3 pc] from multipath screen averaging
+    Return the delta-DM [cm**-3 pc] predicted for a frequency dependent DM.
+
     D is the distance to the pulsar [kpc]
     D_screen is the distance from the Earth to the scattering screen [kpc]
-    nu1 is the frequency [MHz]
-    bw_scint is scintillation bandwidth at nu [MHz]
-    cf. Foster, Fairhead, and Backer (1991); Cordes & Shannon (2010)
+    nu is the frequency [MHz]
+    bw_scint is the scintillation bandwidth at nu [MHz]
+
+    References: Cordes & Shannon (2010); Foster, Fairhead, and Backer (1991)
     """
     #SM is the scattering measure [m**(-20/3) kpc]
     SM = mean_C2N(nu, D, bw_scint) * D
@@ -407,15 +469,13 @@ def dDM(D, D_screen, nu, bw_scint):
 
 def fit_powlaw_function(params, freqs, nu_ref, data=None, errs=None):
     """
-    Function to pass to minimizer in fit_powlaw that returns residuals weighted    by errs**-1.
+    Return the weighted residuals from a power-law model and data.
 
     params is an array = [amplitude at reference frequency, spectral index].
     freqs is an nchan array of frequencies.
     nu_ref is the frequency at which the amplitude is referenced.
-    data are the data values.
-    errs is/are the standard error(s) on the data values.
-
-    cf. powlaw(...), fit_powlaw(...)
+    data is the array of the data values.
+    errs is the array of uncertainties on the data values.
     """
     prms = np.array([param.value for param in params.itervalues()])
     A = prms[0]
@@ -424,16 +484,11 @@ def fit_powlaw_function(params, freqs, nu_ref, data=None, errs=None):
 
 def fit_gaussian_profile_function(params, data=None, errs=None):
     """
-    Function to pass to minimizer in fit_gaussian_profile that returns
-    residuals weighted by errs**-1.
+    Return the weighted residuals from a gaussian profile model and data.
 
-    params is a sequence of 1 + (ngauss*3) values; the first value is the DC
-    component.  Each remaining group of three represents the gaussians
-    loc (0-1), wid (i.e. FWHM) (0-1), and amplitude (>0.0).
-    data are the data values.
-    errs is/are the standard errors(s) on the data values.
-
-    cf. gen_gaussian_profile(...), fit_gaussian_profile(...)
+    See gen_gaussian_profile for form of input params.
+    data is the array of data values.
+    errs is the array of uncertainties on the data values.
     """
     prms = np.array([param.value for param in params.itervalues()])
     return (data - gen_gaussian_profile(prms, len(data))) / errs
@@ -441,20 +496,11 @@ def fit_gaussian_profile_function(params, data=None, errs=None):
 def fit_gaussian_portrait_function(params, phases, freqs, nu_ref, data=None,
         errs=None, join_ichans=None, P=None):
     """
-    Function to pass to minimizer in fit_gaussian_portrait that returns
-    residuals weighted by errs**-1.
+    Return the weighted residuals from a gaussian-component model and data.
 
-    params is an array of 1 + (ngauss*6) values; the first value is the DC
-    component.  Each remaining group of six represent the gaussians loc (0-1),
-    linear slope in loc, wid (i.e. FWHM) (0-1), linear slope in wid,
-    amplitude (>0,0), and spectral index alpha (no implicit negative).
-    phases is the array of phase values (will pass nbin to
-    gen_gaussian_profile).
-    freqs in the array of frequencies at which to calculate the model.
-    nu_ref [MHz] is the frequency to which the locs, wids, and amps reference.
-    errs is/are the standard errors(s) on the data values.
-
-    cf. gen_gaussian_portrait(...), fit_gaussian_portrait(...)
+    See gen_gaussian_portrait for form of input.
+    data is the 2D array of data values.
+    errs is the 2D array of the uncertainties on the data values.
     """
     prms = np.array([param.value for param in params.itervalues()])
     deviates = np.ravel((data - gen_gaussian_portrait(prms, phases, freqs,
@@ -463,8 +509,12 @@ def fit_gaussian_portrait_function(params, phases, freqs, nu_ref, data=None,
 
 def fit_phase_shift_function(phase, model=None, data=None, err=None):
     """
-    Returns phase-offset such that data would have to be rotated (with
-    rotate_data or similar) by phase amount to match model.
+    Return the negative, weighted inverse DFT at phase of model and data.
+
+    phase is the input phase [rot]
+    model is the array of model values (Fourier domain)
+    data is the array of data values (Fourier domain)
+    err is the noise level (Fourier domain)
     """
     harmind = np.arange(len(model))
     phasor = np.exp(harmind * 2.0j * np.pi * phase)
@@ -473,6 +523,9 @@ def fit_phase_shift_function(phase, model=None, data=None, err=None):
 
 def fit_phase_shift_function_deriv(phase, model=None, data=None, err=None):
     """
+    Return the first derivative of fit_phase_shift_function at phase.
+
+    See fit_phase_shift_function for form of input.
     """
     harmind = np.arange(len(model))
     phasor = np.exp(harmind * 2.0j * np.pi * phase)
@@ -482,6 +535,9 @@ def fit_phase_shift_function_deriv(phase, model=None, data=None, err=None):
 
 def fit_phase_shift_function_2deriv(phase, model=None, data=None, err=None):
     """
+    Return the second derivative of fit_phase_shift_function at phase.
+
+    See fit_phase_shift_function for form of input.
     """
     harmind = np.arange(len(model))
     phasor = np.exp(harmind * 2.0j * np.pi * phase)
@@ -492,10 +548,13 @@ def fit_phase_shift_function_2deriv(phase, model=None, data=None, err=None):
 def fit_portrait_function(params, model=None, p_n=None, data=None, errs=None,
         P=None, freqs=None, nu_ref=np.inf):
     """
-    This is the function to be minimized by fit_portrait.  The returned value
-    is equivalent to the chi**2 value of the model and data, given the input
-    parameters, differing only by a constant depending on a weighted sum of the
-    data (see 'd' in fit_portrait(...)).
+    Return the function to be minimized by fit_portrait, evaluated at params.
+
+    The returned value is equivalent to the chi-squared value of the model and
+    data, given the input parameters, differing only by a constant depending
+    on a weighted, quadratic sum of the data (see 'd' in fit_portrait).
+    The quantity is related to the inverse DFT of model and data (i.e. the
+    cross-correlation of the time-domain quantities).
 
     NB: both model and data must already be in the Fourier domain.
 
@@ -503,18 +562,15 @@ def fit_portrait_function(params, model=None, p_n=None, data=None, errs=None,
     [cm**-3 pc].
     model is the nchan x nbin phase-frequency model portrait that has been
     DFT'd along the phase axis.
-    p_n is an nchan array containing a phase-average of the model; see p_n in
-    fit_portrait(...).
+    p_n is an nchan array containing a weighted, quadratic sum of the model
+    (see 'p_n' in fit_portrait).
     data is the nchan x nbin phase-frequency data portrait that has been DFT'd
     along the phase axis.
-    errs is/are the standard error(s) on the data values (in the Fourier
-    domain!).
+    err is the nchan array of noise level estimates (in the Fourier domain).
     P is the period [s] of the pulsar at the data epoch.
     freqs is an nchan array of frequencies [MHz].
-    nu_ref is the frequency [MHz] that is designated to have zero delay from a
+    nu_ref is the frequency [MHz] that is defined to have zero delay from a
     non-zero dispersion measure.
-
-    cf. fit_portrait(...)
     """
     phase = params[0]
     m = 0.0
@@ -537,10 +593,9 @@ def fit_portrait_function(params, model=None, p_n=None, data=None, errs=None,
 def fit_portrait_function_deriv(params, model=None, p_n=None, data=None,
         errs=None, P=None, freqs=None, nu_ref=np.inf):
     """
-    Returns the first-derivatives of the fit_portrait_function(...)
-    (i.e. chi**2) with respect to the two parameters, phase and DM.
+    Return the two first-derivatives of fit_portrait_function.
 
-    cf. fit_portrait_function(...)
+    See fit_portrait_function for form of input.
     """
     phase = params[0]
     D = Dconst * params[1] / P
@@ -563,13 +618,17 @@ def fit_portrait_function_deriv(params, model=None, p_n=None, data=None,
 def fit_portrait_function_2deriv(params, model=None, p_n=None, data=None,
         errs=None, P=None, freqs=None, nu_ref=np.inf):
     """
-    Returns the three unique values in the Hessian, which is a 2x2
-    symmetric matrix of the second-derivatives of fit_portrait_function(...).
-    The curvature matrix is one-half the second-derivative of the chi**2
-    function (this function).
-    The covariance matrix is the inverse of the curvature matrix.
+    Return the three second-derivatives of fit_portrait_function.
 
-    cf. fit_portrait, fit_portrait_function
+    The three unique values in the Hessian, which is a 2x2 symmetric matrix of
+    the second-derivatives of fit_portrait_function, are returned, evaluated at
+    params.
+
+    NB: The curvature matrix is one-half the second-derivative of the
+    chi-squared function (this function).  The covariance matrix is the
+    inverse of the curvature matrix.
+
+    See fit_portrait_function for form of input.
     """
     phase = params[0]
     D = Dconst * params[1] / P
@@ -596,21 +655,22 @@ def fit_portrait_function_2deriv(params, model=None, p_n=None, data=None,
     nu_zero = (W_n.sum() / np.sum(W_n * freqs**-2))**0.5
     return (np.array([d2_phi, d2_DM, d2_cross]), nu_zero)
 
-def fit_portrait_function_2deriv_full(params, model=None, p_n=None, data=None,
-        errs=None, P=None, freqs=None, nu_ref=np.inf):
-    return 0
-
 def estimate_portrait(phase, DM, scales, data, errs, P, freqs, nu_ref=np.inf):
+    #############
+    #MOTH-BALLED#
+    #############
     #here, all vars have additional epoch-index except nu_ref
     #i.e. all have to be arrays of at least len 1; errs are precision
     """
+    Return an average over all data portraits.
+
     An early attempt to make a '2-D' version of PBD's autotoa.  That is, to
     iterate over all epochs of data portraits to build a non-gaussian model
     that can be smoothed.
 
     <UNDER CONSTRUCTION>
 
-    cf. PBD's autotoa, PhDT
+    References: PBD's autotoa, PhDT
     """
     dFFT = fft.rfft(data, axis=2)
     dFFT[:, :, 0] *= DC_fact
@@ -631,14 +691,14 @@ def estimate_portrait(phase, DM, scales, data, errs, P, freqs, nu_ref=np.inf):
 def wiener_filter(prof, noise):
     #FIX does not work
     """
-    Returns the 'optimal' Wiener filter given a noisy pulse profile.
+    Return the 'optimal' Wiener filter given a noisy pulse profile.
 
     <UNDER CONSTRUCTION>
 
     prof is a noisy pulse profile.
-    noise is standard deviation of the data.
+    noise is standard error of the profile.
 
-    cf. PBD's PhDT
+    Reference: PBD's PhDT
     """
     FFT = fft.rfft(prof)
     pows = np.real(FFT * np.conj(FFT)) / len(prof)
@@ -647,20 +707,22 @@ def wiener_filter(prof, noise):
 
 def brickwall_filter(N, kc):
     """
-    Returns a 'brickwall' filter with N points; the first kc are ones, the
-    remainder are zeros.
+    Return a 'brickwall' filter with N points.
+
+    The brickwall filter has the first kc as ones and the remainder as zeros.
     """
     fk = np.zeros(N)
     fk[:kc] = 1.0
     return fk
 
 def fit_brickwall(prof, noise):
+    #FIX this is obviously wrong
     """
-    Attempts to find the critical harmonic bin index given a noisey pulse
-    profile, beyond which there is no signal.
+    Return the index kc for the best-fit brickwall.
+
+    See brickwall_filter and wiener_filter.
 
     <UNDER CONSTRUCTION>
-
     """
     wf = wiener_filter(prof, noise)
     N = len(wf)
@@ -670,17 +732,36 @@ def fit_brickwall(prof, noise):
     return X2.argmin()
 
 def half_triangle_function(a, b, dc, N):
+    """
+    Return a half-triangle function with base a and height b.
+
+    dc is an overall baseline level.
+    N is the length of the returned function.
+    """
     fn = np.zeros(N) + dc
     a = int(np.floor(a))
     fn[:a] += -(np.float64(b)/a)*np.arange(a) + b
     return fn
 
-def find_kc_function(params, data):
+def find_kc_function(params, data, errs):
+    """
+    Return the (weighted) chi-squared statistic for a half-triangle model.
+
+    params are the input parameters for half_triangle_function: (a, b, dc).
+    data is the array of data values.
+    errs is the array of uncertainties on the data.
+    """
     a, b, dc = params[0], params[1], params[2]
-    return np.sum((data - half_triangle_function(a, b, dc, len(data)))**2.0)
+    return np.sum((data - half_triangle_function(a, b, dc, len(data)) /
+        errs)**2.0)
 
 def find_kc(pows):
     """
+    Return the critical cutoff index kc based on a half-triangle function fit.
+
+    The function attempts to find where the noise-floor in a power-spectrum
+    begins.
+    pows is the input power-spectrum values.
     """
     data = np.log10(pows)
     other_args = [data]
@@ -692,18 +773,19 @@ def find_kc(pows):
 
 def fit_powlaw(data, init_params, errs, freqs, nu_ref):
     """
-    Fits a power-law to input data using lmfit's least-squares algorithm.
+    Fit a power-law function to data.
+
+    lmfit is used for the minimization.
     Returns an array of fitted parameters, an array of parameter error
-    estimates, the chi**2 value, the degrees of freedom, and the residuals
+    estimates, the chi-squared value, the degrees of freedom, and the residuals
     between the best-fit model and the data.
 
     data is the input array of data values used in the fit.
     init_params are the initial guesses for the [amplitude at nu_ref,
     spectral index].
-    errs is/are the standard errors(s) on the data values.
+    errs is the array of uncertainties on the data values.
     freqs is an nchan array of frequencies.
     nu_ref is the frequency at which the amplitude is referenced.
-
     """
     #Generate the parameter structure
     params = lm.Parameters()
@@ -725,18 +807,19 @@ def fit_powlaw(data, init_params, errs, freqs, nu_ref):
 def fit_gaussian_profile(data, init_params, errs, fit_scattering=False,
         quiet=True):
     """
-    Fits a set of gaussians to a pulse profile using lmfit's least-squares
-    algorithm.
-    Returns an array of fitted parameters, the reduced chi**2 value, the number
-    of degrees of freedom, and the residuals between the best-fit model and the
-    data.
+    Fit gaussian functions to a profile.
 
-    data is the nbin pulse profile used in the fit.
+    lmfit is used for the minimization.
+    Returns an array of fitted parameters, the reduced chi-squared value, the
+    number of degrees of freedom, and the residuals between the best-fit model
+    and the data.
+
+    data is the pulse profile array of length nbin used in the fit.
     init_params is an array of initial guesses for the 1 + (ngauss*3) values;
     the first value is the DC component.  Each remaining group of three
-    represents the gaussians loc (0-1), wid (i.e. FWHM) (0-1), and
+    represents the gaussians' loc (0-1), wid (i.e. FWHM) (0-1), and
     amplitude (>0.0).
-    errs is/are the standard errors(s) on the data values.
+    errs is the array of uncertainties on the data values.
     quiet=True suppresses output [default].
     """
     nparam = len(init_params)
@@ -791,9 +874,10 @@ def fit_gaussian_profile(data, init_params, errs, fit_scattering=False,
 def fit_gaussian_portrait(data, init_params, errs, fit_flags, phases, freqs,
         nu_ref, join_params=[], P=None, quiet=True):
     """
-    Fits a set of evolving gaussians to a phase-frequency pulse portrait using
-    lmfit's least-squares algorithm.
-    Returns an array of fitted values, the chi**2 value, and the number of
+    Fit evolving gaussian components to a portrait.
+
+    lmfit is used for the minimization.
+    Returns an array of fitted values, the chi-squared value, and the number of
     degrees of freedom.
 
     data is the nchan x nbin phase-frequency data portrait used in the fit.
@@ -802,15 +886,16 @@ def fit_gaussian_portrait(data, init_params, errs, fit_flags, phases, freqs,
     remaining group of six represent the gaussians loc (0-1), linear slope in
     loc, wid (i.e. FWHM) (0-1), linear slope in wid, amplitude (>0,0), and
     spectral index alpha (no implicit negative).
-    errs is/are the standard errors(s) on the data values.
+    errs is the array of uncertainties on the data values.
     fit_flags is an array of 1 + (ngauss*6) values, where non-zero entries
     signify that the parameter should be fit.
-    phases is the array of phase values (will pass nbin to
-    gen_gaussian_profile).
+    phases is the array of phase values.
     freqs in the array of frequencies at which to calculate the model.
     nu_ref [MHz] is the frequency to which the locs, wids, and amps reference.
+    join_params specifies how to simultaneously fit several portraits; see
+    ppgauss.
+    P is the pulse period [sec].
     quiet=True suppresses output [default].
-
     """
     nparam = len(init_params)
     ngauss = (len(init_params) - 2) / 6
@@ -886,6 +971,23 @@ def fit_portrait(data, model, init_params, P, freqs, nu_fit=np.inf,
         nu_out=None, errs=None, bounds=[(None, None), (None, None)], id=None,
         quiet=True):
     """
+    Fit a phase offset and DM between a data portrait and model portrait.
+
+    A truncated Newtonian algorithm is used.
+    Returns  a 
+    n (phi_out, DM, scales, np.array(param_errs), nu_out, covariance,
+            red_chi2, duration, nfeval, return_code)
+
+    data is the nchan x nbin phase-frequency data portrait.
+    model is the nchan x nbin phase-frequency model portrait.
+    init_params is an array = [phase, DM], with phase in [rot] and DM in
+    [cm**-3 pc].
+    P is the period [s] of the pulsar at the data epoch.
+    freqs is an nchan array of frequencies [MHz].
+    nu_fit is the frequency [MHz] used as nu_ref in the fit.
+    nu_out is the desired output reference frequency [MHz].  Defaults to the
+    zero-covariance frequency calculated in the fit.
+    err is the nchan array of noise level estimates (in the Fourier domain).
     """
     dFFT = fft.rfft(data, axis=1)
     dFFT[:, 0] *= DC_fact
