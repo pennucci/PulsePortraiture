@@ -1594,7 +1594,7 @@ def read_model(modelfile, phases=None, freqs=None, P=None, quiet=False):
             bw = (freqs[-1] - freqs[0]) + ((freqs[-1] - freqs[-2]))
         else:
             bw = 0.0
-        print "%d frequency channels, %.0f MHz bandwidth, centered near ~%.3f MHz,"%(nchan, abs(bw), freqs.mean())
+        print "%d frequency channels, ~%.0f MHz bandwidth, centered near ~%.0f MHz,"%(nchan, abs(bw), freqs.mean())
         print "with model parameters referenced at %.3f MHz."%nu_ref
     if read_only:
         return name, nu_ref, ngauss, params, fit_flags
