@@ -4,6 +4,8 @@
 #Coming soon#
 #############
 
+#Written by Timothy T. Pennucci (TTP; pennucci@virginia.edu)
+
 from pplib import *
 
 #See DC_fact in pplib.py

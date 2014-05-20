@@ -4,6 +4,8 @@
 #Coming soon#
 #############
 
+#Written by Timothy T. Pennucci (TTP; pennucci@virginia.edu)
+
 from matplotlib.patches import Rectangle
 from pplib import *
 

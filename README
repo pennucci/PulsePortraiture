@@ -1,9 +1,40 @@
-For use with PSRCHIVE-compatible folded archives.
+===================
+=Pulse Portraiture=
+===================
 
-Full documentation/docstrings coming soon.
+What it is:
+    -a wideband pulsar timing code written in python. It uses an extension of
+    Joe Taylor's FFTFIT algorithm (Taylor 1992) to simultaneously measure a
+    phase (TOA) and dispersion measure (DM).  It is to be used with
+    PSRCHIVE-compatible folded archives.
 
-ppgauss will build a model; pptoas will measure TOAs and DMs.
+Why:
+    -The motivation behind writing this software was to develop a wideband
+    timing routine for high-precision pulsar timing, and it makes up a chunk of
+    Tim Pennucci's Ph.D. thesis.  Algorithm development and coding help was
+    provided by Paul Demorest and Scott Ransom.
 
-examples/example.py can be run as a demonstration.
+The technical description of this work is:
+    -Pennucci, Demorest, & Ransom (2014), "Elementary Wideband Timing of Radio
+        Pulsars" (arXiv:1402:1672),
+    and has been submitted to The Astrophysical Journal.
 
-See arxiv:1402:1672 for a technical description.
+Requirements:
+    -PSRCHIVE, compiled with the python-interface enabled
+    -at least numpy 1.7.1 & scipy 0.12.0
+    -lmfit is required for portrait modelling.
+
+In short:
+    -pplib contains all functions and classes needed for the fitting scripts.
+    -ppgauss is a command-line utility to build gaussian-component model
+        portraits.
+    -pptoas is a command-line utility to measure TOAs and DMs.
+
+License:
+    -Released under GPLv2, sans "or later" clause.
+
+Other:
+    -Full documentation/docstrings coming soon; examples/example.py can be run
+    as a demonstration.  Code improvements are underway, as is a broad
+    application to IPTA pulsars of interest.  Suggestions and additional
+    development are welcome (https://github.com/pennucci/PulsePortraiture).
