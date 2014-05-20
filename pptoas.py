@@ -716,7 +716,7 @@ if __name__ == "__main__":
 
     (options, args) = parser.parse_args()
 
-    if (options.datafile is None or options.modelfile is None):
+    if (options.datafiles is None or options.modelfile is None):
             print "\npptoas.py - simultaneous least-squares fit for TOAs and DMs\n"
             parser.print_help()
             print ""
