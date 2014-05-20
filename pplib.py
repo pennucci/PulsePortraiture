@@ -1018,7 +1018,7 @@ def fit_phase_shift(data, model, noise=None, bounds=[-0.5, 0.5]):
     #errors = [phase_error, scale_error]
     red_chi2 = (d - ((fmin**2) / p)) / (len(data) - 2)
     return DataBunch(phase=phase, phase_err=phase_error, scale=scale,
-            scale_error, red_chi2=red_chi2)
+            scale_error=scale_error, red_chi2=red_chi2)
 
 def fit_portrait(data, model, init_params, P, freqs, nu_fit=None, nu_out=None,
         errs=None, bounds=[(None, None), (None, None)], id=None, quiet=True):

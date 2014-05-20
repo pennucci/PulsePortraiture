@@ -21,7 +21,6 @@ class GetTOAs:
         """
         """
         if file_is_ASCII(datafiles):
-            self.metafile = datafiles
             self.datafiles = open(datafiles, "r").readlines()
             self.datafiles = [self.datafiles[ifile][:-1] for ifile in
                     xrange(len(self.datafiles))]
@@ -672,12 +671,9 @@ if __name__ == "__main__":
     #parser.add_option("-h", "--help",
     #                  action="store_true", dest="help", default=False,
     #                  help="Show this help message and exit.")
-    parser.add_option("-d", "--datafile",
-                      action="store", metavar="archive", dest="datafile",
-                      help="PSRCHIVE archive from which to measure TOAs/DMs.  ***NB: Files should be de-dedispersed!***")
-    parser.add_option("-M", "--metafile",
-                      action="store",metavar="metafile", dest="metafile",
-                      help="File containing list of archive filenames from which to measure TOAs/DMs.")
+    parser.add_option("-d", "--datafiles",
+                      action="store", metavar="archive", dest="datafiles",
+                      help="PSRCHIVE archive from which to measure TOAs/DMs, or a metafile listing archive filenames.  ***NB: Files should be NOT be dedispersed!***")
     parser.add_option("-m", "--modelfile",
                       action="store", metavar="model", dest="modelfile",
                       help="Model file from ppgauss.py, or PSRCHIVE FITS file that has same channel frequencies, nchan, nbin as datafile(s) (i.e. cannot be used with --uncommon).")
@@ -720,15 +716,13 @@ if __name__ == "__main__":
 
     (options, args) = parser.parse_args()
 
-    if (options.datafile is None and options.metafile is None or
-            options.modelfile is None):
+    if (options.datafile is None or options.modelfile is None):
             print "\npptoas.py - simultaneous least-squares fit for TOAs and DMs\n"
             parser.print_help()
             print ""
             parser.exit()
 
-    datafile = options.datafile
-    metafile = options.metafile
+    datafiles = options.datafiles
     modelfile = options.modelfile
     nu_ref = options.nu_ref
     if nu_ref:
@@ -748,10 +742,6 @@ if __name__ == "__main__":
     showplot = options.showplot
     quiet = options.quiet
 
-    if metafile is None:
-        datafiles = datafile
-    else:
-        datafiles = metafile
     gt = GetTOAs(datafiles=datafiles, modelfile=modelfile, common=common,
             quiet=quiet)
     gt.get_TOAs(nu_ref=nu_ref, DM0=DM0, bary_DM=bary_DM, fit_DM=fit_DM,
