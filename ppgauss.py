@@ -430,7 +430,7 @@ class DataPortrait:
     def write_errfile(self, errfile=None, append=False, quiet=False):
         if errfile is None:
             errfile = self.datafile + ".gmodel_errs"
-        model_param_errs = np.copy(self.fit_errs)
+        model_param_errs = np.copy(self.model_param_errs)
         #Convert tau (scattering timescale) to sec
         model_param_errs[1] *= self.Ps[0] / self.nbin
         write_model(errfile, self.model_name+"_errors", self.nu_ref,

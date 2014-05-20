@@ -66,8 +66,11 @@ PL_model = True
 #display#
 #########
 
-#Colormap preference -- cubehelix, pink, hot, terrain, spectral, gist_heat, seismic are all decent....see plt.cm for list of available colormaps.
-default_colormap = "cubehelix"
+#Set colormap preference
+#Decent monocolor: pink, gist_heat, copper, hot, gray, Blues_r
+#Decent multicolor: cubehelix, terrain, spectral, seismic
+#see plt.cm for list of available colormaps.
+default_colormap = "gist_heat"
 if hasattr(plt.cm, default_colormap):
     plt.rc("image", cmap=default_colormap)
 else:
