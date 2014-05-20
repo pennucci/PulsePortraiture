@@ -234,19 +234,19 @@ class GetTOAs:
                 ####################
                 if not quiet:
                     print "Fitting for TOA %d"%(isubx)
-                (phi, DM, scalex, param_errs, nu_ref, covariance, red_chi2,
-                        duration, nfeval, rc) = fit_portrait(portx, modelx,
-                                np.array([phase_guess, DM_guess]), P, freqsx,
-                                nu_fit, self.nu_ref, errs, bounds=bounds,
-                                id = id, quiet=quiet)
-                phi_err, DM_err = param_errs[0], param_errs[1]
-                fit_duration += duration
+                results = fit_portrait(portx, modelx,
+                        np.array([phase_guess, DM_guess]), P, freqsx, nu_fit,
+                        self.nu_ref, errs, bounds=bounds, id = id, quiet=quiet)
+                results.phi = results.phase
+                results.phi_err = results.phase_err
+                fit_duration += results.duration
 
                 ####################
                 #  CALCULATE  TOA  #
                 ####################
-                TOA = epochs[isubx] + pr.MJD((phi * P) / (3600 * 24.))
-                TOA_err = phi_err * P * 1e6 # [us]
+                results.TOA = epochs[isubx] + pr.MJD((results.phi * P) /
+                        (3600 * 24.))
+                results.TOA_err = results.phi_err * P * 1e6 # [us]
 
                 ##########################
                 #DOPPLER CORRECTION OF DM#
@@ -255,32 +255,32 @@ class GetTOAs:
                     #NB: the 'doppler factor' retrieved from PSRCHIVE seems to
                     #be the inverse of the convention nu_source/nu_observed
                     df = arch.get_Integration(isub).get_doppler_factor()
-                    DM *= df    #NB: No longer the *fitted* value!
+                    results.DM *= df    #NB: No longer the *fitted* value!
                     doppler_fs[isubx] = df
                 else:
                     doppler_fs[isubx] = 1.0
 
-                nu_refs[isubx] = nu_ref
-                phis[isubx] = phi
-                phi_errs[isubx] = phi_err
-                TOAs[isubx] = TOA
-                TOA_errs[isubx] = TOA_err
-                DMs[isubx] = DM
-                DM_errs[isubx] = DM_err
-                nfevals[isubx] = nfeval
-                rcs[isubx] = rc
-                scalesx.append(scalex)
-                scale_errs.append(param_errs[2:])
-                scale = np.zeros(nchan)
+                nu_refs[isubx] = results.nu_ref
+                phis[isubx] = results.phi
+                phi_errs[isubx] = results.phi_err
+                TOAs[isubx] = results.TOA
+                TOA_errs[isubx] = results.TOA_err
+                DMs[isubx] = results.DM
+                DM_errs[isubx] = results.DM_err
+                nfevals[isubx] = results.nfeval
+                rcs[isubx] = results.return_code
+                scalesx.append(results.scales)
+                scale_errs.append(results.scale_errs)
+                results.all_scales = np.zeros(nchan)
                 iscalex = 0
                 for ichan in xrange(nchan):
                     if weights[isub, ichan] == 1:
-                        scale[ichan] = scalex[iscalex]
+                        results.all_scales[ichan] = results.scales[iscalex]
                         iscalex += 1
                     else: pass
-                scales[isubx] = scale
-                covariances[isubx] = covariance
-                red_chi2s[isubx] = red_chi2
+                scales[isubx] = results.all_scales
+                covariances[isubx] = results.covariance
+                red_chi2s[isubx] = results.red_chi2
             DeltaDMs = DMs - DM0
             #The below returns the weighted mean and the sum of the weights,
             #but needs to do better in the case of small-error outliers from

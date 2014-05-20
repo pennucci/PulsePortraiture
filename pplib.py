@@ -1030,7 +1030,7 @@ def fit_portrait(data, model, init_params, P, freqs, nu_fit=np.inf,
         else:
             sys.stderr.write(
                     "Fit failed with return code %d -- %s"%(results.status, rcstring))
-    if not quiet and results.success is True:
+    if not quiet and results.success is True and 0:
         sys.stderr.write("Fit succeeded with return code %d -- %s\n"
                 %(results.status, rcstring))
     #Curvature matrix = 1/2 2deriv of chi2 (cf. Gregory sect 11.5)
@@ -1051,12 +1051,15 @@ def fit_portrait(data, model, init_params, P, freqs, nu_fit=np.inf,
     param_errs = list(covariance_matrix.diagonal()**0.5)
     DoF = len(data.ravel()) - (len(freqs) + 2)
     red_chi2 = (d + results.fun) / DoF
+    #Calculate scales
     scales = get_scales(data, model, phi, DM, P, freqs, nu_fit)
-    #Errors on scales, if ever needed (these are wrong b/c of covariances)
-    param_errs += list(pow(p_n / errs**2.0, -0.5))
-    #The below should be changed to a DataBunch
-    return (phi_out, DM, scales, np.array(param_errs), nu_out, covariance,
-            red_chi2, duration, nfeval, return_code)
+    #Errors on scales, if ever needed (these may be wrong b/c of covariances)
+    scale_errs = pow(p_n / errs**2.0, -0.5)
+    results = DataBunch(phase=phi_out, phase_err=param_errs[0], DM=DM,
+            DM_err=param_errs[1], scales=scales, scale_errs=scale_errs,
+            nu_ref=nu_out, covariance=covariance, red_chi2=red_chi2,
+            duration=duration, nfeval=nfeval, return_code=return_code)
+    return results
 
 def fit_phase_shift(data, model, noise=None, bounds=[-0.5, 0.5]):
     """

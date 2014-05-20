@@ -382,15 +382,15 @@ class DataPortrait:
                 if phase_guess > 0.5:
                     phase_guess -= 1.0
                 DM_guess = 0.0
-                (self.phi, self.DM, self.scalesx, param_errs, nu_zero, covar,
-                        self.red_chi2, self.fit_duration, self.nfeval,
-                        self.rc) = fit_portrait(self.portx, self.modelx,
+                results = fit_portrait(self.portx, self.modelx,
                                 np.array([phase_guess, DM_guess]), self.Ps[0],
                                 self.freqsxs[0], self.nu_fit, None, None,
                                 bounds=[(None, None), (None, None)], id=None,
                                 quiet=True)
-                self.phierr = param_errs[0]
-                self.DMerr = param_errs[1]
+                self.fp_results = results
+                (self.phi, self.phierr, self.DM, self.DMerr, self.red_chi2) = (
+                        results.phase, results.phase_err, results.DM,
+                        results.DM_err, results.red_chi2)
             self.duration = time.time() - start
             self.total_time += self.duration
             yield
