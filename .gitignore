@@ -9,5 +9,6 @@ PPprofile/
 examples/*.pyc
 examples/*.swp
 examples/*~
+ppalign.py
 pplib_dist.py
 MCtests/
