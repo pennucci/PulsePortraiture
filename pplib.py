@@ -4,10 +4,11 @@
 #pplib#
 #######
 
-#Contains all necessary functions and definitions for the fitting routines, as
-#well as some additional functions used in the our wideband timing analysis.
+#pplib contains all necessary functions and definitions for the fitting
+#programs ppgauss and pptoas, as well as some additional functions used in our
+#wideband timing analysis.
 
-#Written by Timothy T. Pennucci (TTP)
+#Written by Timothy T. Pennucci (TTP; pennucci@virginia.edu).
 #Contributions by Scott M. Ransom (SMR) and Paul B. Demorest (PBD) 
 
 #########
@@ -145,7 +146,10 @@ def gaussian_function(xs, loc, wid, norm=False):
     """
     Evaluates a gaussian function with parameters loc and wid at values xs.
 
-    See gaussian_profile for details.
+    xs is the array of values that are evaluated in the function.
+    loc is the pulse phase location (0-1) [rot].
+    wid is the gaussian pulse's full width at half-max (FWHM) [rot].
+    norm=True returns the profile such that the integrated density = 1.
     """
     mean = loc
     sigma = wid / (2 * np.sqrt(2 * np.log(2)))
@@ -159,14 +163,15 @@ def gaussian_function(xs, loc, wid, norm=False):
 
 def gaussian_profile(nbin, loc, wid, norm=False, abs_wid=False, zeroout=True):
     """
-    Return a gaussian pulse profile with 'nbin' bins and peak amplitude of 1.
+    Return a gaussian pulse profile with nbin bins and peak amplitude of 1.
 
-    If norm=True, return the profile such that the integrated density = 1.
-        'nbin' = the number of bins in the profile
-        'loc' = the pulse phase location (0-1) [rot]
-        'wid' = the gaussian pulse's full width at half-max (FWHM) [rot]
-    If abs_wid=True, will use abs(wid).
-    If zeroout=True and wid <= 0, return a zero array.
+    nbin is the number of bins in the profile.
+    loc is the pulse phase location (0-1) [rot].
+    wid is the gaussian pulse's full width at half-max (FWHM) [rot].
+    norm=True returns the profile such that the integrated density = 1.
+    abs_wid=True, will use abs(wid).
+    zeroout=True and wid <= 0, return a zero array.
+
     Note: The FWHM of a gaussian is approx 2.35482 "sigma", or exactly
           2*sqrt(2*ln(2)).
 
@@ -217,9 +222,9 @@ def gen_gaussian_profile(params, nbin):
     Return a model-profile with ngauss gaussian components.
 
     params is a sequence of 2 + (ngauss*3) values where the first value is
-    the DC component, the second value is the scattering timescale [bin]
-    and each remaining group of three represents the gaussians' loc (0-1),
-    wid (i.e. FWHM) (0-1), and amplitude (>0.0).
+        the DC component, the second value is the scattering timescale [bin]
+        and each remaining group of three represents the gaussians' loc (0-1),
+        wid (i.e. FWHM) (0-1), and amplitude (>0.0).
     nbin is the number of bins in the model.
 
     Taken and tweaked from SMR's pygaussfit.py
@@ -244,20 +249,22 @@ def gen_gaussian_portrait(params, phases, freqs, nu_ref, join_ichans=[],
     join_ichans is used only in ppgauss.
 
     params is an array of 2 + (ngauss*6) + 2*len(join_ichans) values.
-    The first value is the DC component, and the second value is the scattering
-    timescale [bin].  The next ngauss*6 values represent the gaussians' loc
-    (0-1), evolution parameter in loc, wid (i.e. FWHM) (0-1),
-    evolution parameter in wid, amplitude (>0,0), and spectral index alpha (no
-    implicit negative).  The remaining 2*len(join_ichans) parameters are pairs
-    of phase and DM.  The iith list of channels in join_ichans gets rotated in
-    the generated model by the iith pair of phase and DM.
+        The first value is the DC component, and the second value is the
+        scattering timescale [bin].  The next ngauss*6 values represent the
+        gaussians' loc (0-1), evolution parameter in loc, wid (i.e. FWHM)
+        (0-1), evolution parameter in wid, amplitude (>0,0), and spectral
+        index alpha (no implicit negative).  The remaining 2*len(join_ichans)
+        parameters are pairs of phase and DM.  The iith list of channels in
+        join_ichans gets rotated in the generated model by the iith pair of
+        phase and DM.
     phases is the array of phase values (will pass nbin to
-    gen_gaussian_profile).
+        gen_gaussian_profile).
     freqs in the array of frequencies at which to calculate the model.
     nu_ref is the frequency to which the locs, wids, and amps reference.
 
     The evolution parameters will either be linear slopes, or a power-law
     indices, depending on the global settings in the header of pplib.py.
+
     The units of the evolution parameters and the frequencies need to match
     appropriately.
     """
@@ -344,9 +351,11 @@ def powlaw_freqs(lo, hi, N, alpha, mid=False):
 
     Given a bandwidth from lo to hi frequencies, split into N channels, and a
     power-law index alpha, this function finds the frequencies such that each
-    channel contains the same amount of flux.  Default behavior returns N+1
-    frequencies (includes both lo and hi freqs); if mid=True, returns N
-    frequencies, corresponding to the center frequency in each channel.
+    channel contains the same amount of flux.
+
+    mid=True, returns N frequencies, corresponding to the center frequency in
+        each channel. Default behavior returns N+1 frequencies (includes both
+        lo and hi freqs).
     """
     alpha = np.float64(alpha)
     nus = np.zeros(N + 1)
@@ -395,8 +404,8 @@ def add_scattering(port, kernel, repeat=3):
     port is the nchan x nbin portrait.
     kernel is the scattering kernel to be used in the convolution with port.
     repeat attempts to rid the convolution of edge effects by repeating the
-    port and kernel repeat times before convolution; the center portion is
-    returned.
+        port and kernel repeat times before convolution; the center portion is
+        returned.
     """
     mid = repeat/2
     d = np.array(list(port.transpose()) * repeat).transpose()
@@ -418,11 +427,12 @@ def add_scintillation(port, params=None, random=True, nsin=2, amax=1.0,
     """
     Add totally fake scintillation to a portrait based on sinusoids.
 
+    port is the nchan x nbin array of data values.
     params are triplets of sinusoidal parameters: "amps", "freqs" [cycles],
-    and "phases" [cycles].
+        and "phases" [cycles].
     if params is None and random is True, random params for nsin sinusoids are
-    chosen from a uniform distribution on [0,amax], a chi-squared
-    distribution with wmax dof, and a uniform distribution on [0,1].
+        chosen from a uniform distribution on [0,amax], a chi-squared
+        distribution with wmax dof, and a uniform distribution on [0,1].
     """
     nchan = len(port)
     pattern = np.zeros(nchan)
@@ -562,18 +572,18 @@ def fit_portrait_function(params, model=None, p_n=None, data=None, errs=None,
     NB: both model and data must already be in the Fourier domain.
 
     params is an array = [phase, DM], with phase in [rot] and DM in
-    [cm**-3 pc].
+        [cm**-3 pc].
     model is the nchan x nbin phase-frequency model portrait that has been
-    DFT'd along the phase axis.
+        DFT'd along the phase axis.
     p_n is an nchan array containing a weighted, quadratic sum of the model
-    (see 'p_n' in fit_portrait).
+        (see 'p_n' in fit_portrait).
     data is the nchan x nbin phase-frequency data portrait that has been DFT'd
-    along the phase axis.
+        along the phase axis.
     err is the nchan array of noise level estimates (in the Fourier domain).
     P is the period [s] of the pulsar at the data epoch.
     freqs is an nchan array of frequencies [MHz].
     nu_ref is the frequency [MHz] that is defined to have zero delay from a
-    non-zero dispersion measure.
+        non-zero dispersion measure.
     """
     phase = params[0]
     m = 0.0
@@ -764,6 +774,7 @@ def find_kc(pows):
 
     The function attempts to find where the noise-floor in a power-spectrum
     begins.
+
     pows is the input power-spectrum values.
     """
     data = np.log10(pows)
@@ -785,7 +796,7 @@ def fit_powlaw(data, init_params, errs, freqs, nu_ref):
 
     data is the input array of data values used in the fit.
     init_params is a list of initial parameter guesses = [amplitude at nu_ref,
-    spectral index].
+        spectral index].
     errs is the array of uncertainties on the data values.
     freqs is an nchan array of frequencies.
     nu_ref is the frequency at which the amplitude is referenced.
@@ -824,9 +835,9 @@ def fit_gaussian_profile(data, init_params, errs, fit_scattering=False,
 
     data is the pulse profile array of length nbin used in the fit.
     init_params is a list of initial guesses for the 1 + (ngauss*3) values;
-    the first value is the DC component.  Each remaining group of three
-    represents the gaussians' loc (0-1), wid (i.e. FWHM) (0-1), and
-    amplitude (>0.0).
+        the first value is the DC component.  Each remaining group of three
+        represents the gaussians' loc (0-1), wid (i.e. FWHM) (0-1), and
+        amplitude (>0.0).
     errs is the array of uncertainties on the data values.
     quiet=True suppresses output [default].
     """
@@ -893,18 +904,18 @@ def fit_gaussian_portrait(data, init_params, errs, fit_flags, phases, freqs,
 
     data is the nchan x nbin phase-frequency data portrait used in the fit.
     init_params is a list of initial guesses for the 1 + (ngauss*6)
-    parameters in the model; the first value is the DC component.  Each
-    remaining group of six represent the gaussians loc (0-1), linear slope in
-    loc, wid (i.e. FWHM) (0-1), linear slope in wid, amplitude (>0,0), and
-    spectral index alpha (no implicit negative).
+        parameters in the model; the first value is the DC component.  Each
+        remaining group of six represent the gaussians loc (0-1), linear slope
+        in loc, wid (i.e. FWHM) (0-1), linear slope in wid, amplitude (>0,0),
+        and spectral index alpha (no implicit negative).
     errs is the array of uncertainties on the data values.
     fit_flags is an array of 1 + (ngauss*6) values, where non-zero entries
-    signify that the parameter should be fit.
+        signify that the parameter should be fit.
     phases is the array of phase values.
     freqs in the array of frequencies at which to calculate the model.
     nu_ref [MHz] is the frequency to which the locs, wids, and amps reference.
     join_params specifies how to simultaneously fit several portraits; see
-    ppgauss.
+        ppgauss.
     P is the pulse period [sec].
     quiet=True suppresses output [default].
     """
@@ -1035,13 +1046,13 @@ def fit_portrait(data, model, init_params, P, freqs, nu_fit=None, nu_out=None,
     data is the nchan x nbin phase-frequency data portrait.
     model is the nchan x nbin phase-frequency model portrait.
     init_params is a list of initial parameter guesses = [phase, DM], with
-    phase in [rot] and DM in [cm**-3 pc].
+        phase in [rot] and DM in [cm**-3 pc].
     P is the period [s] of the pulsar at the data epoch.
     freqs is an nchan array of frequencies [MHz].
     nu_fit is the frequency [MHz] used as nu_ref in the fit.  Defaults to the
-    mean value of freqs.
+        mean value of freqs.
     nu_out is the desired output reference frequency [MHz].  Defaults to the
-    zero-covariance frequency calculated in the fit.
+        zero-covariance frequency calculated in the fit.
     errs is the array of uncertainties on the data values.
     bounds is the list of 2 tuples containing the bounds on the phase and DM.
     id provides a label for the TOA.
@@ -1125,11 +1136,11 @@ def get_noise(data, method=default_noise_method, **kwargs):
     Estimate the off-pulse noise.
 
     data is a 1- or 2-D array of input values.
-    method is either "PS" or "fit" where
-    "PS" uses the mean of the last quarter if the power spectrum, and
-    "fit" attempts to find the noise floor by fitting a half-triangle function
-    to the power spectrum.
-    kwargs are passed to the selected noise-measuring function.
+    method is either "PS" or "fit" where:
+        "PS" uses the mean of the last quarter if the power spectrum, and
+        "fit" attempts to find the noise floor by fitting a half-triangle
+        function to the power spectrum.
+    **kwargs are passed to the selected noise-measuring function.
 
     Other noise-measuring methods to come.
     """
@@ -1150,7 +1161,7 @@ def get_noise_PS(data, frac=4, chans=False):
 
     data is a 1- or 2-D array of values.
     frac is a value specifying the inverse of the fraction of the
-    power-spectrum to be examined.
+        power-spectrum to be examined.
     chans=True will return an estimate of the noise in each input channel.
     """
     if chans:
@@ -1265,13 +1276,13 @@ def rotate_data(data, phase=0.0, DM=0.0, Ps=None, freqs=None,
     data is a 1-, 2-, 3- or 4-D array of data.
     phase is a value specifying the amount of achromatic rotation [rot].
     DM is a value specifying the amount of rotation based on the cold-plasma
-    dispersion law [cm**-3 pc].
+        dispersion law [cm**-3 pc].
     Ps is an array of periods [sec], needed if there is a nsub axis.
     freqs is an array of frequencies [MHz], needed if there is a nchan axis.
     nu_ref is the reference frequency [MHz] that has zero delay for any value
-    of DM.
+        of DM.
     taxis is an integer specfiying which axis is the temporal axis; needed if
-    len(Ps) > 1.
+        len(Ps) > 1.
     faxis is an integer specifying which axis is the frequency axis.
     baxis is an integer specifying which axis is the phase axis.
     """
@@ -1346,12 +1357,12 @@ def rotate_portrait(port, phase=0.0, DM=None, P=None, freqs=None,
     port is a nchan x nbin array of data values.
     phase is a value specifying the amount of achromatic rotation [rot].
     DM is a value specifying the amount of rotation based on the cold-plasma
-    dispersion law [cm**-3 pc].
+        dispersion law [cm**-3 pc].
     P is the pulsar period [sec] at the epoch of the data, needed if a DM is
-    provided.
+        provided.
     freqs is an array of frequencies [MHz], needed if a DM is provided.
     nu_ref is the reference frequency [MHz] that has zero delay for any value
-    of DM.
+        of DM.
     """
     pFFT = fft.rfft(port, axis=1)
     for nn in xrange(len(pFFT)):
@@ -1401,7 +1412,7 @@ def DM_delay(DM, freq, freq_ref=np.inf, P=None):
 
     DM is the dispersion measure [cm**-3 pc].
     freq is the delayed frequency [MHz].
-    freq_ref is the frequency against which the delay is measured.
+    freq_ref is the frequency [MHz] against which the delay is measured.
     P is a period [sec]; if provided, the return is in [rot].
     """
     delay = Dconst * DM * ((freq**-2.0) - (freq_ref**-2.0))
@@ -1416,8 +1427,8 @@ def phase_transform(phi, DM, nu_ref1=np.inf, nu_ref2=np.inf, P=None, mod=True):
 
     phi is an input delay [rot] or [sec].
     DM is the dispersion measure [cm**-3 pc].
-    nu_ref1 is the reference frequency for phi.
-    nu_ref2 is the reference frequency of the ouput delay.
+    nu_ref1 is the reference frequency [MHz] for phi.
+    nu_ref2 is the reference frequency [MHz] of the ouput delay.
     P is the pulsar period; if not provided, assumes phi is in [sec].
     mod=True ensures the output delay in [rot] is on the interval [-0.5, 0.5).
 
@@ -1491,7 +1502,7 @@ def load_data(filename, dedisperse=False, dededisperse=False, tscrunch=False,
 
     filename is the input PSRCHIVE archive.
     Most of the options should be self-evident; archives are manipulated by
-    PSRCHIVE only.
+        PSRCHIVE only.
     flux_prof=True will include an array with the phase-averaged flux profile.
     norm_weights=True returns all channel weights as either 1 or 0.
     refresh_arch=True refreshes the returned archive to its original state.
@@ -1646,7 +1657,7 @@ def write_model(filename, name, nu_ref, model_params, fit_flags, append=False,
     name is the name of the model.
     nu_ref is the reference frequency [MHz] of the model.
     model_params is the list of 2 + 6*ngauss model parameters, where index 1 is
-    the scattering timescale [sec].
+        the scattering timescale [sec].
     fit_flags is the list of 2 + 6*ngauss flags (1 or 0) designating a fit.
     append=True will append to a file named filename.
     quiet=True suppresses output.
@@ -1769,11 +1780,30 @@ def file_is_ASCII(filename):
 
 def write_archive(data, ephemeris, freqs, nu0=None, bw=None,
         outfile="pparchive.fits", tsub=1.0, start_MJD=None, weights=None,
-        dedispersed=False, state="Coherence", obs="GBT", quiet=False):
+        dedispersed=False, state="Stokes", obs="GBT", quiet=False):
     """
+    Write data to a PSRCHIVE psrfits file (using a hack).
+
+    Not guaranteed to work perfectly.
+
+    Takes dedispersed data, please.
+
+    data is a nsub x npol x nchan x nbin array of values.
+    ephemeris is the timing ephemeris to be installed.
+    freqs is an array of the channel center-frequencies [MHz].
+    nu0 is the center frequency [MHz]; if None, defaults to the mean of freqs.
+    bw is the bandwidth; if None, is calculated from freqs.
+    outfile is the desired output file name.
+    tsub is the duration of each subintegration [sec].
+    start_MJD is the starting epoch of the data in PSRCHIVE MJD format.
+    weights is a nsub x nchan array of weights.
+    dedispersed=True, will save the archive as dedispered.
+    state is the polarization state of the data ("Coherence" or "Stokes" for
+        npol == 4, or "Intensity" for npol == 1).
+    obs is the telescope code.
+    quiet=True suppresses output.
+
     Mostly written by PBD.
-    Takes dedispersed data, please.  If dedispersed=True, will save archive
-    this way.
     """
     nsub, npol, nchan, nbin = data.shape
     if nu0 is None:
@@ -1828,7 +1858,7 @@ def write_archive(data, ephemeris, freqs, nu0=None, bw=None,
     arch.set_bandwidth(bw)
     arch.set_telescope(obs)
     if npol==4:
-        arch.set_state(state) #Could also do 'Stokes' here
+        arch.set_state(state)
     #Fill in some subintegration attributes
     if start_MJD is None:
         start_MJD = pr.MJD(50000, 0, 0.0)
@@ -1861,13 +1891,42 @@ def write_archive(data, ephemeris, freqs, nu0=None, bw=None,
 def make_fake_pulsar(modelfile, ephemeris, outfile="fake_pulsar.fits", nsub=1,
         npol=1, nchan=512, nbin=1048, nu0=1500.0, bw=800.0, tsub=300.0,
         phase=0.0, dDM=0.0, start_MJD=None, weights=None, noise_std=1.0,
-        scale=1.0, dedisperse=False, t_scat=0.0, alpha=scattering_alpha,
-        scint=False, state="Coherence", obs="GBT", quiet=False):
+        scale=1.0, dedispersed=False, t_scat=0.0, alpha=scattering_alpha,
+        scint=False, state="Stokes", obs="GBT", quiet=False):
     """
+    Generate fake pulsar data written to a PSRCHIVE psrfits archive.
+
+    Not guaranteed to work perfectly.
+
+    modelfile is the write_model(...)-type of file specifying the
+        gaussian-component model to use.
+    ephemeris is the timing ephemeris to be installed.
+    outfile is the desired output file name.
+    nsub is the number of subintegrations in the data.
+    npol is the number of polarizations in the data.
+    nchan is the number of frequency channels in the data.
+    nbin is the number of phase bins in the data.
+    nu0 is the center frequency [MHz] of the data.
+    bw is the bandwidth of the data.
+    tsub is the duration of each subintegration [sec].
+    phase is an arbitrary rotation [rot] to all subints, with respect to nu0.
+    dDM is a dispersion measure [cm**-3 pc] added to what is given by the
+        ephemeris. Dispersion occurs at infinite frequency. (??)
+    start_MJD is the starting epoch of the data in PSRCHIVE MJD format.
+    weights is a nsub x nchan array of weights.
+    noise_std is the frequency-independent noise-level added to the data.
+    scale is an arbitrary scaling to the amplitude parameters in modelfile.
+    dedispersed=True, will save the archive as dedispered.
+    t_scat != 0.0 convolves the data with a scattering timscale t_scat [sec].
+    alpha is the scattering index.
+    scint=True adds random scintillation, based on default parameters. scint
+        can also be a list of parameters taken by add_scintillation.
+    state is the polarization state of the data ("Coherence" or "Stokes" for
+        npol == 4, or "Intensity" for npol == 1).
+    obs is the telescope code.
+    quiet=True suppresses output.
+
     Mostly written by PBD.
-    'phase' [rot] is an arbitrary rotation to all subints, with respect to nu0.
-    'dDM' [cm**-3 pc] is an additional DM to what is given in ephemeris.
-    Dispersion occurs at infinite frequency.
     """
     chanwidth = bw / nchan
     lofreq = nu0 - (bw/2)
@@ -1933,7 +1992,7 @@ def make_fake_pulsar(modelfile, ephemeris, outfile="fake_pulsar.fits", nsub=1,
     arch.set_bandwidth(bw)
     arch.set_telescope(obs)
     if npol==4:
-        arch.set_state(state) #Could also do 'Stokes' here
+        arch.set_state(state)
     #Fill in some subintegration attributes
     if start_MJD is None:
         start_MJD = pr.MJD(PEPOCH)
@@ -1951,15 +2010,6 @@ def make_fake_pulsar(modelfile, ephemeris, outfile="fake_pulsar.fits", nsub=1,
     arch.set_ephemeris(ephemeris)
     #Now finally, fill in the data!
     #NB the different pols are not realistic: same model, same noise_std
-#This has to be redone; using P0 is not correct.
-#    name, ngauss, model = read_model(modelfile, phases, freqs, P0, quiet)
-    dummy1, dummy2, dummy3 = read_model(modelfile, phases, freqs, P0, quiet)
-#    if scint is not False:
-#        if scint is True:
-#            model = add_scintillation(model, random=True, nsin=2, amax=1.0,
-#                    wmax=5.0)
-#        else:
-#            model = add_scintillation(model, scint)
     #If wanting to use PSRCHIVE's rotation scheme, uncomment the dedisperse and
     #dededisperse lines, and set rotmodel = model.
     arch.set_dedispersed(False)
@@ -1977,25 +2027,39 @@ def make_fake_pulsar(modelfile, ephemeris, outfile="fake_pulsar.fits", nsub=1,
                 sk = scattering_kernel(t_scat, nu0, freqs, phases, P,
                         alpha=alpha)
                 rotmodel = add_scattering(rotmodel, sk, repeat=3)
+            if scint is not False:
+                if scint is True:
+                    rotmodel = add_scintillation(rotmodel, random=True, nsin=3,
+                            amax=1.0, wmax=5.0)
+                else:
+                    rotmodel = add_scintillation(rotmodel, scint)
             for ichan in xrange(nchan):
                 subint.set_weight(ichan, weights[isub, ichan])
                 prof = subint.get_Profile(ipol, ichan)
                 noise = noise_std[ichan]
                 if noise:
-                    prof.get_amps()[:] = rotmodel[ichan] + np.random.normal(
-                            0.0, noise, nbin)
-                    prof.get_amps()[:] *= scale
+                    prof.get_amps()[:] = scale*rotmodel[ichan] + \
+                            np.random.normal(0.0, noise, nbin)
                 else:
-                    prof.get_amps()[:] = rotmodel[ichan]
-                    prof.get_amps()[:] *= scale
+                    prof.get_amps()[:] = scale*rotmodel[ichan]
         isub += 1
-    if dedisperse: arch.dedisperse()
+    if dedispersed: arch.dedisperse()
     arch.unload(outfile)
     if not quiet: print "\nUnloaded %s.\n"%outfile
 
 def quick_add_archs(metafile, outfile, rotate=False, fiducial=0.5,
         quiet=False):
     """
+    Incoherently add data from a list of archives together.
+
+    Not intended for serious use; defer to psradd.
+
+    metafile is a list of PSRCHIVE archives.
+    outfile is the output archive file name.
+    rotate=True will rotate the output archive so that the maximum of the
+        average profile is at the fiducial phase.
+    fiducial specifies the fiducial phase in the case rotate=True.
+    quiet=True suppresses output.
     """
     from os import system
     datafiles = open(metafile, "r").readlines()
@@ -2039,7 +2103,9 @@ def quick_add_archs(metafile, outfile, rotate=False, fiducial=0.5,
 def write_princeton_TOA(TOA_MJDi, TOA_MJDf, TOA_err, nu_ref, dDM, obs='@',
         name=' ' * 13):
     """
-    Ripped and altered from PRESTO
+    Write Princeton-style TOAs.
+
+    Additional formats coming soon...
 
     Princeton Format
 
@@ -2050,6 +2116,16 @@ def write_princeton_TOA(TOA_MJDi, TOA_MJDf, TOA_err, nu_ref, dDM, obs='@',
     25-44   TOA [MJD] (decimal point must be in column 30 or column 31)
     45-53   TOA uncertainty [us]
     69-78   DM correction [cm**-3 pc]
+
+    TOA_MJDi is the integer part of the TOA's MJD epoch.
+    TOA_MJDf is the fractional part of the TOA's MJD epoch.
+    TOA_err is the TOA's "1-sigma" uncertainty [us].
+    nu_ref is the TOA's reference frequency.
+    dDM is this TOA's DM "correction" (cf. tempo's NDDM).
+    obs is the observatory code.
+    name is whitespace.
+
+    Taken and tweaked from SMR's PRESTO.
     """
     if nu_ref == np.inf: nu_ref = 0.0
     #Splice together the fractional and integer MJDs
@@ -2065,6 +2141,27 @@ def show_portrait(port, phases=None, freqs=None, title=None, prof=True,
         aspect="auto", interpolation="none", origin="lower", extent=None,
         **kwargs):
     """
+    Show a pulsar portrait.
+
+    To be improved.
+
+    port is the nchan x nbin pulsar portrait array.
+    phases is the nbin array with phase-bin centers [rot].  Defaults to
+        phase-bin indices.
+    freqs is the nchan array with frequency-channel centers [MHz]. Defaults to
+        frequency-channel indices.
+    title is a string to be displayed.
+    prof=True adds a panel showing the average pulse profile.
+    fluxprof=True adds a panel showing the phase-averaged spectrum.
+    rvrsd=True flips the frequency axis.
+    colorbar=True adds the color bar.
+    savefig specifies a string for a saved figure; will not show the plot.
+    aspect sets the aspect ratio
+    interpolation sets the interpolation scheme
+    origin tells pyplot where to put the (0,0) point (?).
+    extent is a 4-element tuple setting the (lo_phase, hi_phase, lo_freq,
+        hi_freq) limits on the plot.
+    **kwargs get passed to imshow.  eg. vmin, vmax...
     """
     nn = 2*3*5  #Need something divisible by 2,3,5...
     grid = gs.GridSpec(nn, nn)
@@ -2150,6 +2247,27 @@ def show_residual_plot(port, model, resids=None, phases=None, freqs=None,
         aspect="auto", interpolation="none", origin="lower", extent=None,
         **kwargs):
     """
+    Show a portrait, model, and residuals in a single plot.
+
+    To be improved.
+
+    port is the nchan x nbin pulsar portrait array.
+    model is the nchan x nbin model portrait array.
+    resids=None tells the function to calculate the residuals in situ.
+    phases is the nbin array with phase-bin centers [rot].  Defaults to
+        phase-bin indices.
+    freqs is the nchan array with frequency-channel centers [MHz]. Defaults to
+        frequency-channel indices.
+    titles is a three-element tuple for the titles on each plot.
+    rvrsd=True flips the frequency axis.
+    colorbar=True adds the color bar.
+    savefig specifies a string for a saved figure; will not show the plot.
+    aspect sets the aspect ratio
+    interpolation sets the interpolation scheme
+    origin tells pyplot where to put the (0,0) point (?).
+    extent is a 4-element tuple setting the (lo_phase, hi_phase, lo_freq,
+        hi_freq) limits on the plot.
+    **kwargs get passed to imshow.  eg. vmin, vmax...
     """
     mm = 6
     nn = (2*mm) + (mm/3)
@@ -2219,31 +2337,3 @@ def show_residual_plot(port, model, resids=None, phases=None, freqs=None,
         plt.close()
     else:
         plt.show()
-
-def plot_lognorm(mu, tau, lo=0.0, hi=5.0, npts=500, plot=1, show=0):
-    """
-    """
-    import pymc as pm
-    pts = np.empty(npts)
-    xs = np.linspace(lo, hi, npts)
-    for ii in xrange(npts):
-        pts[ii] = np.exp(pm.lognormal_like(xs[ii], mu, tau))
-    if plot:
-        plt.plot(xs, pts)
-    if show:
-        plt.show()
-    return xs, pts
-
-def plot_gamma(alpha, beta, lo=0.0, hi=5.0, npts=500, plot=1, show=0):
-    """
-    """
-    import pymc as pm
-    pts = np.empty(npts)
-    xs = np.linspace(lo, hi, npts)
-    for ii in xrange(npts):
-        pts[ii] = np.exp(pm.gamma_like(xs[ii], alpha, beta))
-    if plot:
-        plt.plot(xs, pts)
-    if show:
-        plt.show()
-    return xs, pts

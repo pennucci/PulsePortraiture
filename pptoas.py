@@ -1,10 +1,15 @@
 #!/usr/bin/env python
 
-#############
-#Coming soon#
-#############
+########
+#pptoas#
+########
 
-#Written by Timothy T. Pennucci (TTP; pennucci@virginia.edu)
+#pptoas is a command-line program used to simultaneously fit for phases (TOAs),
+#    and dispersion measures (DMs).  Full-functionality is obtained when using
+#    pptoas within an interactive python environment.
+
+#Written by Timothy T. Pennucci (TTP; pennucci@virginia.edu).
+#Contributions by Scott M. Ransom (SMR) and Paul B. Demorest (PBD)
 
 from pplib import *
 
@@ -15,10 +20,24 @@ else:
     rm_baseline = False
 
 class GetTOAs:
+
     """
+    GetTOAs is a class with methods to measure TOAs and DMs from data.
     """
+
     def __init__(self, datafiles, modelfile, common=False, quiet=False):
         """
+        Unpack all of the data and set initial attributes.
+
+        datafiles is either a single PSRCHIVE file name, or a name of a
+            metafile containing a list of archive names.
+        modelfile is a a write_model(...)-type of model file specifying the
+            gaussian model parameters.  modelfile can also be an arbitrary
+            PSRCHIVE archive, although this feature is
+            *not*quite*implemented*yet*.
+        common=True should only be used if all the archives in a specified
+            metafile have identical parameters (beta).
+        quiet=True suppresses output.
         """
         if file_is_ASCII(datafiles):
             self.datafiles = open(datafiles, "r").readlines()
@@ -91,6 +110,25 @@ class GetTOAs:
             fit_DM=True, bounds=[(None, None), (None, None)], nu_fit=None,
             show_plot=False, quiet=False):
         """
+        Measure phases (TOAs) and dispersion measures (DMs).
+
+        datafile defaults to self.datafiles, otherwise it is a single
+            PSRCHIVE archive name
+        nu_ref is the desired output reference frequency [MHz] of the TOAs;
+            defaults to the zero-covariance frequency.
+        DM0 is the baseline dispersion measure [cm**-3 pc]; defaults to what is
+            stored in each datafile.
+        bary_DM=True corrects the measured DMs based on the Doppler motion of
+            the observatory with respect to the solar system barycenter.
+        fit_DM=False will fit only for a phase.
+        bounds is a list of two 2-tuples, giving the lower and upper bounds on
+            the phase and dispersion measure, respectively.
+        nu_fit is the reference frequency [MHz] used in the fit; defaults to
+            a guess at the zero-covariance frequency based on signal-to-noise
+            ratios.
+        show_plot=True will show a plot at the end of the fitting; it is only
+            useful if the number of subintegrations in a datafile > 1.
+        quiet=True suppresses output.
         """
         self.nu_ref = nu_ref
         self.DM0 = DM0
@@ -344,6 +382,20 @@ class GetTOAs:
     def write_TOAs(self, datafile=None, outfile=None, nu_ref=None,
             one_DM=False, dmerrfile=None):
         """
+        Write TOAs to file.
+
+        Currently only writes Princeton-formatted TOAs.
+
+        datafile defaults to self.datafiles, otherwise it is a single
+            PSRCHIVE archive name
+        outfile is the name of the output file.
+        nu_ref is the desired output reference frequency [MHz] of the TOAs;
+            defaults to the zero-covariance frequency.
+        one_DM writes the weighted average delta-DM in the TOA file, instead of
+            the per-TOA delta-DM.
+        dmerrfile is a string specifying the name of a "DM" file to be written
+            containing the TOA, the (full) DM, and the DM uncertainty.  This
+            output needs improvement!
         """
         #FIX - determine observatory
         #FIX - options for different TOA formats
@@ -409,44 +461,18 @@ class GetTOAs:
             dmerrs.close()
         sys.stdout = sys.__stdout__
 
-    def write_pam_cmds(self, datafile=None, outfile=None):
-        """
-        DO NOT USE
-        """
-        if datafile is None:
-            datafiles = self.datafiles
-        else:
-            datafiles = [datafile]
-        if outfile is not None:
-            of = open(outfile, "a")
-        else:
-            of = sys.__stdout__
-        for datafile in datafiles:
-            ifile = datafiles.index(datafile)
-            phis = self.phis[ifile]
-            phi_errs = self.phi_errs[ifile]
-            nu0 = self.nu0s[ifile]
-            nu_fits = self.nu_fits[ifile]
-            DeltaDM_mean = self.DeltaDM_means[ifile]
-            DM0 = self.DM0s[ifile]
-            DM = DeltaDM_mean + DM0
-            pam_ext = datafile[-datafile[::-1].find("."):] + ".rot"
-            #The below returns the weighted mean and the sum of the weights,
-            #but needs to do better in the case of small-error outliers from
-            #RFI, etc.  Also, last TOA may mess things up...use median...?
-            phi_mean, phi_var = np.average(phis, weights=phi_errs**-2,
-                    returned=True)
-            phi_var = phi_var**-1
-            phi_mean = phase_transform(phi_mean, DM, nu_fits.mean(), nu0,
-                    np.array(self.Ps).mean())
-            of.write("pam -e %s -r %.7f -d %.5f %s\n"%(pam_ext, phi_mean, DM,
-                datafile))
-        if outfile is not None: of.close()
-
     def show_subint(self, datafile=None, isubx=0, quiet=False):
         """
-        subintx 0 = python index 0
-        isubx is currently mapped incorrectly.
+        Plot a phase-frequency portrait of a subintegration.
+
+        datafile is a single PSRCHIVE archive name; defaults to the first one
+            listed in self.datafiles.
+        isubx is the index of the (unzapped) subintegration to be displayed.
+            (However, isubx may be mapped incorrectly...)
+        quiet=True suppresses output.
+
+        To be improved.
+        (see show_portrait(...))
         """
         if datafile is None:
             datafile = self.datafiles[0]
@@ -464,8 +490,16 @@ class GetTOAs:
 
     def show_fit(self, datafile=None, isubx=0, quiet=False):
         """
-        subintx 0 = python index 0
-        isubx is currently mapped incorrectly.
+        Plot the fit results from a subintegration.
+
+        datafile is a single PSRCHIVE archive name; defaults to the first one
+            listed in self.datafiles.
+        isubx is the index of the (unzapped) subintegration to be displayed.
+            (However, isubx may be mapped incorrectly...)
+        quiet=True suppresses output.
+
+        To be improved.
+        (see show_residual_plot(...))
         """
         if datafile is None:
             datafile = self.datafiles[0]
@@ -507,7 +541,14 @@ class GetTOAs:
 
     def show_results(self, datafile=None):
         """
-        Need descriptors in the plots...rx, etc.
+        Show a plot of the fitted phases and dispersion measures.
+
+        Only useful if the number of subintegrations > 1.
+
+        datafile is a single PSRCHIVE archive name; defaults to the first one
+            listed in self.datafiles.
+
+        To be improved.
         """
         if datafile:
             ifile = self.datafiles.index(datafile)
@@ -596,71 +637,6 @@ class GetTOAs:
         plt.title(datafile)
         plt.show()
 
-    def show_hists(self, datafile=None):
-        if datafile is None:
-            nfevals = []
-            rcs = []
-            nsubx = np.array(self.nsubxs).sum()
-            for ifile in xrange(len(self.datafiles)):
-                nfevals += list(self.nfevals[ifile])
-                rcs += list(self.rcs[ifile])
-            nfevals = np.array(nfevals)
-            rcs = np.array(rcs)
-        else:
-            ifile = self.datafiles.index(datafile)
-            nfevals = self.nfevals[ifile]
-            rcs = self.rcs[ifile]
-            nsubx = self.nsubxs[ifile]
-        cols = ['b','k','g','b','r']
-        bins = nfevals.max()
-        binmin = nfevals.min()
-        rc1=np.zeros(bins - binmin + 1)
-        rc2=np.zeros(bins - binmin + 1)
-        rc4=np.zeros(bins - binmin + 1)
-        rc5=np.zeros(bins - binmin + 1)
-        for isubx in xrange(nsubx):
-            nfeval = nfevals[isubx]
-            if rcs[isubx] == 1:
-                rc1[nfeval - binmin] += 1
-            elif rcs[isubx] == 2:
-                rc2[nfeval - binmin] += 1
-            elif rcs[isubx] == 4:
-                rc4[nfeval - binmin] += 1
-            else:
-                print "rc %d discovered at rcs index %d"%(rcs[isubx], isubx)
-                rc5[nfevals - binmin] += 1
-        width = 1
-        b1 = plt.bar(np.arange(binmin - 1, bins) + 0.5, rc1, width,
-                color=cols[1])
-        b2 = plt.bar(np.arange(binmin - 1, bins) + 0.5, rc2, width,
-                color=cols[2], bottom=rc1)
-        b4 = plt.bar(np.arange(binmin - 1, bins) + 0.5, rc4, width,
-                color=cols[4], bottom=(rc1 + rc2))
-        if rc5.sum() != 0:
-            b5 = plt.bar(np.arange(binmin - 1, bins) + 0.5, rc5, width,
-                    color=cols[3], bottom=(rc1 + rc2 + rc4))
-            plt.legend((b1[0], b2[0], b4[0], b5[0]), ('rc=1', 'rc=2', 'rc=4',
-                'rc=#'))
-        else: plt.legend((b1[0], b2[0], b4[0]), ('rc=1', 'rc=2', 'rc=4'))
-        plt.xlabel("nfevals")
-        plt.ylabel("counts")
-        plt.xticks(np.arange(1, bins + 1))
-        if rc5.sum() != 0:
-            plt.axis([binmin - width/2.0, bins + width/2.0, 0, max(rc1 + rc2 +
-                rc4 + rc5)])
-        else:
-            plt.axis([binmin - width/2.0, bins + width/2.0, 0, max(rc1 + rc2 +
-                rc4)])
-        plt.figure(2)
-        urcs = np.unique(rcs)
-        rchist = np.histogram(rcs, bins=len(urcs))[0]
-        for iurc in xrange(len(urcs)):
-            rc = urcs[iurc]
-            plt.hist(np.ones(rchist[iurc]) * rc, bins=1, color=cols[rc])
-            plt.xlabel("rc")
-            plt.ylabel("counts")
-        plt.show()
-
 
 if __name__ == "__main__":
 
@@ -717,7 +693,7 @@ if __name__ == "__main__":
     (options, args) = parser.parse_args()
 
     if (options.datafiles is None or options.modelfile is None):
-            print "\npptoas.py - simultaneous least-squares fit for TOAs and DMs\n"
+            print "\npptoas.py - simultaneously measure TOAs and DMs in broadband data\n"
             parser.print_help()
             print ""
             parser.exit()

@@ -1,21 +1,40 @@
 #!/usr/bin/env python
 
-#############
-#Coming soon#
-#############
+#########
+#ppgauss#
+#########
 
-#Written by Timothy T. Pennucci (TTP; pennucci@virginia.edu)
+#ppgauss is a command-line program used to make frequency-dependent,
+#    gaussian-component models of pulse portraits.  Full-functionality is
+#    obtained when using ppgauss within an interactive python environment.
+
+#Written by Timothy T. Pennucci (TTP; pennucci@virginia.edu).
+#Contributions by Scott M. Ransom (SMR) and Paul B. Demorest (PBD)
 
 from matplotlib.patches import Rectangle
 from pplib import *
 
 
 class DataPortrait:
+
     """
+    DataPortrait is a class that contains the data to which a model is fit.
+
+    This class is also useful for the quick examining of PSRCHIVE archives in
+    an interactive python environment.
     """
+
     def __init__(self, datafile=None, quiet=False):
-        ""
-        ""
+        """
+        Unpack all of the data and set initial attributes.
+
+        If datafile is a metafile of PSRCHIVE archives, "join" attributes are
+        set, which are used to align the archives.  A large (>3) number of
+        archives signficiantly slows the fitting process, and it has only been
+        testing for the case that each archive originates from a unique
+        receiver.
+        quiet=True suppresses output.
+        """
         self.init_params = []
         if file_is_ASCII(datafile):
             self.join_params = []
@@ -151,6 +170,15 @@ class DataPortrait:
     def fit_profile(self, profile, tau=0.0, fixscat=True, auto_gauss=0.0,
             show=True):
         """
+        Fit gaussian components to a profile.
+
+        profile is the array containing the profile of length nbin.
+        tau != 0.0 is the scattering timescale [bin] added to the fitted
+            gaussians; it is also the initial parameter if fixscat=False.
+        fixscat=False fits for a scattering timescale.
+        auto_gauss != 0.0 specifies the initial guess at a width of a single
+            gaussian component to be fit automatically.
+        show=False is used if you want auto_gauss to work without checking it.
         """
         fig = plt.figure()
         profplot = fig.add_subplot(211)
@@ -163,47 +191,51 @@ class DataPortrait:
         self.init_params = self.interactor.fitted_params
         self.ngauss = (len(self.init_params) - 2) / 3
 
-    def fit_flux_profile(self, guessA=1.0, guessalpha=0.0, fit=True, plot=True,
+    def fit_flux_profile(self, guessA=1.0, guessalpha=0.0, plot=True,
             quiet=False):
         """
-        Will fit a power law across frequency in a portrait by bin scrunching.
-        This should be the usual average pulsar power-law spectrum.  The plot
-        will show obvious scintles.
+        Fit a power-law to the phase-averaged flux spectrum of the data.
+
+        Fitted parameters and uncertainties are added to as class attributes.
+
+        guessA is the initial amplitude parameter.
+        guessalpha is the initial spectral index parameter.
+        plot=True shows the fit results.
+        quiet=True suppresses output.
         """
-        if fit:
-            #Noise level below may be off
-            fp = fit_powlaw(self.flux_profx, np.array([guessA,guessalpha]),
-                np.median(self.noise_stdsxs), self.freqsxs[0], self.nu0)
-            if not quiet:
-                print ""
-                print "Flux-density power-law fit"
-                print "----------------------------------"
-                print "residual mean = %.2f"%fp.residuals.mean()
-                print "residual std. = %.2f"%fp.residuals.std()
-                print "reduced chi-squared = %.2f"%(fp.chi2 / fp.dof)
-                print "A = %.3f +/- %.3f (flux at %.2f MHz)"%(fp.amp,
-                        fp.amp_err, self.nu0)
-                print "alpha = %.3f +/- %.3f"%(fp.alpha, fp.alpha_err)
-            if plot:
-                if fit: plt.subplot(211)
-                else: plt.subplot(111)
+        #Noise level below may be off
+        fp = fit_powlaw(self.flux_profx, np.array([guessA,guessalpha]),
+            np.median(self.noise_stdsxs), self.freqsxs[0], self.nu0)
+        if not quiet:
+            print ""
+            print "Flux-density power-law fit"
+            print "----------------------------------"
+            print "residual mean = %.2f"%fp.residuals.mean()
+            print "residual std. = %.2f"%fp.residuals.std()
+            print "reduced chi-squared = %.2f"%(fp.chi2 / fp.dof)
+            print "A = %.3f +/- %.3f (flux at %.2f MHz)"%(fp.amp,
+                    fp.amp_err, self.nu0)
+            print "alpha = %.3f +/- %.3f"%(fp.alpha, fp.alpha_err)
+        if plot:
+            if fit: plt.subplot(211)
+            else: plt.subplot(111)
+            plt.xlabel("Frequency [MHz]")
+            plt.ylabel("Flux Units")
+            plt.title("Average Flux Profile for %s"%self.source)
+            if fit:
+                plt.plot(self.freqs, powlaw(self.freqs, self.nu0,
+                    fp.amp, fp.alpha), 'k-')
+                plt.plot(self.freqsxs[0], self.flux_profx, 'r+')
+                plt.subplot(212)
                 plt.xlabel("Frequency [MHz]")
                 plt.ylabel("Flux Units")
-                plt.title("Average Flux Profile for %s"%self.source)
-                if fit:
-                    plt.plot(self.freqs, powlaw(self.freqs, self.nu0,
-                        fp.amp, fp.alpha), 'k-')
-                    plt.plot(self.freqsxs[0], self.flux_profx, 'r+')
-                    plt.subplot(212)
-                    plt.xlabel("Frequency [MHz]")
-                    plt.ylabel("Flux Units")
-                    plt.title("Residuals")
-                    plt.plot(self.freqsxs[0], fp.residuals, 'r+')
-                plt.show()
-            self.spect_A = fp.amp
-            self.spect_A_err = fp.amp_err
-            self.spect_index = fp.alpha
-            self.spect_index_err = fp.alpha_err
+                plt.title("Residuals")
+                plt.plot(self.freqsxs[0], fp.residuals, 'r+')
+            plt.show()
+        self.spect_A = fp.amp
+        self.spect_A_err = fp.amp_err
+        self.spect_index = fp.alpha
+        self.spect_index_err = fp.alpha_err
 
 
     def make_gaussian_model(self, modelfile=None,
@@ -212,6 +244,36 @@ class DataPortrait:
             auto_gauss=0.0, writemodel=False, outfile=None, writeerrfile=False,
             errfile=None, model_name=None, residplot=None, quiet=False):
         """
+        Fit a gaussian-component model with independently evolving components.
+
+        This is the main function within ppgauss.
+
+        modelfile is a write_model(...)-type of model file; if provided, the
+            fit will use its parameters and flags as a starting point for a
+            new fit.
+        ref_prof is a tuple specifying the (reference frequency, bandwidth)
+            [MHz] of the profile used for an initial fit of gaussian
+            components.  The reference frequency will be the model reference
+            frequency.
+        tau is a scattering timescale [bin]
+        fixloc=True does not allow the components' positions to evolve
+        fixwid=True does not allow the components' width to evolve
+        fixamp=True does not allow the components' height to evolve
+        fixscat=True does not fit for a scattering timescale.
+        niter is the number of iterations after the initial model fit.
+        fiducial_gaussian=True sets fixloc=False for all components except the
+            first component fit, which is fixed.
+        auto_gauss != 0.0 specifies the initial guess at a width of a single
+            gaussian component to be fit automatically.
+        writemodel=True writes the fitted model to file.
+        outfile is a string designating the name of the output model file name.
+        writeerrfile=True writes a model file containing errors on the fitted
+            parameters.
+        errfile is a string designating the name of the parameter error file.
+        model_name is a string designating the name of the model.
+        residplot is a string given if a saved output plot of the model, data,
+            and residuals is desired.
+        quiet=True suppresses output.
         """
         if errfile is None and outfile is not None:
             errfile = outfile + "_err"
@@ -344,6 +406,7 @@ class DataPortrait:
 
     def model_iteration(self, quiet=False):
         """
+        Iterate over a model fit.
         """
         while (1):
             start = time.time()
@@ -366,7 +429,7 @@ class DataPortrait:
                 self.DMerr = 0.0
                 self.red_chi2 = 0.0
                 ###HACK
-                print "JOIN PARAMS", self.join_params
+                print "JOIN PARAMETERS:", self.join_params
             else:
                 self.model_params = self.fitted_params[:]
                 self.model_param_errs = self.fit_errs[:]
@@ -397,6 +460,16 @@ class DataPortrait:
             yield
 
     def check_convergence(self, efac=1.0, quiet=False):
+        """
+        Check for convergence.
+
+        Considers if the phase and DM in the data, as measured by the fitted
+        model, are within the errors (times efac) of the measurements.
+
+        It will not work if datafiles is a metafile.  This will be improved.
+
+        quiet=True suppresses output.
+        """
         if not quiet:
             print "Iter %d:"%(self.itern - self.niter)
             print " duration of %.2f min"%(self.duration /  60.)
@@ -416,6 +489,13 @@ class DataPortrait:
             return 0
 
     def write_model(self, outfile=None, append=False, quiet=False):
+        """
+        Write the model parameters to file.
+
+        outfile is a string designating the name of the output model file name.
+        append=True will append to an already existing file of the same name.
+        quiet=True suppresses output.
+        """
         if outfile is None:
             outfile = self.datafile + ".gmodel"
         model_params = np.copy(self.model_params)
@@ -428,6 +508,14 @@ class DataPortrait:
                 self.fit_flags, append=append, quiet=quiet)
 
     def write_errfile(self, errfile=None, append=False, quiet=False):
+        """
+        Write the model parameter uncertainties to file.
+
+        errfile is a string designating the name of the parameter error file.
+        append=True will append to an already existing file of the same name.
+        quiet=True suppresses output.
+        """
+
         if errfile is None:
             errfile = self.datafile + ".gmodel_errs"
         model_param_errs = np.copy(self.model_param_errs)
@@ -438,6 +526,9 @@ class DataPortrait:
 
     def show_data_portrait(self):
         """
+        Show the data portrait.
+
+        See show_portrait(...)
         """
         title = "%s Portrait"%self.source
         show_portrait(np.transpose(self.weights) * self.port, self.phases,
@@ -445,6 +536,9 @@ class DataPortrait:
 
     def show_model_fit(self):
         """
+        Show the model, data, and residuals.
+
+        See show_residual_plot(...)
         """
         resids = self.port - self.model_masked
         titles = ("%s"%self.datafile, "%s"%self.model_name, "Residuals")
@@ -452,10 +546,26 @@ class DataPortrait:
                 self.freqs, titles, bool(self.bw < 0))
 
 class GaussianSelector:
+    """
+    GaussianSelector is a class for hand-fitting gaussian components.
+
+    Taken and tweaked from SMR's pygaussfit.py
+    """
+
     def __init__(self, ax, profile, errs, tau=0.0, fixscat=True, minspanx=None,
-            minspany=None, useblit=True, auto_gauss=0.1):
+            minspany=None, useblit=True, auto_gauss=0.0):
         """
-        Ripped and altered from SMR's pygaussfit.py
+        Initialize the input parameters and open the interactive window.
+
+        ax is a pyplot axis.
+        profile is an array of pulse profile data values.
+        errs specifies the uncertainty on the profile values.
+        tau is a scattering timescale [bin].
+        fixscat=True does not fit for the scattering timescale.
+        minspanx, minspany are vestigial.
+        useblit should be True.
+        auto_gauss != 0.0 specifies the initial guess at a width of a single
+            gaussian component to be fit automatically.
         """
         if not auto_gauss:
             print ""
@@ -539,12 +649,12 @@ class GaussianSelector:
             self.eventrelease = None
 
     def update_background(self, event):
-        'force an update of the background'
+        """force an update of the background"""
         if self.useblit:
             self.background = self.canvas.copy_from_bbox(self.ax.bbox)
 
     def ignore(self, event):
-        'return True if event should be ignored'
+        """return True if event should be ignored"""
         # If no button was pressed yet ignore the event if it was out
         # of the axes
         if self.eventpress == None:
@@ -555,7 +665,7 @@ class GaussianSelector:
                 event.button != self.eventpress.button)
 
     def press(self, event):
-        'on button press event'
+        """on button press event"""
         # Is the correct button pressed within the correct axes?
         if self.ignore(event): return
         # make the drawed box/line visible get the click-coordinates,
@@ -566,7 +676,7 @@ class GaussianSelector:
             self.eventpress.ydata = self.DCguess
 
     def release(self, event):
-        'on button release event'
+        """on button release event"""
         if self.eventpress is None or self.ignore(event): return
         # release coordinates, button, ...
         self.eventrelease = event
@@ -589,7 +699,7 @@ class GaussianSelector:
         self.eventrelease = None              #   inital values
 
     def update(self):
-        'draw using newfangled blit or oldfangled draw depending on useblit'
+        """draw using blit or old draw depending on useblit"""
         if self.useblit:
             if self.background is not None:
                 self.canvas.restore_region(self.background)
@@ -599,6 +709,7 @@ class GaussianSelector:
             self.canvas.draw_idle()
 
     def onmove(self, event):
+        """on move event"""
         if self.eventpress is None or self.ignore(event): return
         x, y = event.xdata, event.ydata         # actual position 
                                                 # with button still pressed
@@ -613,7 +724,7 @@ class GaussianSelector:
         self.update()
 
     def keypress(self, event):
-        'on key press event'
+        """on key press event"""
         if self.ignore(event): return
         self.eventpress = event
         if event.key == 'q':
@@ -621,6 +732,7 @@ class GaussianSelector:
             self.close()
 
     def plot_gaussians(self, params):
+        """plot gaussian components and profile"""
         plt.subplot(211)
         plt.cla()
         # Re-plot the original profile
@@ -636,6 +748,7 @@ class GaussianSelector:
                 wid), '%s'%cols[igauss])
 
     def onselect(self):
+        """on select event"""
         event1 = self.eventpress
         event2 = self.eventrelease
         # Left mouse button = add a gaussian
@@ -692,6 +805,7 @@ class GaussianSelector:
                 plt.draw()
 
     def close(self):
+        """close"""
         plt.close(1)
         plt.close(2)
 
@@ -750,7 +864,8 @@ if __name__ == "__main__":
                       action="store_true", dest="fgauss", default=False,
                       help="Sets fitloc=True except for the first gaussian component fitted in the initial profile fit.  i.e. sets a 'fiducial gaussian'.")
     parser.add_option("--autogauss",
-                      action="store", dest="auto_gauss", default=0.0,
+                      action="store", metavar="wid", dest="auto_gauss",
+                      default=0.0,
                       help="Automatically fit one gaussian to initial profile with initial width [rot] given as the argument.")
     parser.add_option("--figure", metavar="figurename",
                       action="store", dest="figure", default=False,
@@ -762,7 +877,7 @@ if __name__ == "__main__":
     (options, args) = parser.parse_args()
 
     if options.datafile is None and options.metafile is None:
-        print "\nppgauss.py - generates gaussian-component model portrait\n"
+        print "\nppgauss.py - generate a gaussian-component model pulse portrait\n"
         parser.print_help()
         print ""
         parser.exit()

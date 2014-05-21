@@ -19,8 +19,8 @@ nchan = 64      #Number of frequency channels
 nbin = 512      #Number of phase bins
 nu0 = 1500.0    #Center of the band [MHz]
 bw = 800.0      #Bandwidth [MHz]
-tsub = 120.0    #Length of subintegration [s]
-noise_std = 2.77#Noise level of the band, per subintegration [flux units] (switch to snr)
+tsub = 60.0     #Length of subintegration [s]
+noise_std = 2.75#Noise level of the band, per subintegration [flux units]
 dDM_mean = 3e-4 #Add in random dispersion measure offsets with this mean value
 dDM_std = 2e-4  #Add in random dispersion measure offsets with this std
 dDMs = np.random.normal(dDM_mean, dDM_std, nfiles)
@@ -43,7 +43,7 @@ for ifile in range(nfiles):
     make_fake_pulsar(modelfile, ephemeris, outfile="example-%d.fits"%(ifile+1),
             nsub=nsub, npol=npol, nchan=nchan, nbin=nbin, nu0=nu0, bw=bw,
             tsub=tsub, phase=0.0, dDM=dDMs[ifile], start_MJD=None,
-            weights=weights, noise_std=noise_std, scale=1.0, dedisperse=False,
+            weights=weights, noise_std=noise_std, scale=1.0, dedispersed=False,
             t_scat=t_scat, alpha=alpha, scint=scint, state="Coherence",
             obs="GBT", quiet=quiet)
     #NB: the input parfile cannot yet have binary parameters
