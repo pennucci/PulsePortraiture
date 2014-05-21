@@ -9,6 +9,11 @@ PPprofile/
 examples/*.pyc
 examples/*.swp
 examples/*~
+examples/example-*
+examples/example.meta
+examples/example.port
+examples/example.png
+examples/example.tim
 ppalign.py
 pplib_dist.py
 MCtests/
