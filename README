@@ -34,7 +34,7 @@ License:
     -Released under GPLv2, sans "or later" clause.
 
 Other:
-    -Full documentation/docstrings coming soon; examples/example.py can be run
-    as a demonstration.  Code improvements are underway, as is a broad
-    application to IPTA pulsars of interest.  Suggestions and additional
-    development are welcome (https://github.com/pennucci/PulsePortraiture).
+    -More detailed documentation coming soon; examples/example.py can be run as
+    a demonstration.  Code improvements are underway, as is a broad application
+    to IPTA pulsars of interest.  Suggestions and additional development are
+    welcome (https://github.com/pennucci/PulsePortraiture).
