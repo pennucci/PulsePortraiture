@@ -120,7 +120,8 @@ class GetTOAs:
             stored in each datafile.
         bary_DM=True corrects the measured DMs based on the Doppler motion of
             the observatory with respect to the solar system barycenter.
-        fit_DM=False will fit only for a phase.
+        fit_DM=False will fit only for a phase; if this is the case, set
+            bary_DM to False.
         bounds is a list of two 2-tuples, giving the lower and upper bounds on
             the phase and dispersion measure, respectively.
         nu_fit is the reference frequency [MHz] used in the fit; defaults to
