@@ -1122,6 +1122,16 @@ def fit_portrait(data, model, init_params, P, freqs, nu_fit=None, nu_out=None,
 
 def get_noise(data, method=default_noise_method, **kwargs):
     """
+    Estimate the off-pulse noise.
+
+    data is a 1- or 2-D array of input values.
+    method is either "PS" or "fit" where
+    "PS" uses the mean of the last quarter if the power spectrum, and
+    "fit" attempts to find the noise floor by fitting a half-triangle function
+    to the power spectrum.
+    kwargs are passed to the selected noise-measuring function.
+
+    Other noise-measuring methods to come.
     """
     if method == "PS":
         return get_noise_PS(data, **kwargs)
@@ -1133,6 +1143,15 @@ def get_noise(data, method=default_noise_method, **kwargs):
 
 def get_noise_PS(data, frac=4, chans=False):
     """
+    Estimate the off-pulse noise.
+
+    This function will estimate the noise based on the mean of the highest
+    1/frac harmonics in the power spectrum of data.
+
+    data is a 1- or 2-D array of values.
+    frac is a value specifying the inverse of the fraction of the
+    power-spectrum to be examined.
+    chans=True will return an estimate of the noise in each input channel.
     """
     if chans:
         noise = np.zeros(len(data))
@@ -1152,7 +1171,15 @@ def get_noise_PS(data, frac=4, chans=False):
 
 def get_noise_fit(data, fact=1.1, chans=False):
     """
-    Relatively slow; could use a speed up.
+    Estimate the off-pulse noise.
+
+    This function will estimate the noise based on the mean of the highest
+    harmonics, where critical cutoff harmonic is found by a fit of a
+    half-triangle function to the power-spectrum of the data.
+
+    data is a 1- or 2-D array of values.
+    fact is a value to scale the fitted cutoff harmonic.
+    chans=True will return an estimate of the noise in each input channel.
     """
     if chans:
         noise = np.zeros(len(data))
@@ -1178,9 +1205,14 @@ def get_noise_fit(data, fact=1.1, chans=False):
 
 def get_SNR(prof, fudge=3.25):
     """
-    From Lorimer & Kramer (2005).
-    Assuming baseline removed!
-    fudge is factor in a (bad) attempt to match PSRCHIVE
+    Return an estimate of the signal-to-noise ratio (SNR) of the data.
+
+    Assumes that the baseline is removed!
+
+    prof is an input array of data.
+    fudge is a scale factor that attempts to match (poorly) PSRCHIVE's SNRs.
+
+    Reference: Lorimer & Kramer (2005).
     """
     noise = get_noise(prof)
     nbin = len(prof)
@@ -1194,6 +1226,17 @@ def get_SNR(prof, fudge=3.25):
 
 def get_scales(data, model, phase, DM, P, freqs, nu_ref=np.inf):
     """
+    Return the best-fit, per-channel scaling amplitudes.
+
+    data is the nchan x nbin phase-frequency data portrait.
+    model is the nchan x nbin phase-frequency model portrait.
+    phase is the best-fit phase [rot]
+    DM is the best-fit dispersion measure in [cm**-3 pc].
+    P is the period [s] of the pulsar at the data epoch.
+    freqs is an nchan array of frequencies [MHz].
+    nu_ref is the reference frequency of the input phase [MHz].
+
+    Reference: Equation 11 of Pennucci, Demorest, & Ransom (2014).
     """
     scales = np.zeros(len(freqs))
     dFFT = fft.rfft(data, axis=1)
@@ -1212,15 +1255,25 @@ def get_scales(data, model, phase, DM, P, freqs, nu_ref=np.inf):
 def rotate_data(data, phase=0.0, DM=0.0, Ps=None, freqs=None,
         nu_ref=np.inf, taxis=None, faxis=-2, baxis=-1,):
     """
-    Positive values of phase and DM rotate to earlier phase ("dedisperses").
-    When used to dediserpse, rotate_portrait is virtually identical to
-    arch.dedisperse() in PSRCHIVE.
+    Rotate and/or dedisperse a data cube.
 
-    faxis, freqs needed if rotating for DM != 0.0
-    taxis needed if len(Ps) > 1, for DM != 0.0
+    Positive values of phase and DM rotate the data to earlier phases
+    (i.e. it "dedisperses").
 
-    ***Need to change this convention.  Seems intuituve to have positive phase
-    rotate to later, and positive DM rotate to later.***
+    Simpler functions are rotate_portrait or rotate_profile.
+
+    data is a 1-, 2-, 3- or 4-D array of data.
+    phase is a value specifying the amount of achromatic rotation [rot].
+    DM is a value specifying the amount of rotation based on the cold-plasma
+    dispersion law [cm**-3 pc].
+    Ps is an array of periods [sec], needed if there is a nsub axis.
+    freqs is an array of frequencies [MHz], needed if there is a nchan axis.
+    nu_ref is the reference frequency [MHz] that has zero delay for any value
+    of DM.
+    taxis is an integer specfiying which axis is the temporal axis; needed if
+    len(Ps) > 1.
+    faxis is an integer specifying which axis is the frequency axis.
+    baxis is an integer specifying which axis is the phase axis.
     """
     shape = data.shape
     ndim = len(shape)
@@ -1282,9 +1335,23 @@ def rotate_data(data, phase=0.0, DM=0.0, Ps=None, freqs=None,
 def rotate_portrait(port, phase=0.0, DM=None, P=None, freqs=None,
         nu_ref=np.inf):
     """
-    Positive values of phase and DM rotate to earlier phase ("dedisperses").
+    Rotate and/or dedisperse a portrait.
+
+    Positive values of phase and DM rotate the data to earlier phases
+    (i.e. it "dedisperses").
+
     When used to dediserpse, rotate_portrait is virtually identical to
     arch.dedisperse() in PSRCHIVE.
+
+    port is a nchan x nbin array of data values.
+    phase is a value specifying the amount of achromatic rotation [rot].
+    DM is a value specifying the amount of rotation based on the cold-plasma
+    dispersion law [cm**-3 pc].
+    P is the pulsar period [sec] at the epoch of the data, needed if a DM is
+    provided.
+    freqs is an array of frequencies [MHz], needed if a DM is provided.
+    nu_ref is the reference frequency [MHz] that has zero delay for any value
+    of DM.
     """
     pFFT = fft.rfft(port, axis=1)
     for nn in xrange(len(pFFT)):
@@ -1301,7 +1368,12 @@ def rotate_portrait(port, phase=0.0, DM=None, P=None, freqs=None,
 
 def rotate_profile(profile, phase=0.0):
     """
-    Positive values rotate to earlier phase.
+    Rotate a profile by phase.
+
+    Positive values of phase rotate to earlier phase.
+
+    profile is an input array of data.
+    phase is a value specifying the amount of rotation [rot].
     """
     pFFT = fft.rfft(profile)
     pFFT *= np.exp(np.arange(len(pFFT)) * 2.0j * np.pi * phase)
@@ -1309,12 +1381,13 @@ def rotate_profile(profile, phase=0.0):
 
 def fft_rotate(arr, bins):
     """
-    Ripped and altered from PRESTO
-
     Return array 'arr' rotated by 'bins' places to the left.
+
     The rotation is done in the Fourier domain using the Shift Theorem.
     'bins' can be fractional.
     The resulting vector will have the same length as the original.
+
+    Taken and tweaked from SMR's PRESTO.  Used for testing.
     """
     arr = np.asarray(arr)
     freqs = np.arange(arr.size/2 + 1, dtype=np.float64)
@@ -1322,14 +1395,16 @@ def fft_rotate(arr, bins):
             np.float64(arr.size))
     return np.fft.irfft(phasor * np.fft.rfft(arr), arr.size)
 
-def DM_delay(DM, freq, freq2=np.inf, P=None):
+def DM_delay(DM, freq, freq_ref=np.inf, P=None):
     """
-    Calculates the delay of emitted frequency freq [MHz] from
-    dispersion measure DM [cm**-3 pc] relative to freq2 [default=inf].
-    If a period P [s] is provided, the delay is returned in phase [rot],
-    otherwise in seconds.
+    Return the amount of dispersive delay [sec] between two frequencies.
+
+    DM is the dispersion measure [cm**-3 pc].
+    freq is the delayed frequency [MHz].
+    freq_ref is the frequency against which the delay is measured.
+    P is a period [sec]; if provided, the return is in [rot].
     """
-    delay = Dconst * DM * ((freq**-2.0) - (freq2**-2.0))
+    delay = Dconst * DM * ((freq**-2.0) - (freq_ref**-2.0))
     if P:
         return delay / P
     else:
@@ -1337,10 +1412,20 @@ def DM_delay(DM, freq, freq2=np.inf, P=None):
 
 def phase_transform(phi, DM, nu_ref1=np.inf, nu_ref2=np.inf, P=None, mod=True):
     """
-    From nu_ref1 --> nu_ref2
-    Default behavior is for P=1.0, i.e. transform delays [sec]
+    Transform an input delay at nu_ref1 to a delay at nu_ref2.
+
+    phi is an input delay [rot] or [sec].
+    DM is the dispersion measure [cm**-3 pc].
+    nu_ref1 is the reference frequency for phi.
+    nu_ref2 is the reference frequency of the ouput delay.
+    P is the pulsar period; if not provided, assumes phi is in [sec].
+    mod=True ensures the output delay in [rot] is on the interval [-0.5, 0.5).
+
+    Default behavior is for P=1.0 [sec], i.e. transform delays [sec]
     """
-    if P is None: P = 1.0
+    if P is None:
+        P = 1.0
+        mod = False
     phi_prime =  phi + (Dconst * DM * P**-1 * (nu_ref2**-2.0 - nu_ref1**-2.0))
     if mod:
         #phi_prime %= 1
@@ -1350,11 +1435,13 @@ def phase_transform(phi, DM, nu_ref1=np.inf, nu_ref2=np.inf, P=None, mod=True):
 
 def guess_fit_freq(freqs, SNRs=None):
     """
-    Returns an estimate of an "optimal" frequency for fitting DM and phase
-    in the sense that it minimizes the covariance.
-    Intuited: "center of mass" where the weight in a given channel is given by:
-    SNR/freq**2
-    Default SNRs are ones.
+    Estimate a zero-covariance frequency.
+
+    Returns a "center of mass" frequency, where the weights are given by
+    SNR*(freq**-2).
+
+    freqs is an array of frequencies.
+    SNRs is an array of signal-to-noise ratios (defaults to 1s).
     """
     nu0 = (freqs.min() + freqs.max()) * 0.5
     if SNRs is None:
@@ -1364,48 +1451,52 @@ def guess_fit_freq(freqs, SNRs=None):
 
 def doppler_correct_freqs(freqs, doppler_factor):
     """
-    Input topocentric frequencies, output barycentric frequencies.
-    doppler_factor = nu_source / nu_observed = sqrt( (1+beta) / (1-beta)),
-    for beta = v/c, and v is positive for increasing source distance.
-    NB: PSRCHIVE defines doppler_factor as the inverse of the above.
+    Correct frequencies for doppler motion.
+
+    Returns barycentric frequencies.  Untested.
+
+    freqs is an array of topocentric frequencies.
+    doppler_factor is the Doppler factor:
+        doppler_factor = nu_source / nu_observed = sqrt( (1+beta) / (1-beta)),
+        for beta = v/c, and v is positive for increasing source distance.
+        NB: PSRCHIVE defines doppler_factor as the inverse of the above.
+
+    Reference: Equations 13, 14, & 15 of Pennucci, Demorest, & Ransom (2014).
     """
     return doppler_factor * freqs
 
 def calculate_TOA(epoch, P, phi, DM=0.0, nu_ref1=np.inf, nu_ref2=np.inf):
     """
-    Calculates TOA given epoch [PSRCHIVE MJD], period P [sec], and phase
-    offset phi [rot].  If phi was measured w.r.t. nu_ref1 [MHZ], providing
-    DM [cm**-3 pc], nu_ref1 and nu_ref2 [MHz] will calculate the TOA w.r.t
-    nu_ref2.
+    Calculate a TOA [PSRCHIVE MJD] for given input.
+
+    epoch is a PSRCHIVE MJD.
+    P is the pulsar period [sec].
+    phi is the phase offset [rot].
+    DM is the dispersion measure [cm**-3 pc], for transforming to nu_ref2.
+    nu_ref1 is the reference frequency [MHz] of phi.
+    nu_ref2 is the reference frequency [MHz] of the output TOA.
     """
     #The pre-Doppler corrected DM must be used
     phi_prime = phase_transform(phi, DM, nu_ref1, nu_ref2, P)
     TOA = epoch + pr.MJD((phi_prime * P) / (3600 * 24.))
     return TOA
 
-def get_channel_TOAs(freqs, Ps, epochs, phase, phase_error, DM, nu_ref, obs):
-    """
-    Experimental, probably wrong.
-    Currently does not get errors "right"...
-    """
-    channel_phases = phase_transform(phase, DM, nu_ref, freqs, Ps, mod=True)
-    channel_TOAs = np.array([calculate_TOA(epochs[ichan], Ps[ichan],
-        channel_phases[ichan]) for ichan in xrange(len(freqs))])
-    for iTOA in range(len(freqs)):
-        TOA_MJDi = channel_TOAs[iTOA].intday()
-        TOA_MJDf = channel_TOAs[iTOA].fracday()
-        #Should calculate error from covariance matrix...
-        TOA_err = phase_error*Ps[iTOA]*1e6
-        freq = freqs[iTOA]
-        write_princeton_TOA(TOA_MJDi, TOA_MJDf, TOA_err, freq, 0.0, obs)
-
 def load_data(filename, dedisperse=False, dededisperse=False, tscrunch=False,
         pscrunch=False, fscrunch=False, rm_baseline=True, flux_prof=False,
-        norm_weights=True, quiet=False):
+        norm_weights=True, refresh_arch=True, return_arch=True, quiet=False):
     """
-    Will read and return data using PSRCHIVE.
-    The returned archive is 'refreshed'.
-    Perhaps should have default to not returning arch (poten. memory problem)
+    Load data from a PSRCHIVE archive.
+
+    Returns an object containing a large number of useful archive attributes.
+
+    filename is the input PSRCHIVE archive.
+    Most of the options should be self-evident; archives are manipulated by
+    PSRCHIVE only.
+    flux_prof=True will include an array with the phase-averaged flux profile.
+    norm_weights=True returns all channel weights as either 1 or 0.
+    refresh_arch=True refreshes the returned archive to its original state.
+    return_arch=False will not return the archive, which may be smart at times.
+    quiet=True suppresses output.
     """
     #Load archive
     arch = pr.Archive_load(filename)
@@ -1519,10 +1610,10 @@ def load_data(filename, dedisperse=False, dededisperse=False, tscrunch=False,
         # unzapped subint  = %d\n\
         pol'n state        = %s\n"%(P, DM, nu0, abs(bw), nbin, nchan, nchanx,
                 nsub, nsubx, state)
-    #Returns refreshed arch; could be changed...
-    arch.refresh()
     if norm_weights:
         weights = weights_norm
+    if refresh_arch: arch.refresh()
+    if not return_arch: arch = None
     #Return getitem/attribute-accessible class!
     data = DataBunch(arch=arch, bw=bw, DM=DM, epochs=epochs, filename=filename,
             flux_prof=flux_prof, flux_profx=flux_profx, freqs=freqs,
@@ -1536,6 +1627,10 @@ def load_data(filename, dedisperse=False, dededisperse=False, tscrunch=False,
 
 def unpack_dict(data):
     """
+    unpack a DataBunch/dictionary
+
+    <UNDER CONSTRUCTION>
+
     This does not work yet; just for reference...
     Dictionary has to be named 'data'...
     """
@@ -1545,6 +1640,16 @@ def unpack_dict(data):
 def write_model(filename, name, nu_ref, model_params, fit_flags, append=False,
         quiet=False):
     """
+    Write a gaussian-component model.
+
+    filename is the output file name.
+    name is the name of the model.
+    nu_ref is the reference frequency [MHz] of the model.
+    model_params is the list of 2 + 6*ngauss model parameters, where index 1 is
+    the scattering timescale [sec].
+    fit_flags is the list of 2 + 6*ngauss flags (1 or 0) designating a fit.
+    append=True will append to a file named filename.
+    quiet=True suppresses output.
     """
     if append:
         outfile = open(filename, "a")
@@ -1565,6 +1670,19 @@ def write_model(filename, name, nu_ref, model_params, fit_flags, append=False,
 
 def read_model(modelfile, phases=None, freqs=None, P=None, quiet=False):
     """
+    Read-in a gaussian-component model.
+
+    If only modelfile is specified, returns the contents of the modelfile:
+        (model name, model reference frequency, number of gaussian components,
+        list of parameters, list of fit flags).
+    Otherwise, builds a model based on the input phases, frequencies, and
+    period (if scattering timescale != 0.0).
+
+    modelfile is the name of the write_model(...)-type of model file.
+    phases is an array of phase-bin centers [rot].
+    freqs in an array of center-frequencies [MHz].
+    P is the pulsar period [sec]; needed if the scattering timescale != 0.0.
+    quiet=True suppresses output.
     """
     if phases is None and freqs is None:
         read_only = True
@@ -1625,6 +1743,7 @@ def read_model(modelfile, phases=None, freqs=None, P=None, quiet=False):
             bw = 0.0
         print "%d frequency channels, ~%.0f MHz bandwidth, centered near ~%.0f MHz,"%(nchan, abs(bw), freqs.mean())
         print "with model parameters referenced at %.3f MHz."%nu_ref
+    #This could be changed to a DataBunch
     if read_only:
         return name, nu_ref, ngauss, params, fit_flags
     else:
@@ -1632,6 +1751,7 @@ def read_model(modelfile, phases=None, freqs=None, P=None, quiet=False):
 
 def file_is_ASCII(filename):
     """
+    Checks if a file is ASCII.
     """
     from os import popen4
     cmd = "file -L %s"%filename
