@@ -20,8 +20,8 @@ The technical description of this work is:
     and has been submitted to The Astrophysical Journal.
 
 Requirements:
-    -PSRCHIVE, compiled with the python-interface enabled
-    -at least numpy 1.7.1 & scipy 0.12.0
+    -PSRCHIVE, compiled with the python-interface enabled,
+    -at least numpy 1.7.1 & scipy 0.12.0, and
     -lmfit is required for portrait modelling.
 
 In short:
