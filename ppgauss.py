@@ -417,19 +417,19 @@ class DataPortrait:
             (self.fitted_params, self.fit_errs, self.chi2, self.dof) = (
                     fgp.fitted_params, fgp.fit_errs, fgp.chi2, fgp.dof)
             if self.njoin:
-                #FIX, convergence can be based on residuals
                 self.model_params = self.fitted_params[:-self.njoin*2]
                 self.model_param_errs = self.fit_errs[:-self.njoin*2]
                 self.join_params = self.fitted_params[-self.njoin*2:]
                 self.join_param_errs = self.fit_errs[-self.njoin*2:]
                 self.all_join_params[1] = self.join_params
+                #FIX, convergence can be based on residuals
                 self.phi = 0.5
                 self.phierr = 0.0
                 self.DM = 1.0
                 self.DMerr = 0.0
                 self.red_chi2 = 0.0
-                ###HACK
-                print "JOIN PARAMETERS:", self.join_params
+                #This function is a hack for now.
+                self.write_join_parameters()
             else:
                 self.model_params = self.fitted_params[:]
                 self.model_param_errs = self.fit_errs[:]
@@ -515,7 +515,6 @@ class DataPortrait:
         append=True will append to an already existing file of the same name.
         quiet=True suppresses output.
         """
-
         if errfile is None:
             errfile = self.datafile + ".gmodel_errs"
         model_param_errs = np.copy(self.model_param_errs)
@@ -523,6 +522,28 @@ class DataPortrait:
         model_param_errs[1] *= self.Ps[0] / self.nbin
         write_model(errfile, self.model_name+"_errors", self.nu_ref,
                 model_param_errs, self.fit_flags, append=append, quiet=quiet)
+
+    def write_join_parameters(self):
+        """
+        Write the JOIN parameters to file.
+
+        This function is a hack until something better is developed for how to
+        deal with these alignment parameters.
+        """
+        print "JOIN Parameters:", self.join_params
+        joinfile = self.metafile + ".join"
+        jf = open(joinfile, "a")
+        header = "# archive name" + " "*32 + "phase offset [rot]" + " "*2 + \
+                "delta-DM [cm**-3 pc]\n"
+        jf.write(header)
+        for ifile in xrange(len(self.datafiles)):
+            datafile = self.datafiles[ifile]
+            phase = self.join_params[ifile*2]
+            dm = self.join_params[ifile*2 + 1]
+            line = datafile + " "*abs(45-len(datafile)) + "% .10f"%phase + \
+                    " "*7 + "% .6f"%dm + "\n"
+            jf.write(line)
+        jf.close()
 
     def show_data_portrait(self):
         """
