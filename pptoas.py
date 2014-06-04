@@ -678,9 +678,6 @@ if __name__ == "__main__":
     parser.add_option("--fix_DM",
                       action="store_false", dest="fit_DM", default=True,
                       help="Do not fit for DM.  NB: you'll want to also use --no_bary_DM.")
-    parser.add_option("--pam_cmd",
-                      action="store_true", dest="pam_cmd", default=False,
-                      help='Append pam commands to file "pam_cmd."')
     parser.add_option("--common",
                       action="store_true", dest="common", default=False,
                       help="If supplying a metafile, use this flag if the data are homogenous (i.e. have the same nu0, bw, nchan, nbin).  Not recommended for use...")
@@ -712,7 +709,6 @@ if __name__ == "__main__":
     bary_DM = options.bary_DM
     one_DM = options.one_DM
     fit_DM = options.fit_DM
-    pam_cmd = options.pam_cmd
     outfile = options.outfile
     errfile = options.errfile
     common = options.common
@@ -724,4 +720,3 @@ if __name__ == "__main__":
     gt.get_TOAs(nu_ref=nu_ref, DM0=DM0, bary_DM=bary_DM, fit_DM=fit_DM,
             show_plot=showplot, quiet=quiet)
     gt.write_TOAs(outfile=outfile, one_DM=one_DM, dmerrfile=errfile)
-    if pam_cmd: gt.write_pam_cmds()
