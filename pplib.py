@@ -635,7 +635,8 @@ def fit_portrait_function_2deriv(params, model=None, p_n=None, data=None,
 
     The three unique values in the Hessian, which is a 2x2 symmetric matrix of
     the second-derivatives of fit_portrait_function, are returned, evaluated at
-    params.
+    params, as well as the estimate of the zero-covariance reference
+    frequency.
 
     NB: The curvature matrix is one-half the second-derivative of the
     chi-squared function (this function).  The covariance matrix is the
