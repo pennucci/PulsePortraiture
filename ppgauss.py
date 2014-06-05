@@ -845,7 +845,7 @@ if __name__ == "__main__":
                       help="PSRCHIVE archive from which to generate gaussian model.")
     parser.add_option("-M", "--metafile",
                       action="store", metavar="metafile", dest="metafile",
-                      help="Experimental.  Not recommended for your use.  Will be able to fit several obs. from different bands.  NB: First file in metafile MUST also be the one that contains nu_ref.")
+                      help="(BETA) Will be able to fit several obs. from different bands.  NB: First file in metafile MUST also be the one that contains nu_ref.")
     parser.add_option("-o", "--outfile",
                       action="store", metavar="outfile", dest="outfile",
                       help="Name of output model file name. [default=archive.gmodel]")

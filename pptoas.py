@@ -365,7 +365,7 @@ class GetTOAs:
             if not quiet:
                 print "--------------------------"
                 print datafile
-                print "~%.2f min/TOA"%(fit_duration / (60. * nsubx))
+                print "~%.4f min/TOA"%(fit_duration / (60. * nsubx))
                 print "Avg. TOA error is %.3f us"%(phi_errs.mean() *
                         Ps.mean() * 1e6)
             if show_plot:
@@ -377,7 +377,7 @@ class GetTOAs:
             tot_duration = time.time() - start
         if not quiet:
             print "--------------------------"
-            print "Total time: %.2f min, ~%.2f min/TOA"%(tot_duration / 60,
+            print "Total time: %.2f min, ~%.4f min/TOA"%(tot_duration / 60,
                     tot_duration / (60 * np.sum(np.array(self.nsubxs))))
 
     def write_TOAs(self, datafile=None, outfile=None, nu_ref=None,
@@ -456,7 +456,7 @@ class GetTOAs:
                     TOA_MJDi = TOAs[isubx].intday()
                     TOA_MJDf = TOAs[isubx].fracday()
                     TOA = "%5d"%int(TOA_MJDi) + ("%.13f"%TOA_MJDf)[1:]
-                    dmerrs.write("%s\t%.8f\t%.6f\n"%(TOA,
+                    dmerrs.write("%.3f\t%s\t%.8f\t%.6f\n"%(nu_refs[isubx], TOA,
                         self.DMs[ifile][isubx], self.DM_errs[ifile][isubx]))
         if dmerrfile is not None:
             dmerrs.close()
