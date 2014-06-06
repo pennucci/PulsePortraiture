@@ -70,7 +70,7 @@ class DataPortrait:
                 datafile = self.datafiles[ifile]
                 data = load_data(datafile, dedisperse=True, tscrunch=True,
                         pscrunch=True, fscrunch=False, rm_baseline=True,
-                        flux_prof=True, norm_weights=True,
+                        flux_prof=True, norm_weights=True, return_arch=True,
                         quiet=quiet)
                 self.nchan += data.nchan
                 self.nchanx += data.nchanx
@@ -156,7 +156,7 @@ class DataPortrait:
             self.data = load_data(datafile, dedisperse=True,
                     dededisperse=False, tscrunch=True, pscrunch=True,
                     fscrunch=False, rm_baseline=True, flux_prof=True,
-                    norm_weights=True, quiet=quiet)
+                    norm_weights=True, return_arch=True, quiet=quiet)
             #Unpack the data dictionary into the local namespace;
             #see load_data for dictionary keys.
             for key in self.data.keys():
@@ -757,6 +757,7 @@ class GaussianSelector:
         plt.subplot(211)
         plt.cla()
         # Re-plot the original profile
+        plt.hlines(0, 0.0, 1.0, color='black', lw=1, alpha=0.3, linestyle=':')
         plt.plot(self.phases, self.profile, c='black', lw=3, alpha=0.3)
         plt.xlabel('Pulse Phase')
         plt.ylabel('Pulse Amplitude')

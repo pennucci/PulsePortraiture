@@ -80,7 +80,7 @@ class GetTOAs:
             data = load_data(self.datafiles[0], dedisperse=False,
                     dededisperse=False, tscrunch=True, pscrunch=True,
                     fscrunch=False, rm_baseline=rm_baseline, flux_prof=False,
-                    norm_weights=True, quiet=True)
+                    norm_weights=True, return_arch=False, quiet=True)
             if self.is_gauss_model:
                 self.model_name, self.ngauss, self.model = read_model(
                         self.modelfile, data.phases, data.freqs, data.Ps[0],
@@ -89,7 +89,8 @@ class GetTOAs:
                 self.model_data = load_data(self.modelfile, dedisperse=True,
                         dededisperse=False, tscrunch=True, pscrunch=True,
                         fscrunch=False, rm_baseline=rm_baseline,
-                        flux_prof=False, norm_weights=True, quiet=True)
+                        flux_prof=False, norm_weights=True, return_arch=False,
+                        quiet=True)
                 self.model_name = self.model_data.source
                 self.ngauss = 0
                 self.model_weights = self.model_data.weights[0]
@@ -147,12 +148,15 @@ class GetTOAs:
             data = load_data(datafile, dedisperse=False,
                     dededisperse=False, tscrunch=False, pscrunch=True,
                     fscrunch=False, rm_baseline=rm_baseline, flux_prof=False,
-                    norm_weights=True, quiet=quiet)
+                    norm_weights=True, return_arch=True, quiet=quiet)
             #Unpack the data dictionary into the local namespace; see load_data
             #for dictionary keys.
             for key in data.keys():
                 exec(key + " = data['" + key + "']")
             if source is None: source = "noname"
+            #Observation info
+            obs = DataBunch(telescope=telescope, backend=backend,
+                    frontend=frontend, tempo_code=tempo_code)
             #Read model
             if len(datafiles) !=1 and self.common is False:
                 self.model_name, self.ngauss, model = read_model(
@@ -333,7 +337,7 @@ class GetTOAs:
                         (DM_errs**2)) / (len(DeltaDMs) - 1)
             DeltaDM_err = DeltaDM_var**0.5
             self.order.append(datafile)
-            self.obs.append(arch.get_telescope())
+            self.obs.append(obs)
             self.nu0s.append(nu0)
             self.nu_fits.append(nu_fits)
             self.nu_refs.append(nu_refs)
@@ -387,8 +391,8 @@ class GetTOAs:
 
         Currently only writes Princeton-formatted TOAs.
 
-        datafile defaults to self.datafiles, otherwise it is a single
-            PSRCHIVE archive name
+        datafile defaults to self.datafiles, otherwise it is a list of
+            PSRCHIVE archive names that have been fitted for TOAs.
         outfile is the name of the output file.
         nu_ref is the desired output reference frequency [MHz] of the TOAs;
             defaults to the zero-covariance frequency.
@@ -398,7 +402,6 @@ class GetTOAs:
             containing the TOA, the (full) DM, and the DM uncertainty.  This
             output needs improvement!
         """
-        #FIX - determine observatory
         #FIX - options for different TOA formats
         if datafile is None:
             datafiles = self.datafiles
@@ -416,6 +419,7 @@ class GetTOAs:
                 #Default to self.nu_refs
                 if self.nu_ref is None:
                     nu_refs = self.nu_refs[ifile]
+
                 else:
                     nu_refs = self.nu_ref * np.ones(nsubx)
                 TOAs = self.TOAs[ifile]
@@ -433,10 +437,7 @@ class GetTOAs:
                     TOAs[isubx] = calculate_TOA(epochs[isubx], Ps[isubx],
                             phis[isubx], DMs_fitted[isubx],
                             self.nu_refs[ifile][isubx], nu_refs[isubx])
-            try:
-                obs_code = obs_codes["%s"%self.obs[ifile].lower()]
-            except KeyError:
-                obs_code = obs_codes["%s"%self.obs[ifile].upper()]
+            obs_code = self.obs[ifile].tempo_code
             #Currently writes topocentric frequencies
             for isubx in xrange(nsubx):
                 TOA_MJDi = TOAs[isubx].intday()
@@ -482,7 +483,8 @@ class GetTOAs:
                 dededisperse=False, tscrunch=False,
                 #pscrunch=True, fscrunch=False, rm_baseline=rm_baseline,
                 pscrunch=True, fscrunch=False, rm_baseline=True,
-                flux_prof=False, norm_weights=True, quiet=quiet)
+                flux_prof=False, norm_weights=True, return_arch=False,
+                quiet=quiet)
         title = "%s ; subintx %d"%(datafile, isubx)
         port = np.transpose(data.weights[isubx] * np.transpose(
             data.subints[isubx,0]))
@@ -509,7 +511,8 @@ class GetTOAs:
                 dededisperse=False, tscrunch=False,
                 #pscrunch=True, fscrunch=False, rm_baseline=rm_baseline,
                 pscrunch=True, fscrunch=False, rm_baseline=True,
-                flux_prof=False, norm_weights=True, quiet=quiet)
+                flux_prof=False, norm_weights=True, return_arch=False,
+                quiet=quiet)
         phi = self.phis[ifile][isubx]
         #Pre-corrected DM, if corrected
         DM_fitted = self.DMs[ifile][isubx] / self.doppler_fs[ifile][isubx]

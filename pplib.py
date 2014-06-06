@@ -57,7 +57,7 @@ DC_fact = 0
 
 #Upper limit on the width of a Gaussian component to "help" in fitting.
 #Should be either None or > 0.0.
-wid_max = 0.2
+wid_max = 0.25
 
 #If PL_model == True, the wid and loc of the gaussian parameters will be
 #modeled with power-law functions instead of linear ones.
@@ -1515,6 +1515,14 @@ def load_data(filename, dedisperse=False, dededisperse=False, tscrunch=False,
     source = arch.get_source()
     if not quiet:
         print "\nReading data from %s on source %s..."%(filename, source)
+    #Basic info used in TOA output
+    telescope = arch.get_telescope()
+    try:
+        tempo_code = obs_codes[arch.get_telescope().lower()]    #"asite"
+    except KeyError:
+        asite = '?'
+    frontend = arch.get_receiver_name()
+    backend = arch.get_backend_name()
     #De/dedisperse?
     if dedisperse: arch.dedisperse()
     if dededisperse: arch.dededisperse()
@@ -1627,13 +1635,14 @@ def load_data(filename, dedisperse=False, dededisperse=False, tscrunch=False,
     if refresh_arch: arch.refresh()
     if not return_arch: arch = None
     #Return getitem/attribute-accessible class!
-    data = DataBunch(arch=arch, bw=bw, DM=DM, epochs=epochs, filename=filename,
-            flux_prof=flux_prof, flux_profx=flux_profx, freqs=freqs,
-            freqsxs=freqsxs, masks=masks, nbin=nbin, nchan=nchan,
-            nchanx=nchanx, noise_stds=noise_stds, nsub=nsub, nsubx=nsubx,
-            nu0=nu0, okichan=okichan, okisub=okisub, phases=phases, prof=prof,
-            prof_noise=prof_noise, prof_SNR=prof_SNR, Ps=Ps, SNRs=SNRs,
-            source=source, state=state, subints=subints, subintsxs=subintsxs,
+    data = DataBunch(arch=arch, backend=backend, bw=bw, DM=DM, epochs=epochs,
+            filename=filename, flux_prof=flux_prof, flux_profx=flux_profx,
+            freqs=freqs, freqsxs=freqsxs, frontend=frontend, masks=masks,
+            nbin=nbin, nchan=nchan, nchanx=nchanx, noise_stds=noise_stds,
+            nsub=nsub, nsubx=nsubx, nu0=nu0, okichan=okichan, okisub=okisub,
+            phases=phases, prof=prof, prof_noise=prof_noise, prof_SNR=prof_SNR,
+            Ps=Ps, SNRs=SNRs, source=source, state=state, subints=subints,
+            subintsxs=subintsxs, telescope=telescope, tempo_code=tempo_code,
             weights=weights)
     return data
 
@@ -2069,7 +2078,8 @@ def quick_add_archs(metafile, outfile, rotate=False, fiducial=0.5,
         datafile = datafiles[ifile]
         data = load_data(datafile, dedisperse=True, dededisperse=False,
                 tscrunch=True, pscrunch=True, fscrunch=False, rm_baseline=True,
-                flux_prof=False, norm_weights=True, quiet=True)
+                flux_prof=False, norm_weights=True, return_arch=True,
+                quiet=True)
         if ifile == 0:
             nchan = data.nchan
             nbin = data.nbin
@@ -2136,6 +2146,12 @@ def write_princeton_TOA(TOA_MJDi, TOA_MJDf, TOA_err, nu_ref, dDM, obs='@',
             TOA_err, dDM)
     #else:
     #    print obs + " %13s %8.3f %s %8.3f"%(name, nu_ref, TOA, TOA_err)
+
+def write_pptoas(TOA, freq, archive):
+    """
+    """
+#pat subint -C snr -C wt -f "tempo2 IPTA" -s $^
+#guppi_55543_J1600-3053_0009.8y.x.ff 1879.092 55543.620312807225702   1.635  gbt  -fe Rcvr1_2 -be GUPPI -f Rcvr1_2_GUPPI -bw 12.5 -tobs 918.51 -tmplt J1600-3053.Rcvr1_2.GUPPI.8y.x.sum.sm -gof 1.29 -nbin 2048 -nch 8 -chan 62 -subint 1 -snr 34.481 -wt 8037 -proc 8y -pta NANOGrav
 
 def show_portrait(port, phases=None, freqs=None, title=None, prof=True,
         fluxprof=True, rvrsd=False, colorbar=True, savefig=False,
