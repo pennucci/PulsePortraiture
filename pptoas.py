@@ -25,29 +25,43 @@ class TOA:
     TOA class bundles common TOA attributes together with useful functions.
     """
 
-    def __init__(self, archive, frequency, MJD, TOA_error, telescope, DM=0.0,
-            DM_error=0.0, flags={}):
+    def __init__(self, archive, frequency, MJD, TOA_error, telescope, DM=None,
+            DM_error=None, flags={}):
         """
         Form the TOA.
+
+        archive is the string name of the TOA's archive.
+        frequency is the reference frequency [MHz] of the TOA.
+        MJD is a PSRCHIVE MJD object (the TOA, topocentric).
+        TOA_error is the TOA uncertainty [us].
+        telescope is the string designating the observatory.
+        DM is the full DM [cm**-3 pc] associated with the TOA.
+        DM_error is the DM uncertainty [cm**-3 pc].
+        flags is a dictionary of arbitrary TOA flags \
+                (eg. {'subint':0, 'be':'GUPPI'})
         """
         self.archive = archive
         self.frequency = frequency
         self.MJD = MJD
-        self.TOA_error = error
+        self.TOA_error = TOA_error
         self.telescope = telescope
         self.DM = DM
-        self.DM_err = self.DM_err
+        self.DM_error = DM_error
         self.flags = flags
-        for flag in flags:
-            exec("self.%s = flag"%flag)
-    
-    def print_TOA(self, format="Tempo2"):
-        """
-        Print a formatted TOA to standard output.
-        """
-        write_TOAs(self, format=format, outfile=None)
+        for flag in flags.keys():
+            exec('self.%s = flags["%s"]'%(flag, flag))
 
-    def convert_TOA(self, new_frequency):
+    def print_TOA(self, format="tempo2", outfile=None):
+        """
+        Print a formatted TOA to standard output or to file.
+
+        format is one of 'tempo2', ... others coming ...
+        outfile is the output file name; if None, will print to standard \
+                output.
+        """
+        write_TOAs(self, format=format, outfile=outfile, append=True)
+
+    def convert_TOA(self, new_frequency, covariance):
         """
         To do...
         """
@@ -111,6 +125,7 @@ class GetTOAs:
         self.fit_durations = []
         self.quiet = quiet
         self.order = []
+        self.TOA_list = []
         if len(self.datafiles) == 1 or self.common is True:
             data = load_data(self.datafiles[0], dedisperse=False,
                     dededisperse=False, tscrunch=True, pscrunch=True,
@@ -234,6 +249,7 @@ class GetTOAs:
             ok_isubs = map(int, np.compress(map(len,
                 np.array(subintsxs)[:,0]), np.arange(nsub)))
             for isubx in xrange(nsubx):
+                toa_flags = {}
                 isub = ok_isubs[isubx]
                 id = datafile + "_%d_%d"%(isub, isubx)
                 epoch = epochs[isub]
@@ -358,6 +374,24 @@ class GetTOAs:
                 scales[isubx] = results.all_scales
                 covariances[isubx] = results.covariance
                 red_chi2s[isubx] = results.red_chi2
+                toa_flags['be'] = backend
+                toa_flags['fe'] = frontend
+                toa_flags['f'] = backend + "_" + frontend
+                toa_flags['nbin'] = nbin
+                toa_flags['nch'] = nchan
+                toa_flags['subint'] = isub
+                toa_flags['tobs'] = subtimes[isub]
+                toa_flags['pp_tmplt'] = self.modelfile
+                toa_flags['pp_cov'] = results.covariance
+                toa_flags['pp_gof'] = results.red_chi2
+                #toa_flags['pp_phs'] = results.phi
+                toa_flags['pp_snr'] = results.snr
+                #for k,v in addtl_toa_flags:
+                self.TOA_list += TOA(datafile, results.nu_ref, results.TOA,
+                        results.TOA_err, telescope, results.DM, results.DM_err,
+                        toa_flags)
+#guppi_55543_J1600-3053_0009.8y.x.ff 1879.092 55543.620312807225702   1.635  gbt  -fe Rcvr1_2 -be GUPPI -f Rcvr1_2_GUPPI -bw 12.5 -tobs 918.51 -tmplt J1600-3053.Rcvr1_2.GUPPI.8y.x.sum.sm -gof 1.29 -nbin 2048 -nch 8 -chan 62 -subint 1 -snr 34.481 -wt 8037 -proc 8y -pta NANOGrav
+
             DeltaDMs = DMs - DM0
             #The below returns the weighted mean and the sum of the weights,
             #but needs to do better in the case of small-error outliers from
@@ -419,7 +453,7 @@ class GetTOAs:
             print "Total time: %.2f min, ~%.4f min/TOA"%(tot_duration / 60,
                     tot_duration / (60 * np.sum(np.array(self.nsubxs))))
 
-    def write_TOAs(self, datafile=None, outfile=None, nu_ref=None,
+    def write_princeton_TOAs(self, datafile=None, outfile=None, nu_ref=None,
             one_DM=False, dmerrfile=None):
         """
         Write TOAs to file.
@@ -698,6 +732,9 @@ if __name__ == "__main__":
                       action="store", metavar="timfile", dest="outfile",
                       default=None,
                       help="Name of output .tim file name. Will append. [default=stdout]")
+    parser.add_option("-f", "--format",
+                      action="store", metavar="format", dest="format",
+                      help="Format of output .tim file; either 'princeton' or 'tempo2'.  Default is tempo2 format.")
     parser.add_option("--nu_ref",
                       action="store", metavar="nu_ref", dest="nu_ref",
                       default=None,
@@ -750,6 +787,7 @@ if __name__ == "__main__":
     one_DM = options.one_DM
     fit_DM = options.fit_DM
     outfile = options.outfile
+    format = options.format
     errfile = options.errfile
     common = options.common
     showplot = options.showplot
@@ -759,4 +797,8 @@ if __name__ == "__main__":
             quiet=quiet)
     gt.get_TOAs(nu_ref=nu_ref, DM0=DM0, bary_DM=bary_DM, fit_DM=fit_DM,
             show_plot=showplot, quiet=quiet)
-    gt.write_TOAs(outfile=outfile, one_DM=one_DM, dmerrfile=errfile)
+    if format == "princeton":
+        gt.write_princeton_TOAs(outfile=outfile, one_DM=one_DM,
+            dmerrfile=errfile)
+    else:
+        write_TOAs(gt.TOA_list, format="tempo2", outfile=outfile, append=True)

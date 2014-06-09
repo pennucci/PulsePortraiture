@@ -1126,9 +1126,11 @@ def fit_portrait(data, model, init_params, P, freqs, nu_fit=None, nu_out=None,
     scales = get_scales(data, model, phi, DM, P, freqs, nu_fit)
     #Errors on scales, if ever needed (these may be wrong b/c of covariances)
     scale_errs = pow(p_n / errs**2.0, -0.5)
+    #SNR of the fit, based on PDB's notes
+    snr = pow(np.sum(scales**2 * p_n / errs**2), 0.5)
     results = DataBunch(phase=phi_out, phase_err=param_errs[0], DM=DM,
             DM_err=param_errs[1], scales=scales, scale_errs=scale_errs,
-            nu_ref=nu_out, covariance=covariance, red_chi2=red_chi2,
+            nu_ref=nu_out, covariance=covariance, red_chi2=red_chi2, snr=snr,
             duration=duration, nfeval=nfeval, return_code=return_code)
     return results
 
@@ -1565,14 +1567,14 @@ def load_data(filename, dedisperse=False, dededisperse=False, tscrunch=False,
     subints = arch.get_data()
     Ps = np.array([arch.get_Integration(isub).get_folding_period() for isub in
         xrange(nsub)],dtype=np.double)
-    epochs = [arch.get_Integration(isub).get_epoch() for isub in xrange(nsub)]
+    epochs = [sub.get_epoch() for sub in arch]
+    subtimes = [sub.get_duration() for sub in arch]
     #Get weights
     weights = arch.get_weights()
     weights_norm = np.where(weights == 0.0, np.zeros(weights.shape),
             np.ones(weights.shape))
     #Get off-pulse noise
-    noise_stds = np.array([arch.get_Integration(isub).baseline_stats()[1]**0.5
-        for isub in xrange(nsub)])
+    noise_stds = np.array([sub.baseline_stats()[1]**0.5 for sub in arch])
 #If weights are not set...?
 #    weights = np.where(noise_stds[0],weights,0)
 #    weights_norm = np.where(noise_stds[0],weights_norm,0)
@@ -1587,12 +1589,11 @@ def load_data(filename, dedisperse=False, dededisperse=False, tscrunch=False,
     #The channel center frequencies for the non-zapped subints
     freqsxs = [np.compress(weights_norm[isub], freqs) for isub in xrange(nsub)]
     SNRs = np.zeros([nsub, npol, nchan])
-    for isub in range(nsub):
+    for sub in arch:
         for ipol in range(npol):
             for ichan in range(nchan):
                 SNRs[isub, ipol, ichan] = \
-                        arch.get_Integration(isub).get_Profile(ipol,
-                                ichan).snr()
+                        sub.get_Profile(ipol, ichan).snr()
     #The rest is now ignoring npol...
     arch.pscrunch()
     if flux_prof:
@@ -1642,8 +1643,8 @@ def load_data(filename, dedisperse=False, dededisperse=False, tscrunch=False,
             nsub=nsub, nsubx=nsubx, nu0=nu0, okichan=okichan, okisub=okisub,
             phases=phases, prof=prof, prof_noise=prof_noise, prof_SNR=prof_SNR,
             Ps=Ps, SNRs=SNRs, source=source, state=state, subints=subints,
-            subintsxs=subintsxs, telescope=telescope, tempo_code=tempo_code,
-            weights=weights)
+            subintsxs=subintsxs, subtimes=subtimes, telescope=telescope,
+            tempo_code=tempo_code, weights=weights)
     return data
 
 def unpack_dict(data):
@@ -2147,11 +2148,37 @@ def write_princeton_TOA(TOA_MJDi, TOA_MJDf, TOA_err, nu_ref, dDM, obs='@',
     #else:
     #    print obs + " %13s %8.3f %s %8.3f"%(name, nu_ref, TOA, TOA_err)
 
-def write_pptoas(TOA, freq, archive):
+def write_TOAs(TOAs, format="tempo2", outfile=None, append=True):
     """
+    Write formatted TOAs to file.
+
+    TOAs is a single TOA of the TOA class from pptoas, or a list of them.
+    format is one of 'tempo2', ... others coming ...
+    outfile is the output file name; if None, will print to standard output.
+    append=False will overwrite a file with the same name as outfile.
     """
-#pat subint -C snr -C wt -f "tempo2 IPTA" -s $^
-#guppi_55543_J1600-3053_0009.8y.x.ff 1879.092 55543.620312807225702   1.635  gbt  -fe Rcvr1_2 -be GUPPI -f Rcvr1_2_GUPPI -bw 12.5 -tobs 918.51 -tmplt J1600-3053.Rcvr1_2.GUPPI.8y.x.sum.sm -gof 1.29 -nbin 2048 -nch 8 -chan 62 -subint 1 -snr 34.481 -wt 8037 -proc 8y -pta NANOGrav
+    if not hasattr(TOAs, "__len__"): toas = [TOAs]
+    else: toas = TOAs
+    if outfile is not None:
+        if append: mode = 'a'
+        else: mode = 'w'
+        of = open(outfile, mode)
+    for toa in toas:
+        if format == "tempo2":
+            toa_string = "%s %.3f %d%.15f   %.3f  %s"%(toa.archive,
+                    toa.frequency, toa.MJD.intday(), toa.MJD.fracday(),
+                    toa.TOA_error, toa.telescope)
+            if toa.DM is not None:
+                toa_string += " -dm %.7f"%toa.DM
+                toa_string += " -dmerr %.4f"%(1e3 * toa.DM_error)
+            for flag in toa.flags.keys():
+                exec("toa_string += ' -%s %s'"%(flag, str(toa.flags[flag])))
+            if outfile is not None:
+                toa_string += "\n"
+                of.write(toa_string)
+            else:
+                print toa_string
+    if outfile is not None: of.close()
 
 def show_portrait(port, phases=None, freqs=None, title=None, prof=True,
         fluxprof=True, rvrsd=False, colorbar=True, savefig=False,
