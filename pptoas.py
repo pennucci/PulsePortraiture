@@ -19,6 +19,41 @@ if DC_fact:
 else:
     rm_baseline = False
 
+class TOA:
+
+    """
+    TOA class bundles common TOA attributes together with useful functions.
+    """
+
+    def __init__(self, archive, frequency, MJD, TOA_error, telescope, DM=0.0,
+            DM_error=0.0, flags={}):
+        """
+        Form the TOA.
+        """
+        self.archive = archive
+        self.frequency = frequency
+        self.MJD = MJD
+        self.TOA_error = error
+        self.telescope = telescope
+        self.DM = DM
+        self.DM_err = self.DM_err
+        self.flags = flags
+        for flag in flags:
+            exec("self.%s = flag"%flag)
+    
+    def print_TOA(self, format="Tempo2"):
+        """
+        Print a formatted TOA to standard output.
+        """
+        write_TOAs(self, format=format, outfile=None)
+
+    def convert_TOA(self, new_frequency):
+        """
+        To do...
+        """
+        print "Convert TOA to new reference frequency, with new error, \
+                if covariance provided."
+
 class GetTOAs:
 
     """
@@ -653,10 +688,12 @@ if __name__ == "__main__":
     #                  help="Show this help message and exit.")
     parser.add_option("-d", "--datafiles",
                       action="store", metavar="archive", dest="datafiles",
-                      help="PSRCHIVE archive from which to measure TOAs/DMs, or a metafile listing archive filenames.  ***NB: Files should be NOT be dedispersed!***")
+                      help="PSRCHIVE archive from which to measure TOAs/DMs, or a metafile listing archive filenames.  \
+                              ***NB: Files should NOT be dedispersed!!*** \
+                              i.e. vap -c dmc <datafile> should return 0!")
     parser.add_option("-m", "--modelfile",
                       action="store", metavar="model", dest="modelfile",
-                      help="Model file from ppgauss.py, or PSRCHIVE FITS file that has same channel frequencies, nchan, nbin as datafile(s) (i.e. cannot be used with --uncommon).")
+                      help="Model file from ppgauss.py, or PSRCHIVE FITS file that has same channel frequencies, nchan, nbin as datafile(s).")
     parser.add_option("-o", "--outfile",
                       action="store", metavar="timfile", dest="outfile",
                       default=None,
