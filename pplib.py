@@ -1589,9 +1589,9 @@ def load_data(filename, dedisperse=False, dededisperse=False, tscrunch=False,
     #The channel center frequencies for the non-zapped subints
     freqsxs = [np.compress(weights_norm[isub], freqs) for isub in xrange(nsub)]
     SNRs = np.zeros([nsub, npol, nchan])
-    for sub in arch:
-        for ipol in range(npol):
-            for ichan in range(nchan):
+    for isub in xrange(nsub):
+        for ipol in xrange(npol):
+            for ichan in xrange(nchan):
                 SNRs[isub, ipol, ichan] = \
                         sub.get_Profile(ipol, ichan).snr()
     #The rest is now ignoring npol...
@@ -2156,6 +2156,8 @@ def write_TOAs(TOAs, format="tempo2", outfile=None, append=True):
     format is one of 'tempo2', ... others coming ...
     outfile is the output file name; if None, will print to standard output.
     append=False will overwrite a file with the same name as outfile.
+
+    NB: the DM uncertaintiy will be written out at 1000x its value.
     """
     if not hasattr(TOAs, "__len__"): toas = [TOAs]
     else: toas = TOAs
@@ -2165,14 +2167,21 @@ def write_TOAs(TOAs, format="tempo2", outfile=None, append=True):
         of = open(outfile, mode)
     for toa in toas:
         if format == "tempo2":
-            toa_string = "%s %.3f %d%.15f   %.3f  %s"%(toa.archive,
-                    toa.frequency, toa.MJD.intday(), toa.MJD.fracday(),
-                    toa.TOA_error, toa.telescope)
+            toa_string = "%s %.3f %d"%(toa.archive, toa.frequency,
+                    toa.MJD.intday()) + ("%.15f   %.3f  %s"%(toa.MJD.fracday(),
+                            toa.TOA_error, toa.telescope))[1:]
             if toa.DM is not None:
                 toa_string += " -dm %.7f"%toa.DM
                 toa_string += " -dmerr %.4f"%(1e3 * toa.DM_error)
-            for flag in toa.flags.keys():
-                exec("toa_string += ' -%s %s'"%(flag, str(toa.flags[flag])))
+            for flag,value in toa.flags.iteritems():
+                if hasattr(value, "lower"):
+                    exec("toa_string += ' -%s %s'"%(flag, value))
+                elif hasattr(value, "bit_length"):
+                    exec("toa_string += ' -%s %d'"%(flag, value))
+                elif flag == "pp_cov":
+                    exec("toa_string += ' -%s %.1e'"%(flag, toa.flags[flag]))
+                else:
+                    exec("toa_string += ' -%s %.3f'"%(flag, toa.flags[flag]))
             if outfile is not None:
                 toa_string += "\n"
                 of.write(toa_string)

@@ -15,5 +15,5 @@ examples/example.port
 examples/example.png
 examples/example.tim
 ppalign.py
-pplib_dist.py
+pplib_dist.py*
 MCtests/

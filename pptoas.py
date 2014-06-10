@@ -28,7 +28,7 @@ class TOA:
     def __init__(self, archive, frequency, MJD, TOA_error, telescope, DM=None,
             DM_error=None, flags={}):
         """
-        Form the TOA.
+        Form a TOA.
 
         archive is the string name of the TOA's archive.
         frequency is the reference frequency [MHz] of the TOA.
@@ -37,8 +37,8 @@ class TOA:
         telescope is the string designating the observatory.
         DM is the full DM [cm**-3 pc] associated with the TOA.
         DM_error is the DM uncertainty [cm**-3 pc].
-        flags is a dictionary of arbitrary TOA flags \
-                (eg. {'subint':0, 'be':'GUPPI'})
+        flags is a dictionary of arbitrary TOA flags
+            (eg. {'subint':0, 'be':'GUPPI'}).
         """
         self.archive = archive
         self.frequency = frequency
@@ -56,8 +56,8 @@ class TOA:
         Print a formatted TOA to standard output or to file.
 
         format is one of 'tempo2', ... others coming ...
-        outfile is the output file name; if None, will print to standard \
-                output.
+        outfile is the output file name; if None, will print to standard
+            output.
         """
         write_TOAs(self, format=format, outfile=outfile, append=True)
 
@@ -66,7 +66,7 @@ class TOA:
         To do...
         """
         print "Convert TOA to new reference frequency, with new error, \
-                if covariance provided."
+            if covariance provided."
 
 class GetTOAs:
 
@@ -159,7 +159,7 @@ class GetTOAs:
 
     def get_TOAs(self, datafile=None, nu_ref=None, DM0=None, bary_DM=True,
             fit_DM=True, bounds=[(None, None), (None, None)], nu_fit=None,
-            show_plot=False, quiet=False):
+            show_plot=False, addtnl_toa_flags={}, quiet=False):
         """
         Measure phases (TOAs) and dispersion measures (DMs).
 
@@ -171,8 +171,8 @@ class GetTOAs:
             stored in each datafile.
         bary_DM=True corrects the measured DMs based on the Doppler motion of
             the observatory with respect to the solar system barycenter.
-        fit_DM=False will fit only for a phase; if this is the case, set
-            bary_DM to False.
+        fit_DM=False will fit only for a phase; if this is the case, you might
+            want to set bary_DM to False.
         bounds is a list of two 2-tuples, giving the lower and upper bounds on
             the phase and dispersion measure, respectively.
         nu_fit is the reference frequency [MHz] used in the fit; defaults to
@@ -249,7 +249,6 @@ class GetTOAs:
             ok_isubs = map(int, np.compress(map(len,
                 np.array(subintsxs)[:,0]), np.arange(nsub)))
             for isubx in xrange(nsubx):
-                toa_flags = {}
                 isub = ok_isubs[isubx]
                 id = datafile + "_%d_%d"%(isub, isubx)
                 epoch = epochs[isub]
@@ -374,6 +373,7 @@ class GetTOAs:
                 scales[isubx] = results.all_scales
                 covariances[isubx] = results.covariance
                 red_chi2s[isubx] = results.red_chi2
+                toa_flags = {}
                 toa_flags['be'] = backend
                 toa_flags['fe'] = frontend
                 toa_flags['f'] = backend + "_" + frontend
@@ -386,10 +386,11 @@ class GetTOAs:
                 toa_flags['pp_gof'] = results.red_chi2
                 #toa_flags['pp_phs'] = results.phi
                 toa_flags['pp_snr'] = results.snr
-                #for k,v in addtl_toa_flags:
-                self.TOA_list += TOA(datafile, results.nu_ref, results.TOA,
-                        results.TOA_err, telescope, results.DM, results.DM_err,
-                        toa_flags)
+                for k,v in addtnl_toa_flags.iteritems():
+                    toa_flags[k] = v
+                self.TOA_list.append(TOA(datafile, results.nu_ref, results.TOA,
+                        results.TOA_err, telescope.lower(), results.DM,
+                        results.DM_err, toa_flags))
 #guppi_55543_J1600-3053_0009.8y.x.ff 1879.092 55543.620312807225702   1.635  gbt  -fe Rcvr1_2 -be GUPPI -f Rcvr1_2_GUPPI -bw 12.5 -tobs 918.51 -tmplt J1600-3053.Rcvr1_2.GUPPI.8y.x.sum.sm -gof 1.29 -nbin 2048 -nch 8 -chan 62 -subint 1 -snr 34.481 -wt 8037 -proc 8y -pta NANOGrav
 
             DeltaDMs = DMs - DM0
@@ -735,13 +736,17 @@ if __name__ == "__main__":
     parser.add_option("-f", "--format",
                       action="store", metavar="format", dest="format",
                       help="Format of output .tim file; either 'princeton' or 'tempo2'.  Default is tempo2 format.")
+    parser.add_option("--flags",
+                      action="store", metavar="flags", dest="toa_flags",
+                      default="",
+                      help="Pairs making up TOA flags to be written uniformly to all tempo2-formatted TOAs.  eg. ('pta','NANOGrav','version',0.1)")
     parser.add_option("--nu_ref",
                       action="store", metavar="nu_ref", dest="nu_ref",
                       default=None,
                       help="Frequency [MHz] to which the output TOAs are referenced, i.e. the frequency that has zero delay from a non-zero DM. 'inf' is used for inifite frequency.  [default=nu_zero (zero-covariance frequency, recommended)]")
     parser.add_option("--DM",
                       action="store", metavar="DM", dest="DM0", default=None,
-                      help="Nominal DM [cm**-3 pc] (float) from which to measure offset.  If unspecified, will use the DM stored in the archive.")
+                      help="Nominal DM [cm**-3 pc] (float) from which to measure offset in princeton-format NDDM output.  If unspecified, will use the DM stored in the archive.")
     parser.add_option("--no_bary_DM",
                       action="store_false", dest="bary_DM", default=True,
                       help='Do not Doppler-correct the fitted DM to make "barycentric DM".')
@@ -754,7 +759,7 @@ if __name__ == "__main__":
                       help="If specified, will write the fitted DM errors to errfile. Will append.")
     parser.add_option("--fix_DM",
                       action="store_false", dest="fit_DM", default=True,
-                      help="Do not fit for DM.  NB: you'll want to also use --no_bary_DM.")
+                      help="Do not fit for DM; you may also want to use --no_bary_DM.")
     parser.add_option("--common",
                       action="store_true", dest="common", default=False,
                       help="If supplying a metafile, use this flag if the data are homogenous (i.e. have the same nu0, bw, nchan, nbin).  Not recommended for use...")
@@ -788,6 +793,8 @@ if __name__ == "__main__":
     fit_DM = options.fit_DM
     outfile = options.outfile
     format = options.format
+    k,v = options.toa_flags.split(',')[::2],options.toa_flags.split(',')[1::2]
+    addtnl_toa_flags = dict(zip(k,v))
     errfile = options.errfile
     common = options.common
     showplot = options.showplot
@@ -796,9 +803,22 @@ if __name__ == "__main__":
     gt = GetTOAs(datafiles=datafiles, modelfile=modelfile, common=common,
             quiet=quiet)
     gt.get_TOAs(nu_ref=nu_ref, DM0=DM0, bary_DM=bary_DM, fit_DM=fit_DM,
-            show_plot=showplot, quiet=quiet)
+            show_plot=showplot, addtnl_toa_flags=addtnl_toa_flags, quiet=quiet)
     if format == "princeton":
         gt.write_princeton_TOAs(outfile=outfile, one_DM=one_DM,
             dmerrfile=errfile)
     else:
-        write_TOAs(gt.TOA_list, format="tempo2", outfile=outfile, append=True)
+        if one_DM:
+            gt.TOA_one_DM_list = [toa for toa in gt.TOA_list]
+            for toa in gt.TOA_one_DM_list:
+                ifile = gt.datafiles.index(toa.archive)
+                DDM = gt.DeltaDM_means[ifile]
+                DDM_err = gt.DeltaDM_errs[ifile]
+                toa.DM = DDM + gt.DM0s[ifile]
+                toa.DM_error = DDM_err
+                toa.flags['DM_mean'] = True
+            write_TOAs(gt.TOA_one_DM_list, format="tempo2", outfile=outfile,
+                    append=True)
+        else:
+            write_TOAs(gt.TOA_list, format="tempo2", outfile=outfile,
+                    append=True)
