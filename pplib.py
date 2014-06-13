@@ -984,9 +984,10 @@ def fit_gaussian_portrait(data, init_params, errs, fit_flags, phases, freqs,
         print "lmfit status:", results.message
         print "gaussians:", ngauss
         print "DOF:", dof
-        print "reduced chi-sq: %.2f" %red_chi2
+        print "reduced chi-sq: %.2g" %red_chi2
         print "residuals mean: %.3g" %np.mean(residuals)
         print "residuals stdev: %.3g" %np.std(residuals)
+        print "data stdev: %.3g" %get_noise(data)
         print "---------------------------------------------------------------"
     results = DataBunch(fitted_params=fitted_params, fit_errs=fit_errs,
             chi2=chi2, dof=dof)
@@ -1091,16 +1092,15 @@ def fit_portrait(data, model, init_params, P, freqs, nu_fit=None, nu_out=None,
     if not quiet and results.success is not True:
         if id is not None:
             ii = id[::-1].index("_")
-            isubx = id[-ii:]
-            ii += 1
-            jj = ii + id[:-ii][::-1].index("_")
-            isub = id[-jj:-ii]
-            filename = id[:-jj-1]
+            isub = id[-ii:]
+            filename = id[:-ii-1]
             sys.stderr.write(
-                    "Fit failed with return code %d -- %s; %s subint %s subintx %s\n"%(results.status, rcstring, filename, isub, isubx))
+                    "Fit failed with return code %d: %s -- %s subint %s\n"%(
+                        results.status, rcstring, filename, isub))
         else:
             sys.stderr.write(
-                    "Fit failed with return code %d -- %s"%(results.status, rcstring))
+                    "Fit failed with return code %d -- %s"%(results.status,
+                        rcstring))
     if not quiet and results.success is True and 0:
         sys.stderr.write("Fit succeeded with return code %d -- %s\n"
                 %(results.status, rcstring))
@@ -1525,6 +1525,7 @@ def load_data(filename, dedisperse=False, dededisperse=False, tscrunch=False,
         asite = '?'
     frontend = arch.get_receiver_name()
     backend = arch.get_backend_name()
+    backend_delay = arch.get_backend_delay()
     #De/dedisperse?
     if dedisperse: arch.dedisperse()
     if dededisperse: arch.dededisperse()
@@ -1565,8 +1566,7 @@ def load_data(filename, dedisperse=False, dededisperse=False, tscrunch=False,
     #Get data
     #PSRCHIVE indices [subint:pol:chan:bin]
     subints = arch.get_data()
-    Ps = np.array([arch.get_Integration(isub).get_folding_period() for isub in
-        xrange(nsub)],dtype=np.double)
+    Ps = np.array([sub.get_folding_period() for sub in arch], dtype=np.double)
     epochs = [sub.get_epoch() for sub in arch]
     subtimes = [sub.get_duration() for sub in arch]
     #Get weights
@@ -1575,11 +1575,9 @@ def load_data(filename, dedisperse=False, dededisperse=False, tscrunch=False,
             np.ones(weights.shape))
     #Get off-pulse noise
     noise_stds = np.array([sub.baseline_stats()[1]**0.5 for sub in arch])
-#If weights are not set...?
-#    weights = np.where(noise_stds[0],weights,0)
-#    weights_norm = np.where(noise_stds[0],weights_norm,0)
-    okisub = np.compress(weights_norm.mean(axis=1), np.arange(nsub))
-    okichan = np.compress(weights_norm.mean(axis=0), np.arange(nchan))
+    ok_isubs = np.compress(weights_norm.mean(axis=1), range(nsub))
+    ok_ichans = [np.compress(weights_norm[isub], range(nchan)) \
+            for isub in xrange(nsub)]
     #np.einsum is AWESOME
     masks = np.einsum('ij,k', weights_norm, np.ones(nbin))
     masks = np.einsum('j,ikl', np.ones(npol), masks)
@@ -1613,11 +1611,9 @@ def load_data(filename, dedisperse=False, dededisperse=False, tscrunch=False,
     prof = arch.get_data()[0,0,0]
     prof_noise = arch.get_Integration(0).baseline_stats()[1][0,0]**0.5
     prof_SNR = arch.get_Integration(0).get_Profile(0,0).snr()
-    #Number unzapped channels, subints
-    nchanx = int(round(np.mean([subintsxs[isub].shape[1] for isub in
-        xrange(nsub)])))
-    nsubx = int(np.compress([subintsxs[isub].shape[1] for isub in
-        xrange(nsub)], np.ones(nsub)).sum())
+    #Number unzapped channels (mean), subints
+    nchanx = np.array(map(len, ok_ichans)).mean()
+    nsubx = len(ok_isubs)
     if not quiet:
         P = arch.get_Integration(0).get_folding_period()*1000.0
         print "\tP [ms]             = %.3f\n\
@@ -1636,15 +1632,16 @@ def load_data(filename, dedisperse=False, dededisperse=False, tscrunch=False,
     if refresh_arch: arch.refresh()
     if not return_arch: arch = None
     #Return getitem/attribute-accessible class!
-    data = DataBunch(arch=arch, backend=backend, bw=bw, DM=DM, epochs=epochs,
-            filename=filename, flux_prof=flux_prof, flux_profx=flux_profx,
-            freqs=freqs, freqsxs=freqsxs, frontend=frontend, masks=masks,
-            nbin=nbin, nchan=nchan, nchanx=nchanx, noise_stds=noise_stds,
-            nsub=nsub, nsubx=nsubx, nu0=nu0, okichan=okichan, okisub=okisub,
-            phases=phases, prof=prof, prof_noise=prof_noise, prof_SNR=prof_SNR,
-            Ps=Ps, SNRs=SNRs, source=source, state=state, subints=subints,
-            subintsxs=subintsxs, subtimes=subtimes, telescope=telescope,
-            tempo_code=tempo_code, weights=weights)
+    data = DataBunch(arch=arch, backend=backend, backend_delay=backend_delay,
+            bw=bw, DM=DM, epochs=epochs, filename=filename,
+            flux_prof=flux_prof, flux_profx=flux_profx, freqs=freqs,
+            freqsxs=freqsxs, frontend=frontend, masks=masks, nbin=nbin,
+            nchan=nchan, noise_stds=noise_stds, nsub=nsub, nu0=nu0,
+            ok_ichans=ok_ichans, ok_isubs=ok_isubs, phases=phases, prof=prof,
+            prof_noise=prof_noise, prof_SNR=prof_SNR, Ps=Ps, SNRs=SNRs,
+            source=source, state=state, subints=subints, subintsxs=subintsxs,
+            subtimes=subtimes, telescope=telescope, tempo_code=tempo_code,
+            weights=weights)
     return data
 
 def unpack_dict(data):
@@ -2156,9 +2153,10 @@ def write_TOAs(TOAs, format="tempo2", outfile=None, append=True):
     format is one of 'tempo2', ... others coming ...
     outfile is the output file name; if None, will print to standard output.
     append=False will overwrite a file with the same name as outfile.
-
-    NB: the DM uncertaintiy will be written out at 1000x its value.
     """
+    if format != "tempo2":
+        print "Only tempo2-formatted TOAs are provided for now..."
+        return 0
     if not hasattr(TOAs, "__len__"): toas = [TOAs]
     else: toas = TOAs
     if outfile is not None:
@@ -2172,7 +2170,8 @@ def write_TOAs(TOAs, format="tempo2", outfile=None, append=True):
                             toa.TOA_error, toa.telescope))[1:]
             if toa.DM is not None:
                 toa_string += " -dm %.7f"%toa.DM
-                toa_string += " -dmerr %.4f"%(1e3 * toa.DM_error)
+            if toa.DM_error is not None:
+                toa_string += " -dme %.4f"%toa.DM_error
             for flag,value in toa.flags.iteritems():
                 if hasattr(value, "lower"):
                     exec("toa_string += ' -%s %s'"%(flag, value))

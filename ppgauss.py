@@ -73,7 +73,7 @@ class DataPortrait:
                         flux_prof=True, norm_weights=True, return_arch=True,
                         quiet=quiet)
                 self.nchan += data.nchan
-                self.nchanx += data.nchanx
+                self.nchanx += len(data.ok_ichans[0])
                 if ifile == 0:
                     self.join_nchans.append(self.nchan)
                     self.join_nchanxs.append(self.nchanx)
@@ -109,9 +109,10 @@ class DataPortrait:
                 self.flux_prof.extend(data.flux_prof)
                 self.flux_profx.extend(data.flux_profx)
                 self.noise_stds.extend(data.noise_stds[0,0])
-                self.noise_stdsxs.extend(data.noise_stds[0,0][data.okichan])
+                self.noise_stdsxs.extend(
+                        data.noise_stds[0,0][data.ok_ichans[0]])
                 self.SNRs.extend(data.SNRs[0,0])
-                self.SNRsxs.extend(data.SNRs[0,0][data.okichan])
+                self.SNRsxs.extend(data.SNRs[0,0][data.ok_ichans[0]])
             self.Ps /= len(self.datafiles)
             self.Ps = [self.Ps] #This line is a toy
             self.bw = self.hifreq - self.lofreq
@@ -164,8 +165,8 @@ class DataPortrait:
             if self.source is None: self.source = "noname"
             self.port = (self.masks * self.subints)[0,0]
             self.portx = self.subintsxs[0][0]
-            self.noise_stdsxs = self.noise_stds[0,0,self.okichan]
-            self.SNRsxs = self.SNRs[0,0,self.okichan]
+            self.noise_stdsxs = self.noise_stds[0,0,self.ok_ichans[0]]
+            self.SNRsxs = self.SNRs[0,0,self.ok_ichans[0]]
 
     def fit_profile(self, profile, tau=0.0, fixscat=True, auto_gauss=0.0,
             show=True):
@@ -427,7 +428,7 @@ class DataPortrait:
                 self.phierr = 0.0
                 self.DM = 1.0
                 self.DMerr = 0.0
-                self.red_chi2 = 0.0
+                self.red_chi2 = fgp.chi2 / fgp.dof
                 #This function is a hack for now.
                 self.write_join_parameters()
             else:
