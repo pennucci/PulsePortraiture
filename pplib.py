@@ -2169,9 +2169,9 @@ def write_TOAs(TOAs, format="tempo2", outfile=None, append=True):
                     toa.MJD.intday()) + ("%.15f   %.3f  %s"%(toa.MJD.fracday(),
                             toa.TOA_error, toa.telescope))[1:]
             if toa.DM is not None:
-                toa_string += " -dm %.7f"%toa.DM
+                toa_string += " -pp_dm %.7f"%toa.DM
             if toa.DM_error is not None:
-                toa_string += " -dme %.4f"%toa.DM_error
+                toa_string += " -pp_dme %.7f"%toa.DM_error
             for flag,value in toa.flags.iteritems():
                 if hasattr(value, "lower"):
                     exec("toa_string += ' -%s %s'"%(flag, value))

@@ -218,20 +218,26 @@ class DataPortrait:
                     fp.amp_err, self.nu0)
             print "alpha = %.3f +/- %.3f"%(fp.alpha, fp.alpha_err)
         if plot:
-            if fit: plt.subplot(211)
-            else: plt.subplot(111)
-            plt.xlabel("Frequency [MHz]")
-            plt.ylabel("Flux Units")
-            plt.title("Average Flux Profile for %s"%self.source)
-            if fit:
-                plt.plot(self.freqs, powlaw(self.freqs, self.nu0,
-                    fp.amp, fp.alpha), 'k-')
-                plt.plot(self.freqsxs[0], self.flux_profx, 'r+')
-                plt.subplot(212)
-                plt.xlabel("Frequency [MHz]")
-                plt.ylabel("Flux Units")
-                plt.title("Residuals")
-                plt.plot(self.freqsxs[0], fp.residuals, 'r+')
+            ax1 = plt.subplot(211, position=(0.1,0.1,0.8,0.4))
+            ax2 = plt.subplot(212, position=(0.1,0.5,0.8,0.4))
+            ax1.plot(self.freqsxs[0], fp.residuals, 'r+')
+            ax2.plot(self.freqs, powlaw(self.freqs, self.nu0,
+                fp.amp, fp.alpha), 'k-')
+            ax2.plot(self.freqsxs[0], self.flux_profx, 'r+')
+            ax1.set_xlim(self.freqs.min(), self.freqs.max())
+            ax2.set_xlim(ax1.get_xlim())
+            ax2.set_xticklabels([])
+            ax1.set_yticks(ax1.get_yticks()[1:-1])
+            ax2.set_yticks(ax2.get_yticks()[1:-1])
+            ax2.text(0.05, 0.1, r"A$_{\nu_0}$ = %.2f $\pm$ %.2f"%(
+                fp.amp, fp.amp_err) + "\n" + r"$\alpha$ = %.2f $\pm$ %.2f"%(
+                    fp.alpha, fp.alpha_err), ha="left", va="bottom",
+                transform=ax2.transAxes)
+            ax1.text(0.05, 0.1, "Residuals",ha="left", va="bottom",
+                    transform=ax1.transAxes)
+            ax1.set_xlabel("Frequency [MHz]")
+            plt.text(0.05, 0.5, "Flux Units")
+            ax2.set_title("Average Flux Profile for %s"%self.source)
             plt.show()
         self.spect_A = fp.amp
         self.spect_A_err = fp.amp_err
