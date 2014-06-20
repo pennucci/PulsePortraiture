@@ -700,6 +700,10 @@ if __name__ == "__main__":
     parser.add_option("--one_DM",
                       action="store_true", dest="one_DM", default=False,
                       help="Returns single DM value in output .tim file for all subints in the epoch instead of a fitted DM per subint.")
+    parser.add_option("--snr_cut",
+                      metavar="SNR", action="store", dest="snr_cutoff",
+                      default=0.0,
+                      help="Set a SNR cutoff for TOAs written.")
     parser.add_option("--errfile",
                       action="store", metavar="errfile", dest="errfile",
                       default=None,
@@ -739,6 +743,7 @@ if __name__ == "__main__":
     format = options.format
     k,v = options.toa_flags.split(',')[::2],options.toa_flags.split(',')[1::2]
     addtnl_toa_flags = dict(zip(k,v))
+    snr_cutoff = float(options.snr_cutoff)
     errfile = options.errfile
     showplot = options.showplot
     quiet = options.quiet
@@ -759,8 +764,8 @@ if __name__ == "__main__":
                 toa.DM = DDM + gt.DM0s[ifile]
                 toa.DM_error = DDM_err
                 toa.flags['DM_mean'] = True
-            write_TOAs(gt.TOA_one_DM_list, format="tempo2", outfile=outfile,
-                    append=True)
+            write_TOAs(gt.TOA_one_DM_list, format="tempo2",
+                    SNR_cutoff=snr_cutoff, outfile=outfile, append=True)
         else:
-            write_TOAs(gt.TOA_list, format="tempo2", outfile=outfile,
-                    append=True)
+            write_TOAs(gt.TOA_list, format="tempo2", SNR_cutoff=snr_cutoff,
+                    outfile=outfile, append=True)

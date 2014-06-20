@@ -2035,6 +2035,24 @@ def make_fake_pulsar(modelfile, ephemeris, outfile="fake_pulsar.fits", nsub=1,
     arch.unload(outfile)
     if not quiet: print "\nUnloaded %s.\n"%outfile
 
+def filter_TOAs(TOAs, flag, cutoff, criterion=">=", pass_unflagged=False):
+    """
+    Filter TOAs based on a flag and cutoff value.
+
+    TOAs is a TOA list from pptoas.
+    flag is a string specifying what attribute of the toa is filtered.
+    cutoff is the cutoff value for the flag.
+    criterion is a string specifying the condition eg. '>', '<=', etc.
+    pass_unflagged=True will pass TOAs if they do not have the flag.
+    """
+    new_toas = []
+    for toa in TOAs:
+        if hasattr(toa, flag):
+            exec("if toa.%s %s cutoff: new_toas.append(toa)"%(flag, criterion))
+        else:
+            if pass_unflagged: new_toas.append(toa)
+    return new_toas
+
 def write_princeton_TOA(TOA_MJDi, TOA_MJDf, TOA_err, nu_ref, dDM, obs='@',
         name=' ' * 13):
     """
@@ -2071,12 +2089,15 @@ def write_princeton_TOA(TOA_MJDi, TOA_MJDf, TOA_err, nu_ref, dDM, obs='@',
     #else:
     #    print obs + " %13s %8.3f %s %8.3f"%(name, nu_ref, TOA, TOA_err)
 
-def write_TOAs(TOAs, format="tempo2", outfile=None, append=True):
+def write_TOAs(TOAs, format="tempo2", SNR_cutoff=0.0, outfile=None,
+        append=True):
     """
     Write formatted TOAs to file.
 
     TOAs is a single TOA of the TOA class from pptoas, or a list of them.
     format is one of 'tempo2', ... others coming ...
+    SNR_cutoff is a value specifying which TOAs are written based on the flag
+        pp_snr.
     outfile is the output file name; if None, will print to standard output.
     append=False will overwrite a file with the same name as outfile.
     """
@@ -2085,6 +2106,7 @@ def write_TOAs(TOAs, format="tempo2", outfile=None, append=True):
         return 0
     if not hasattr(TOAs, "__len__"): toas = [TOAs]
     else: toas = TOAs
+    toas = filter_TOAs(toas, "pp_snr", SNR_cutoff, ">=", pass_unflagged=False)
     if outfile is not None:
         if append: mode = 'a'
         else: mode = 'w'
