@@ -74,7 +74,7 @@ class GetTOAs:
     GetTOAs is a class with methods to measure TOAs and DMs from data.
     """
 
-    def __init__(self, datafiles, modelfile, common=False, quiet=False):
+    def __init__(self, datafiles, modelfile, quiet=False):
         """
         Unpack all of the data and set initial attributes.
 
@@ -84,8 +84,6 @@ class GetTOAs:
             gaussian model parameters.  modelfile can also be an arbitrary
             PSRCHIVE archive, although this feature is
             *not*quite*implemented*yet*.
-        common=True should only be used if all the archives in a specified
-            metafile have identical parameters (beta).
         quiet=True suppresses output.
         """
         if file_is_ASCII(datafiles):
@@ -96,7 +94,6 @@ class GetTOAs:
             self.datafiles = [datafiles]
         self.is_gauss_model = file_is_ASCII(modelfile)
         self.modelfile = modelfile
-        self.common = common
         self.obs = []
         self.nu0s = []
         self.nu_fits = []
@@ -125,36 +122,6 @@ class GetTOAs:
         self.quiet = quiet
         self.order = []
         self.TOA_list = []
-        if len(self.datafiles) == 1 or self.common is True:
-            data = load_data(self.datafiles[0], dedisperse=False,
-                    dededisperse=False, tscrunch=True, pscrunch=True,
-                    fscrunch=False, rm_baseline=rm_baseline, flux_prof=False,
-                    norm_weights=True, return_arch=False, quiet=True)
-            if self.is_gauss_model:
-                self.model_name, self.ngauss, self.model = read_model(
-                        self.modelfile, data.phases, data.freqs, data.Ps[0],
-                        self.quiet)
-            else:
-                self.model_data = load_data(self.modelfile, dedisperse=True,
-                        dededisperse=False, tscrunch=True, pscrunch=True,
-                        fscrunch=False, rm_baseline=rm_baseline,
-                        flux_prof=False, norm_weights=True, return_arch=False,
-                        quiet=True)
-                self.model_name = self.model_data.source
-                self.ngauss = 0
-                self.model_weights = self.model_data.weights[0]
-                self.model = self.model_data.subints[0,0]
-                #self.model = np.transpose(self.model_weights * np.transpose(
-                #    self.model_data.subints[0,0]))
-            self.source = data.source
-            self.nchan = data.nchan
-            self.nbin = data.nbin
-            self.nu0 = data.nu0
-            self.bw = data.bw
-            self.freqs = data.freqs
-            self.lofreq = self.freqs[0]-(self.bw/(2*self.nchan))
-            if self.source is None: self.source = "noname"
-            del(data)
 
     def get_TOAs(self, datafile=None, nu_ref=None, DM0=None, bary_DM=True,
             fit_DM=True, bounds=[(None, None), (None, None)], nu_fit=None,
@@ -197,7 +164,7 @@ class GetTOAs:
             data = load_data(datafile, dedisperse=False,
                     dededisperse=False, tscrunch=False, pscrunch=True,
                     fscrunch=False, rm_baseline=rm_baseline, flux_prof=False,
-                    norm_weights=True, return_arch=True, quiet=quiet)
+                    refresh_arch=True, return_arch=True, quiet=quiet)
             #Unpack the data dictionary into the local namespace; see load_data
             #for dictionary keys.
             for key in data.keys():
@@ -206,12 +173,6 @@ class GetTOAs:
             #Observation info
             obs = DataBunch(telescope=telescope, backend=backend,
                     frontend=frontend, tempo_code=tempo_code)
-            #Read model
-            if len(datafiles) !=1 and self.common is False:
-                self.model_name, self.ngauss, model = read_model(
-                        self.modelfile, phases, freqs, Ps.mean(), quiet=quiet)
-            else:
-                model = self.model
             nu_fits = np.zeros(nsub, dtype=np.float64)
             nu_refs = np.zeros(nsub, dtype=np.float64)
             phis = np.zeros(nsub, dtype=np.double)
@@ -248,17 +209,19 @@ class GetTOAs:
                 MJD = MJDs[isub]
                 P = Ps[isub]
                 if self.is_gauss_model:
-                    freqsx = freqsxs[isub]
-                    portx = subintsxs[isub][0]
-                    modelx = np.compress(weights[isub], model, axis=0)
-                    SNRsx = np.compress(weights[isub], SNRs[isub, 0])
-                    errs = np.compress(weights[isub], noise_stds[isub, 0] * \
-                            np.sqrt(nbin/2.0))
+                    #Read model
+                    self.model_name, self.ngauss, model = read_model(
+                            self.modelfile, phases, freqs[isub], Ps[isub],
+                            quiet=quiet)
+                    freqsx = freqs[isub,ok_ichans[isub]]
+                    portx = subints[isub,0,ok_ichans[isub]]
+                    modelx = model[ok_ichans[isub]]
+                    SNRsx = SNRs[isub,0,ok_ichans[isub]]
+                    errs = noise_stds[isub,0,ok_ichans[isub]] * \
+                            np.sqrt(nbin/2.0)
                 else:
-                    tot_weights = weights[isub] + self.model_weights
-                    freqsx = np.compress(tot_weights, freqs)
-                    portx = np.compress(tot_weights, subints[isub][0], axis=0)
-                    modelx = np.compress(tot_weights, model, axis=0)
+                    print "pptoas currently only takes gaussian models..."
+                    sys.exit()
                 #nu_fit is a guess at nu_zero, the zero-covariance frequency,
                 #which is calculated after. This attempts to minimize the
                 #number of function calls.  Lower frequencies mean more calls,
@@ -517,13 +480,14 @@ class GetTOAs:
             dmerrs.close()
         sys.stdout = sys.__stdout__
 
-    def show_subint(self, datafile=None, isub=0, quiet=False):
+    def show_subint(self, datafile=None, isub=0, rotate=0.0, quiet=False):
         """
         Plot a phase-frequency portrait of a subintegration.
 
         datafile is a single PSRCHIVE archive name; defaults to the first one
             listed in self.datafiles.
         isub is the index of the subintegration to be displayed.
+        rotate is a phase [rot] specifying the amount to rotate the portrait.
         quiet=True suppresses output.
 
         To be improved.
@@ -536,21 +500,22 @@ class GetTOAs:
                 dededisperse=False, tscrunch=False,
                 #pscrunch=True, fscrunch=False, rm_baseline=rm_baseline,
                 pscrunch=True, fscrunch=False, rm_baseline=True,
-                flux_prof=False, norm_weights=True, return_arch=False,
+                flux_prof=False, refresh_arch=False, return_arch=False,
                 quiet=quiet)
         title = "%s ; subint %d"%(datafile, isub)
-        port = np.transpose(data.weights[isub] * np.transpose(
-            data.subints[isub,0]))
-        show_portrait(port=port, phases=data.phases, freqs=data.freqs,
+        port = data.masks[isub,0] * data.subints[isub,0]
+        if rotate: port = rotate_data(port, rotate)
+        show_portrait(port=port, phases=data.phases, freqs=data.freqs[isub],
                 title=title, prof=True, fluxprof=True, rvrsd=bool(data.bw < 0))
 
-    def show_fit(self, datafile=None, isub=0, quiet=False):
+    def show_fit(self, datafile=None, isub=0, rotate=0.0, quiet=False):
         """
         Plot the fit results from a subintegration.
 
         datafile is a single PSRCHIVE archive name; defaults to the first one
             listed in self.datafiles.
         isub is the index of the subintegration to be displayed.
+        rotate is a phase [rot] specifying the amount to rotate the portrait.
         quiet=True suppresses output.
 
         To be improved.
@@ -563,36 +528,36 @@ class GetTOAs:
                 dededisperse=False, tscrunch=False,
                 #pscrunch=True, fscrunch=False, rm_baseline=rm_baseline,
                 pscrunch=True, fscrunch=False, rm_baseline=True,
-                flux_prof=False, norm_weights=True, return_arch=False,
+                flux_prof=False, refresh_arch=False, return_arch=False,
                 quiet=quiet)
         phi = self.phis[ifile][isub]
         #Pre-corrected DM, if corrected
         DM_fitted = self.DMs[ifile][isub] / self.doppler_fs[ifile][isub]
         scales = self.scales[ifile][isub]
-        freqs = data.freqs
-        nu_fit = self.nu_fits[ifile][isub]
+        freqs = data.freqs[isub]
         nu_ref = self.nu_refs[ifile][isub]
         P = data.Ps[isub]
         phases = data.phases
-        weights = data.weights[isub]
         if not self.is_gauss_model:
-            weights += self.model_weights
-            model_name = self.model_name
-            model = np.transpose(weights * np.transpose(self.model))
+            print "pptoas currently only takes gaussian models..."
+            sys.exit()
         else:
             model_name, ngauss, model = read_model(self.modelfile, phases,
                     freqs, data.Ps.mean(), quiet=quiet)
                     #freqs, data.Ps[isub], quiet=quiet)
-        port = rotate_portrait(data.subints[isub,0], phi, DM_fitted, P, freqs,
+        port = rotate_data(data.subints[isub,0], phi, DM_fitted, P, freqs,
                 nu_ref)
-        port = np.transpose(weights * np.transpose(port))
+        if rotate:
+            model = rotate_data(model, rotate)
+            port = rotate_data(port, rotate)
+        port *= data.masks[isub,0]
         model_scaled = np.transpose(scales * np.transpose(model))
         titles = ("%s\nSubintegration %d"%(datafile, isub),
                 "Fitted Model %s"%(model_name), "Residuals")
         show_residual_plot(port=port, model=model_scaled, resids=None,
                 phases=phases, freqs=freqs, titles=titles,
                 rvrsd=bool(data.bw < 0))
-        return (port, model_scaled, weights, data.freqs,
+        return (port, model_scaled, data.ok_ichans[isub], freqs,
                 data.noise_stds[isub,0])
 
     def show_results(self, datafile=None):
@@ -742,9 +707,6 @@ if __name__ == "__main__":
     parser.add_option("--fix_DM",
                       action="store_false", dest="fit_DM", default=True,
                       help="Do not fit for DM; you may also want to use --no_bary_DM.")
-    parser.add_option("--common",
-                      action="store_true", dest="common", default=False,
-                      help="If supplying a metafile, use this flag if the data are homogenous (i.e. have the same nu0, bw, nchan, nbin).  Not recommended for use...")
     parser.add_option("--showplot",
                       action="store_true", dest="showplot", default=False,
                       help="Plot fit results for each epoch. Only useful if nsubint > 1.")
@@ -778,12 +740,10 @@ if __name__ == "__main__":
     k,v = options.toa_flags.split(',')[::2],options.toa_flags.split(',')[1::2]
     addtnl_toa_flags = dict(zip(k,v))
     errfile = options.errfile
-    common = options.common
     showplot = options.showplot
     quiet = options.quiet
 
-    gt = GetTOAs(datafiles=datafiles, modelfile=modelfile, common=common,
-            quiet=quiet)
+    gt = GetTOAs(datafiles=datafiles, modelfile=modelfile, quiet=quiet)
     gt.get_TOAs(nu_ref=nu_ref, DM0=DM0, bary_DM=bary_DM, fit_DM=fit_DM,
             show_plot=showplot, addtnl_toa_flags=addtnl_toa_flags, quiet=quiet)
     if format == "princeton":

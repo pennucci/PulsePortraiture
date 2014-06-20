@@ -48,14 +48,14 @@ for ifile in range(nfiles):
             obs="GBT", quiet=quiet)
     #NB: the input parfile cannot yet have binary parameters
 
+os.system('psredit -q -m -c rcvr:name="fake_rx" -c be:name="fake_be" example-*.fits')
 os.system("ls example-*.fits > example.meta")
 metafile = "example.meta"
-#If you wanted to add a bunch of datafiles together, you would make a metafile
-#containing the filenames, and feed it to quick_add_archs.  I recommend you 
-#use PSRCHIVE's psradd instead, or just a single long-integration observation.
+#If you wanted to add a bunch of datafiles together, you would use PSRCHIVE's
+#psradd to get a high SNR portrait.
 print "Adding data archives..."
 outfile = "example.port"
-quick_add_archs(metafile, outfile, quiet=False)
+os.system("psradd -T -P -M %s -o %s"%(metafile, outfile))
 
 #Now we want to "build" our gaussian model from the data
 print "Running ppgauss.py to fit a gaussian model..."
@@ -92,7 +92,7 @@ gt.show_results()
 #Show typical fit
 gt.show_fit()
 #Write TOAs
-gt.write_TOAs(outfile="example.tim")
+write_TOAs(gt.TOA_list, format="tempo2", outfile="example.tim", append=False)
 #See fitted versus injected DMs
 #print ""
 #print "Injected DMs, mean, std:"

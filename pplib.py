@@ -757,7 +757,7 @@ def half_triangle_function(a, b, dc, N):
     fn[:a] += -(np.float64(b)/a)*np.arange(a) + b
     return fn
 
-def find_kc_function(params, data, errs):
+def find_kc_function(params, data, errs=1.0):
     """
     Return the (weighted) chi-squared statistic for a half-triangle model.
 
@@ -1497,7 +1497,7 @@ def calculate_TOA(epoch, P, phi, DM=0.0, nu_ref1=np.inf, nu_ref2=np.inf):
 
 def load_data(filename, dedisperse=False, dededisperse=False, tscrunch=False,
         pscrunch=False, fscrunch=False, rm_baseline=True, flux_prof=False,
-        norm_weights=True, refresh_arch=True, return_arch=True, quiet=False):
+        refresh_arch=True, return_arch=True, quiet=False):
     """
     Load data from a PSRCHIVE archive.
 
@@ -1507,7 +1507,6 @@ def load_data(filename, dedisperse=False, dededisperse=False, tscrunch=False,
     Most of the options should be self-evident; archives are manipulated by
         PSRCHIVE only.
     flux_prof=True will include an array with the phase-averaged flux profile.
-    norm_weights=True returns all channel weights as either 1 or 0.
     refresh_arch=True refreshes the returned archive to its original state.
     return_arch=False will not return the archive, which may be smart at times.
     quiet=True suppresses output.
@@ -1548,16 +1547,8 @@ def load_data(filename, dedisperse=False, dededisperse=False, tscrunch=False,
     bw = arch.get_bandwidth()
     nchan = arch.get_nchan()
     #Centers of frequency channels
-    freqs = np.array([arch.get_Integration(0).get_centre_frequency(ichan) for
-        ichan in xrange(nchan)])
-    #Again, for the negative BW cases.  Good fix?
-    #freqs.sort()
-    #By-hand frequency calculation, equivalent to above from PSRCHIVE for
-    #native resolution
-    #chanwidth = bw / nchan
-    #lofreq = nu0 - (bw/2)
-    #freqs = np.linspace(lofreq + (chanwidth/2.0), lofreq + bw -
-    #        (chanwidth/2.0), nchan)
+    freqs = np.array([[sub.get_centre_frequency(ichan) for ichan in \
+            xrange(nchan)] for sub in arch])
     nbin = arch.get_nbin()
     #Centers of phase bins
     phases = np.linspace(0.0 + (nbin*2)**-1, 1.0 - (nbin*2)**-1, nbin)
@@ -1575,23 +1566,19 @@ def load_data(filename, dedisperse=False, dededisperse=False, tscrunch=False,
             np.ones(weights.shape))
     #Get off-pulse noise
     noise_stds = np.array([sub.baseline_stats()[1]**0.5 for sub in arch])
-    ok_isubs = np.compress(weights_norm.mean(axis=1), range(nsub))
-    ok_ichans = [np.compress(weights_norm[isub], range(nchan)) \
+    ok_isubs = np.compress(weights_norm.mean(axis=1), xrange(nsub))
+    ok_ichans = [np.compress(weights_norm[isub], xrange(nchan)) \
             for isub in xrange(nsub)]
     #np.einsum is AWESOME
     masks = np.einsum('ij,k', weights_norm, np.ones(nbin))
     masks = np.einsum('j,ikl', np.ones(npol), masks)
-    #These are the data free of zapped channels and subints
-    subintsxs = [np.compress(weights_norm[isub], subints[isub], axis=1) for
-            isub in xrange(nsub)]
-    #The channel center frequencies for the non-zapped subints
-    freqsxs = [np.compress(weights_norm[isub], freqs) for isub in xrange(nsub)]
     SNRs = np.zeros([nsub, npol, nchan])
     for isub in xrange(nsub):
         for ipol in xrange(npol):
             for ichan in xrange(nchan):
                 SNRs[isub, ipol, ichan] = \
-                        sub.get_Profile(ipol, ichan).snr()
+                        arch.get_Integration(
+                                isub).get_Profile(ipol, ichan).snr()
     #The rest is now ignoring npol...
     arch.pscrunch()
     if flux_prof:
@@ -1600,11 +1587,8 @@ def load_data(filename, dedisperse=False, dededisperse=False, tscrunch=False,
         arch.dedisperse()
         arch.tscrunch()
         flux_prof = arch.get_data().mean(axis=3)[0][0]
-        #Non-zapped data
-        flux_profx = np.compress(arch.get_weights()[0], flux_prof)
     else:
         flux_prof = np.array([])
-        flux_profx = np.array([])
     #Get pulse profile
     arch.tscrunch()
     arch.fscrunch()
@@ -1627,21 +1611,17 @@ def load_data(filename, dedisperse=False, dededisperse=False, tscrunch=False,
         # unzapped subint  = %d\n\
         pol'n state        = %s\n"%(P, DM, nu0, abs(bw), nbin, nchan, nchanx,
                 nsub, nsubx, state)
-    if norm_weights:
-        weights = weights_norm
     if refresh_arch: arch.refresh()
     if not return_arch: arch = None
     #Return getitem/attribute-accessible class!
     data = DataBunch(arch=arch, backend=backend, backend_delay=backend_delay,
             bw=bw, DM=DM, epochs=epochs, filename=filename,
-            flux_prof=flux_prof, flux_profx=flux_profx, freqs=freqs,
-            freqsxs=freqsxs, frontend=frontend, masks=masks, nbin=nbin,
-            nchan=nchan, noise_stds=noise_stds, nsub=nsub, nu0=nu0,
+            flux_prof=flux_prof, freqs=freqs, frontend=frontend, masks=masks,
+            nbin=nbin, nchan=nchan, noise_stds=noise_stds, nsub=nsub, nu0=nu0,
             ok_ichans=ok_ichans, ok_isubs=ok_isubs, phases=phases, prof=prof,
             prof_noise=prof_noise, prof_SNR=prof_SNR, Ps=Ps, SNRs=SNRs,
-            source=source, state=state, subints=subints, subintsxs=subintsxs,
-            subtimes=subtimes, telescope=telescope, tempo_code=tempo_code,
-            weights=weights)
+            source=source, state=state, subints=subints, subtimes=subtimes,
+            telescope=telescope, tempo_code=tempo_code, weights=weights)
     return data
 
 def unpack_dict(data):
@@ -2054,60 +2034,6 @@ def make_fake_pulsar(modelfile, ephemeris, outfile="fake_pulsar.fits", nsub=1,
     if dedispersed: arch.dedisperse()
     arch.unload(outfile)
     if not quiet: print "\nUnloaded %s.\n"%outfile
-
-def quick_add_archs(metafile, outfile, rotate=False, fiducial=0.5,
-        quiet=False):
-    """
-    Incoherently add data from a list of archives together.
-
-    Not intended for serious use; defer to psradd.
-
-    metafile is a list of PSRCHIVE archives.
-    outfile is the output archive file name.
-    rotate=True will rotate the output archive so that the maximum of the
-        average profile is at the fiducial phase.
-    fiducial specifies the fiducial phase in the case rotate=True.
-    quiet=True suppresses output.
-    """
-    from os import system
-    datafiles = open(metafile, "r").readlines()
-    datafiles = [datafiles[ifile][:-1] for ifile in xrange(len(datafiles))]
-    for ifile in xrange(len(datafiles)):
-        datafile = datafiles[ifile]
-        data = load_data(datafile, dedisperse=True, dededisperse=False,
-                tscrunch=True, pscrunch=True, fscrunch=False, rm_baseline=True,
-                flux_prof=False, norm_weights=True, return_arch=True,
-                quiet=True)
-        if ifile == 0:
-            nchan = data.nchan
-            nbin = data.nbin
-            cmd = "cp %s %s"%(datafile, outfile)
-            system(cmd)
-            arch = pr.Archive_load(outfile)
-            arch.set_dispersion_measure(0.0)
-            arch.tscrunch()
-            arch.pscrunch()
-            totport = np.zeros([nchan, nbin])
-            totweights = np.zeros(nchan)
-        if rotate:
-            maxbin = data.prof.argmax()
-            rotport = rotate_portrait(data.subints[0,0],
-                    maxbin/np.float64(nbin) - fiducial)
-        else:
-            rotport = data.subints[0,0]
-        totport += rotport
-        #The below assumes equal weight to all files!
-        totweights += data.weights[0]
-        if not quiet: print "Added %s"%datafile
-    totweights = np.where(totweights==0, 1, totweights)
-    totport = np.transpose((totweights**-1) * np.transpose(totport))
-    I = arch.get_Integration(0)
-    for ichan in xrange(nchan):
-        prof = I.get_Profile(0,ichan)
-        prof.get_amps()[:] = totport[ichan]
-    arch.dedisperse()
-    arch.unload()
-    print "\nUnloaded %s"%outfile
 
 def write_princeton_TOA(TOA_MJDi, TOA_MJDf, TOA_err, nu_ref, dDM, obs='@',
         name=' ' * 13):

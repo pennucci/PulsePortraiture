@@ -65,13 +65,12 @@ class DataPortrait:
             self.noise_stdsxs = []
             self.SNRs = []
             self.SNRsxs = []
-            self.weights = []
+            self.masks = []
             for ifile in range(len(self.datafiles)):
                 datafile = self.datafiles[ifile]
                 data = load_data(datafile, dedisperse=True, tscrunch=True,
                         pscrunch=True, fscrunch=False, rm_baseline=True,
-                        flux_prof=True, norm_weights=True, return_arch=True,
-                        quiet=quiet)
+                        flux_prof=True, return_arch=True, quiet=quiet)
                 self.nchan += data.nchan
                 self.nchanx += len(data.ok_ichans[0])
                 if ifile == 0:
@@ -101,13 +100,13 @@ class DataPortrait:
                 hf = data.freqs.max() + (abs(data.bw) / (2*data.nchan))
                 if hf > self.hifreq:
                     self.hifreq = hf
-                self.freqs.extend(data.freqs)
-                self.freqsxs.extend(data.freqsxs[0])
-                self.weights.extend(data.weights[0])
-                self.port.extend(data.subints[0,0])
-                self.portx.extend(data.subintsxs[0][0])
+                self.freqs.extend(data.freqs[0])
+                self.freqsxs.extend(data.freqs[0,data.ok_ichans[0]])
+                self.masks.extend(data.masks[0,0])
+                self.port.extend(data.subints[0,0] * data.masks[0,0])
+                self.portx.extend(data.subints[0,0,data.ok_ichans[0]])
                 self.flux_prof.extend(data.flux_prof)
-                self.flux_profx.extend(data.flux_profx)
+                self.flux_profx.extend(data.flux_prof[data.ok_ichans[0]])
                 self.noise_stds.extend(data.noise_stds[0,0])
                 self.noise_stdsxs.extend(
                         data.noise_stds[0,0][data.ok_ichans[0]])
@@ -130,24 +129,25 @@ class DataPortrait:
                     self.join_nchanxs[ijoin])[0], np.where(self.isortx <
                         self.join_nchanxs[ijoin+1])[0])
                 self.join_ichanxs.append(join_ichanxs)
-            self.weights = np.array(self.weights)[self.isort]
-            self.weights = [self.weights]
+            self.masks = np.array(self.masks)[self.isort]
+            self.masks = np.array([[self.masks]])
             self.port = np.array(self.port)[self.isort]
             self.portx = np.array(self.portx)[self.isortx]
             self.flux_prof = np.array(self.flux_prof)[self.isort]
             self.flux_profx = np.array(self.flux_profx)[self.isortx]
             self.noise_stds = np.array(self.noise_stds)[self.isort]
+            self.noise_stds = np.array([[self.noise_stds]]) #For consistency
             self.noise_stdsxs = np.array(self.noise_stdsxs)[self.isortx]
             self.SNRs = np.array(self.SNRs)[self.isort]
             self.SNRsxs = np.array(self.SNRsxs)[self.isortx]
             self.freqs.sort()
             self.freqsxs.sort()
+            self.freqs = np.array([self.freqs])
             self.freqsxs = [self.freqsxs]
             self.join_params = np.array(self.join_params)
             self.join_fit_flags = np.array(self.join_fit_flags)
             self.all_join_params = [self.join_ichanxs, self.join_params,
                     self.join_fit_flags]
-            self.show_data_portrait()
         else:
             self.njoin = 0
             self.join_params = []
@@ -157,16 +157,29 @@ class DataPortrait:
             self.data = load_data(datafile, dedisperse=True,
                     dededisperse=False, tscrunch=True, pscrunch=True,
                     fscrunch=False, rm_baseline=True, flux_prof=True,
-                    norm_weights=True, return_arch=True, quiet=quiet)
+                    return_arch=True, quiet=quiet)
             #Unpack the data dictionary into the local namespace;
             #see load_data for dictionary keys.
             for key in self.data.keys():
                 exec("self." + key + " = self.data['" + key + "']")
             if self.source is None: self.source = "noname"
             self.port = (self.masks * self.subints)[0,0]
-            self.portx = self.subintsxs[0][0]
+            self.portx = self.port[self.ok_ichans[0]]
+            self.freqsxs = [self.freqs[0,self.ok_ichans[0]]]
             self.noise_stdsxs = self.noise_stds[0,0,self.ok_ichans[0]]
             self.SNRsxs = self.SNRs[0,0,self.ok_ichans[0]]
+
+    def normalize_portrait(self):
+        """
+        Normalize each profile by its maximum.
+        """
+        for ichan in range(len(self.port)):
+            if self.port[ichan].sum() != 0.0:
+                self.port[ichan] /= self.port[ichan].max()
+                self.noise_stds[0,0,ichan] = get_noise(self.port[ichan])
+        for ichan in range(len(self.portx)):
+            self.portx[ichan] /= self.portx[ichan].max()
+            self.noise_stdsxs[ichan] = get_noise(self.portx[ichan])
 
     def fit_profile(self, profile, tau=0.0, fixscat=True, auto_gauss=0.0,
             show=True):
@@ -221,10 +234,10 @@ class DataPortrait:
             ax1 = plt.subplot(211, position=(0.1,0.1,0.8,0.4))
             ax2 = plt.subplot(212, position=(0.1,0.5,0.8,0.4))
             ax1.plot(self.freqsxs[0], fp.residuals, 'r+')
-            ax2.plot(self.freqs, powlaw(self.freqs, self.nu0,
+            ax2.plot(self.freqs[0], powlaw(self.freqs[0], self.nu0,
                 fp.amp, fp.alpha), 'k-')
             ax2.plot(self.freqsxs[0], self.flux_profx, 'r+')
-            ax1.set_xlim(self.freqs.min(), self.freqs.max())
+            ax1.set_xlim(self.freqs[0].min(), self.freqs[0].max())
             ax2.set_xlim(ax1.get_xlim())
             ax2.set_xticklabels([])
             ax1.set_yticks(ax1.get_yticks()[1:-1])
@@ -300,8 +313,9 @@ class DataPortrait:
                 if self.nu_ref is None: self.nu_ref = self.nu0
                 if self.bw_ref is None: self.bw_ref = abs(self.bw)
                 okinds = np.compress(np.less(self.nu_ref - (self.bw_ref/2),
-                    self.freqs) * np.greater(self.nu_ref + (self.bw_ref/2),
-                    self.freqs) * self.weights[0], np.arange(self.nchan))
+                    self.freqs[0]) * np.greater(self.nu_ref + (self.bw_ref/2),
+                    self.freqs[0]) * self.masks[0,0].mean(axis=1),
+                    np.arange(self.nchan))
                 #The below profile average gives a slightly different set of
                 #values for the profile than self.profile, if given the full
                 #band and center frequency.  Unsure why; shouldn't matter.
@@ -362,7 +376,7 @@ class DataPortrait:
                         print "\nRotating data portrait for iteration %d."%(
                                 self.itern - self.niter + 1)
                     self.port = rotate_portrait(self.port, self.phi, self.DM,
-                            self.Ps[0], self.freqs, self.nu_fit)
+                            self.Ps[0], self.freqs[0], self.nu_fit)
                     self.portx = rotate_portrait(self.portx, self. phi,
                             self.DM, self.Ps[0], self.freqsxs[0], self.nu_fit)
                 else:
@@ -385,7 +399,7 @@ class DataPortrait:
                 self.port[jic] = rotate_data(self.port[jic],
                         -self.join_params[0::2][ii],
                         -self.join_params[1::2][ii], self.Ps[0],
-                        self.freqs[jic], self.nu_ref)
+                        self.freqs[0,jic], self.nu_ref)
                 jicx = self.join_ichanxs[ii]
                 self.portx[jicx] = rotate_data(self.port[jicx],
                         -self.join_params[0::2][ii],
@@ -394,10 +408,10 @@ class DataPortrait:
                 self.model[jic] = rotate_data(self.model[jic],
                         -self.join_params[0::2][ii],
                         -self.join_params[1::2][ii], self.Ps[0],
-                        self.freqs[jic], self.nu_ref)
-            self.model_masked = np.transpose(self.weights[0] *
-                    np.transpose(self.model))
-            self.modelx = np.compress(self.weights[0], self.model, axis=0)
+                        self.freqs[0,jic], self.nu_ref)
+            self.model_masked = self.model * self.masks[0,0]
+            self.modelx = np.compress(self.masks[0,0].mean(axis=1), self.model,
+                    axis=0)
         if not quiet:
             print "Residuals mean: %.2e"%(self.portx - self.modelx).mean()
             print "Residuals std:  %.2e"%(self.portx - self.modelx).std()
@@ -409,7 +423,8 @@ class DataPortrait:
             resids = self.port - self.model_masked
             titles = ("%s"%self.datafile, "%s"%self.model_name, "Residuals")
             show_residual_plot(self.port, self.model, resids, self.phases,
-                    self.freqs, titles, bool(self.bw < 0), savefig=residplot)
+                    self.freqs[0], titles, bool(self.bw < 0),
+                    savefig=residplot)
 
     def model_iteration(self, quiet=False):
         """
@@ -441,11 +456,11 @@ class DataPortrait:
                 self.model_params = self.fitted_params[:]
                 self.model_param_errs = self.fit_errs[:]
             self.model = gen_gaussian_portrait(self.fitted_params,
-                    self.phases, self.freqs, self.nu_ref,
+                    self.phases, self.freqs[0], self.nu_ref,
                     self.join_ichans, self.Ps[0])
-            self.model_masked = np.transpose(self.weights[0] *
-                    np.transpose(self.model))
-            self.modelx = np.compress(self.weights[0], self.model, axis=0)
+            self.model_masked = self.model * self.masks[0,0]
+            self.modelx = np.compress(self.masks[0,0].mean(axis=1), self.model,
+                    axis=0)
             if not self.njoin:
                 #Currently, fit_phase_shift returns an unbounded phase
                 phase_guess = fit_phase_shift(self.portx.mean(axis=0),
@@ -559,8 +574,8 @@ class DataPortrait:
         See show_portrait(...)
         """
         title = "%s Portrait"%self.source
-        show_portrait(np.transpose(self.weights) * self.port, self.phases,
-                self.freqs, title, True, True, bool(self.bw < 0))
+        show_portrait(self.port * self.masks[0,0], self.phases, self.freqs[0],
+                title, True, True, bool(self.bw < 0))
 
     def show_model_fit(self):
         """
@@ -571,7 +586,7 @@ class DataPortrait:
         resids = self.port - self.model_masked
         titles = ("%s"%self.datafile, "%s"%self.model_name, "Residuals")
         show_residual_plot(self.port, self.model, resids, self.phases,
-                self.freqs, titles, bool(self.bw < 0))
+                self.freqs[0], titles, bool(self.bw < 0))
 
 class GaussianSelector:
     """
@@ -896,6 +911,9 @@ if __name__ == "__main__":
                       action="store", metavar="wid", dest="auto_gauss",
                       default=0.0,
                       help="Automatically fit one gaussian to initial profile with initial width [rot] given as the argument.")
+    parser.add_option("--norm", metavar="normalize",
+                      action="store_true", dest="normalize", default=False,
+                      help="Normalize each channel's profile by its maximum.")
     parser.add_option("--figure", metavar="figurename",
                       action="store", dest="figure", default=False,
                       help="Save PNG figure of final fit to figurename. [default=Not saved]")
@@ -929,10 +947,13 @@ if __name__ == "__main__":
     niter = int(options.niter)
     fgauss = options.fgauss
     auto_gauss = float(options.auto_gauss)
+    normalize = options.normalize
     figure = options.figure
     quiet = options.quiet
 
     dp = DataPortrait(datafile=datafile, quiet=quiet)
+    if normalize: dp.normalize_portrait()
+    if not quiet: dp.show_data_portrait()
     tau *= dp.nbin / dp.Ps[0]
     dp.make_gaussian_model(modelfile = None,
             ref_prof=(nu_ref, bw_ref), tau=tau, fixloc=fixloc, fixwid=fixwid,
