@@ -146,6 +146,8 @@ class GetTOAs:
             ratios.
         show_plot=True will show a plot at the end of the fitting; it is only
             useful if the number of subintegrations in a datafile > 1.
+        addtnl_toa_flags are pairs making up TOA flags to be written uniformly
+            to all tempo2-formatted TOAs.  eg. ('pta','NANOGrav','version',0.1)
         quiet=True suppresses output.
         """
         self.nu_ref = nu_ref
