@@ -324,7 +324,7 @@ class GetTOAs:
                 toa_flags = {}
                 toa_flags['be'] = backend
                 toa_flags['fe'] = frontend
-                toa_flags['f'] = backend + "_" + frontend
+                toa_flags['f'] = frontend + "_" + backend
                 toa_flags['nbin'] = nbin
                 toa_flags['nch'] = nchan
                 toa_flags['subint'] = isub
