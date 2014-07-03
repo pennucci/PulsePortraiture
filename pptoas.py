@@ -456,7 +456,7 @@ class GetTOAs:
                     TOAs[isub] = calculate_TOA(epochs[isub], Ps[isub],
                             phis[isub], DMs_fitted[isub],
                             self.nu_refs[ifile][isub], nu_refs[isub])
-            obs_code = self.obs[ifile].tempo_code
+            obs_code = obs_codes[self.obs[ifile].telescope.lower()]
             #Currently writes topocentric frequencies
             for isub in ok_isubs:
                 TOA_MJDi = TOAs[isub].intday()

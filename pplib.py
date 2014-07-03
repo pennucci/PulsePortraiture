@@ -26,7 +26,7 @@ import psrchive as pr
 nodes = False   #Used for MC testing...
 if nodes:
     import matplotlib
-    matplotlib.use("Agg")
+    matplotlib.use('Agg')
 else:
     import matplotlib.pyplot as plt
     import matplotlib.gridspec as gs
@@ -50,7 +50,7 @@ scattering_alpha = -4.0
 #Default get_noise method (see functions get_noise_*).
 #However, PSRCHIVE's baseline_stats is used in most cases (see load_data). 
 #_To_be_improved_.
-default_noise_method = "PS"
+default_noise_method = 'PS'
 
 #Ignore DC component in Fourier fit if DC_fact == 0, else set DC_fact == 1.
 DC_fact = 0
@@ -71,11 +71,11 @@ PL_model = True
 #Decent monocolor: pink, gist_heat, copper, hot, gray, Blues_r
 #Decent multicolor: cubehelix, terrain, spectral, seismic
 #see plt.cm for list of available colormaps.
-default_colormap = "gist_heat"
+default_colormap = 'gist_heat'
 if hasattr(plt.cm, default_colormap):
-    plt.rc("image", cmap=default_colormap)
+    plt.rc('image', cmap=default_colormap)
 else:
-    plt.rc("image", cmap="pink")
+    plt.rc('image', cmap='pink')
 
 #List of colors; can do this better...
 cols = ['b', 'g', 'r', 'c', 'm', 'y', 'k', 'orange', 'brown', 'purple', 'pink',
@@ -87,24 +87,31 @@ cols = ['b', 'g', 'r', 'c', 'm', 'y', 'k', 'orange', 'brown', 'purple', 'pink',
 #misc#
 ######
 
-#List of observatory codes; not sure what "0" corresponds to.
-#These are used for TOA-writing, which may change soon...
-obs_codes = {"bary":"@", "???":"0", "gbt":"1", "atca":"2", "ao":"3",
-             "arecibo":"3", "nanshan":"5", "tid43":"6", "pks":"7", "jb":"8",
-             "vla":"c", "ncy":"f", "eff":"g", "jbdfb":"q", "wsrt":"i",
-             "lofar":"t"}
+#Dictionary of observatory codes; not sure what "0" corresponds to.
+#These are used for Princeton formatted TOAs, which may be incorrect...
+obs_codes = {'bary':'@', '???':'0', 'gbt':'1', 'atca':'2', 'ao':'3',
+             'arecibo':'3', 'nanshan':'5', 'tid43':'6', 'pks':'7', 'jb':'8',
+             'vla':'c', 'ncy':'f', 'eff':'g', 'jbdfb':'q', 'wsrt':'i',
+             'lofar':'t'}
+
+#Dictionary of two-character observatory codes recognized by tempo/2.
+#Taken and lowered from $TEMPO/obsys.dat
+tempo_codes = {'arecibo':'ao', 'chime':'ch', 'effelsberg':'ef', 'gbt':'gb',
+               'gmrt':'gm', 'jodrell':'jb', 'lofar':'lf', 'lwa':'lw',
+               'nancay':'nc', 'parkes':'pk', 'shao':'sh', 'vla':'v2',
+               'wsrt':'wb'}
 
 #RCSTRINGS dictionary, for the return codes given by scipy.optimize.fmin_tnc.
 #These are only needed for debugging.
-RCSTRINGS = {"-1":"INFEASIBLE: Infeasible (low > up).",
-             "0":"LOCALMINIMUM: Local minima reach (|pg| ~= 0).",
-             "1":"FCONVERGED: Converged (|f_n-f_(n-1)| ~= 0.)",
-             "2":"XCONVERGED: Converged (|x_n-x_(n-1)| ~= 0.)",
-             "3":"MAXFUN: Max. number of function evaluations reach.",
-             "4":"LSFAIL: Linear search failed.",
-             "5":"CONSTANT: All lower bounds are equal to the upper bounds.",
-             "6":"NOPROGRESS: Unable to progress.",
-             "7":"USERABORT: User requested end of minimization."}
+RCSTRINGS = {'-1':'INFEASIBLE: Infeasible (low > up).',
+             '0':'LOCALMINIMUM: Local minima reach (|pg| ~= 0).',
+             '1':'FCONVERGED: Converged (|f_n-f_(n-1)| ~= 0.)',
+             '2':'XCONVERGED: Converged (|x_n-x_(n-1)| ~= 0.)',
+             '3':'MAXFUN: Max. number of function evaluations reach.',
+             '4':'LSFAIL: Linear search failed.',
+             '5':'CONSTANT: All lower bounds are equal to the upper bounds.',
+             '6':'NOPROGRESS: Unable to progress.',
+             '7':'USERABORT: User requested end of minimization.'}
 
 #########
 #classes#
@@ -1519,9 +1526,9 @@ def load_data(filename, dedisperse=False, dededisperse=False, tscrunch=False,
     #Basic info used in TOA output
     telescope = arch.get_telescope()
     try:
-        tempo_code = obs_codes[arch.get_telescope().lower()]    #"asite"
+        tempo_code = tempo_codes[telescope.lower()]
     except KeyError:
-        asite = '?'
+        tempo_code = '??'
     frontend = arch.get_receiver_name()
     backend = arch.get_backend_name()
     backend_delay = arch.get_backend_delay()
@@ -2115,7 +2122,8 @@ def write_TOAs(TOAs, format="tempo2", SNR_cutoff=0.0, outfile=None,
         if format == "tempo2":
             toa_string = "%s %.3f %d"%(toa.archive, toa.frequency,
                     toa.MJD.intday()) + ("%.15f   %.3f  %s"%(toa.MJD.fracday(),
-                            toa.TOA_error, toa.telescope))[1:]
+                            toa.TOA_error,
+                            tempo_codes[toa.telescope.lower()]))[1:]
             if toa.DM is not None:
                 toa_string += " -pp_dm %.7f"%toa.DM
             if toa.DM_error is not None:
