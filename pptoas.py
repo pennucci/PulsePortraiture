@@ -92,6 +92,10 @@ class GetTOAs:
                     xrange(len(self.datafiles))]
         else:
             self.datafiles = [datafiles]
+        if len(self.datafiles) > max_nfile:
+            print "Too many archives.  See/change max_nfile(=%d) in pplib.py."\
+                    %max_nfile
+            sys.exit()
         self.is_gauss_model = file_is_ASCII(modelfile)
         self.modelfile = modelfile
         self.obs = []

@@ -63,6 +63,13 @@ wid_max = 0.25
 #modeled with power-law functions instead of linear ones.
 PL_model = True
 
+#cfitsio defines a maximum number of files (NMAXFILES) that can be opened in
+#the header file fitsio2.h.  Without calling unload() with PSRCHIVE, which
+#touches the archive, I am not sure how to close the files.  So, to avoid the
+#loop crashing, set a maximum number of archives for pptoas.  Modern machines
+#should be able to handle almost 1000.
+max_nfile = 999
+
 #########
 #display#
 #########
