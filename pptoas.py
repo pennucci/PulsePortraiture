@@ -205,7 +205,7 @@ class GetTOAs:
             if not fit_DM:
                 bounds[1] = (DM0, DM0)
             if not quiet:
-                print "\nEach of the %d TOAs are approximately %.2f s"%(
+                print "\nEach of the %d TOAs is approximately %.2f s"%(
                         len(ok_isubs), arch.integration_length() / nsub)
                 print "Doing Fourier-domain least-squares fit..."
             itoa = 1
