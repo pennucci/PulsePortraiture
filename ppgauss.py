@@ -542,7 +542,7 @@ class DataPortrait:
         model_param_errs = np.copy(self.model_param_errs)
         #Convert tau (scattering timescale) to sec
         model_param_errs[1] *= self.Ps[0] / self.nbin
-        write_model(errfile, self.model_name+"_errors", self.nu_ref,
+        write_model(errfile, self.model_name + "_errors", self.nu_ref,
                 model_param_errs, self.fit_flags, append=append, quiet=quiet)
 
     def write_join_parameters(self):
@@ -553,7 +553,7 @@ class DataPortrait:
         deal with these alignment parameters.
         """
         print "JOIN Parameters:", self.join_params
-        joinfile = self.metafile + ".join"
+        joinfile = self.model_name + ".join"
         jf = open(joinfile, "a")
         header = "# archive name" + " "*32 + "phase offset [rot]" + " "*2 + \
                 "delta-DM [cm**-3 pc]\n"
@@ -683,7 +683,7 @@ class GaussianSelector:
             plt.subplot(212)
             plt.cla()
             residuals = self.profile - fitprof
-            plt.plot(self.phases, residuals,'k')
+            plt.plot(self.phases, residuals, 'k')
             plt.xlabel('Pulse Phase')
             plt.ylabel('Data-Fit Residuals')
             plt.draw()
@@ -831,7 +831,7 @@ class GaussianSelector:
             plt.subplot(212)
             plt.cla()
             residuals = self.profile - fitprof
-            plt.plot(self.phases, self.residuals,'k')
+            plt.plot(self.phases, residuals, 'k')
             plt.xlabel('Pulse Phase')
             plt.ylabel('Data-Fit Residuals')
             plt.draw()
