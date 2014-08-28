@@ -838,8 +838,8 @@ def fit_powlaw(data, init_params, errs, freqs, nu_ref):
             chi2=chi2, dof=dof)
     return results
 
-def fit_gaussian_profile(data, init_params, errs, fit_scattering=False,
-        quiet=True):
+def fit_gaussian_profile(data, init_params, errs, fit_flags=None,
+        fit_scattering=False, quiet=True):
     """
     Fit gaussian functions to a profile.
 
@@ -849,34 +849,43 @@ def fit_gaussian_profile(data, init_params, errs, fit_scattering=False,
     the number of degrees of freedom.
 
     data is the pulse profile array of length nbin used in the fit.
-    init_params is a list of initial guesses for the 1 + (ngauss*3) values;
-        the first value is the DC component.  Each remaining group of three
-        represents the gaussians' loc (0-1), wid (i.e. FWHM) (0-1), and
-        amplitude (>0.0).
+    init_params is a list of initial guesses for the 2 + (ngauss*3) values;
+        the first value is the DC component, the second value is the
+        scattering timescale [bin] and each remaining group of three represents
+        the gaussians' loc (0-1), wid (i.e. FWHM) (0-1), and amplitude (>0.0).
     errs is the array of uncertainties on the data values.
+    fit_flags is an array specifying which of the non-scattering parameters to
+        fit; defaults to fitting all.
+    fit_scattering=True fits a scattering timescale parameter via convolution
+        with a one-sided exponential function.
     quiet=True suppresses output [default].
     """
     nparam = len(init_params)
     ngauss = (len(init_params) - 2) / 3
-    fs = fit_scattering
+    if fit_flags is None:
+        fit_flags = [True for t in xrange(nparam)]
+        fit_flags[1] = fit_scattering
+    else:
+        fit_flags = [np.bool(fit_flags[0]), fit_scattering] + \
+                [np.bool(fit_flags[xx]) for xx in xrange(1, nparam-1)]
     #Generate the parameter structure
     params = lm.Parameters()
     for ii in xrange(nparam):
         if ii == 0:
-            params.add('dc', init_params[ii], vary=True, min=None, max=None,
-                    expr=None)
+            params.add('dc', init_params[ii], vary=fit_flags[ii], min=None,
+                    max=None, expr=None)
         elif ii ==1:
-            params.add('tau', init_params[ii], vary=fs, min=0.0, max=None,
-                    expr=None)
+            params.add('tau', init_params[ii], vary=fit_flags[ii], min=0.0,
+                    max=None, expr=None)
         elif ii in range(nparam)[2::3]:
-            params.add('loc%s'%str((ii-2)/3 + 1), init_params[ii], vary=True,
-                    min=None, max=None, expr=None)
+            params.add('loc%s'%str((ii-2)/3 + 1), init_params[ii],
+                    vary=fit_flags[ii], min=None, max=None, expr=None)
         elif ii in range(nparam)[3::3]:
-            params.add('wid%s'%str((ii-3)/3 + 1), init_params[ii], vary=True,
-                    min=0.0, max=wid_max, expr=None)
+            params.add('wid%s'%str((ii-3)/3 + 1), init_params[ii],
+                    vary=fit_flags[ii], min=0.0, max=wid_max, expr=None)
         elif ii in range(nparam)[4::3]:
-            params.add('amp%s'%str((ii-4)/3 + 1), init_params[ii], vary=True,
-                    min=0.0, max=None, expr=None)
+            params.add('amp%s'%str((ii-4)/3 + 1), init_params[ii],
+                    vary=fit_flags[ii], min=0.0, max=None, expr=None)
         else:
             print "Undefined index %d."%ii
             sys.exit()

@@ -182,7 +182,7 @@ class DataPortrait:
             self.noise_stdsxs[ichan] = get_noise(self.portx[ichan])
 
     def fit_profile(self, profile, tau=0.0, fixscat=True, auto_gauss=0.0,
-            show=True):
+            profile_fit_flags=None, show=True):
         """
         Fit gaussian components to a profile.
 
@@ -190,8 +190,10 @@ class DataPortrait:
         tau != 0.0 is the scattering timescale [bin] added to the fitted
             gaussians; it is also the initial parameter if fixscat=False.
         fixscat=False fits for a scattering timescale.
-        auto_gauss != 0.0 specifies the initial guess at a width of a single
-            gaussian component to be fit automatically.
+        auto_gauss != 0.0 specifies the initial guess at a width [rot] of a
+            single gaussian component to be fit automatically.
+        profile_fit_flags is an array specifying which of the non-scattering
+            parameters to fit; defaults to fitting all.
         show=False is used if you want auto_gauss to work without checking it.
         """
         fig = plt.figure()
@@ -199,8 +201,8 @@ class DataPortrait:
         #Noise below may be off
         self.interactor = GaussianSelector(profplot, profile,
                 get_noise(profile), tau=tau, fixscat=fixscat,
-                auto_gauss=auto_gauss, minspanx=None, minspany=None,
-                useblit=True)
+                auto_gauss=auto_gauss, profile_fit_flags=profile_fit_flags,
+                minspanx=None, minspany=None, useblit=True)
         if show: plt.show()
         self.init_params = self.interactor.fitted_params
         self.ngauss = (len(self.init_params) - 2) / 3
@@ -283,8 +285,8 @@ class DataPortrait:
         niter is the number of iterations after the initial model fit.
         fiducial_gaussian=True sets fixloc=False for all components except the
             first component fit, which is fixed.
-        auto_gauss != 0.0 specifies the initial guess at a width of a single
-            gaussian component to be fit automatically.
+        auto_gauss != 0.0 specifies the initial guess at a width [rot] of a
+            single gaussian component to be fit automatically.
         writemodel=True writes the fitted model to file.
         outfile is a string designating the name of the output model file name.
         writeerrfile=True writes a model file containing errors on the fitted
@@ -321,7 +323,8 @@ class DataPortrait:
                 #band and center frequency.  Unsure why; shouldn't matter.
                 profile = np.take(self.port, okinds, axis=0).mean(axis=0)
                 self.fit_profile(profile, tau=tau, fixscat=fixscat,
-                        auto_gauss=auto_gauss)
+                        auto_gauss=auto_gauss, profile_fit_flags=None,
+                        show=True)
             #All slopes, spectral indices start at 0.0
             locparams = widparams = ampparams = np.zeros(self.ngauss)
             self.init_model_params = np.empty([self.ngauss, 6])
@@ -377,12 +380,32 @@ class DataPortrait:
                                 self.itern - self.niter + 1)
                     self.port = rotate_portrait(self.port, self.phi, self.DM,
                             self.Ps[0], self.freqs[0], self.nu_fit)
-                    self.portx = rotate_portrait(self.portx, self. phi,
+                    self.portx = rotate_portrait(self.portx, self.phi,
                             self.DM, self.Ps[0], self.freqsxs[0], self.nu_fit)
                 else:
                     if not quiet:
-                        print "...iteration %d..."%(self.itern - self.niter +
-                                1)
+                        print "\nRotating data portrait for iteration %d."%(
+                                self.itern - self.niter + 1)
+                        #print "...iteration %d..."%(self.itern - self.niter +
+                        #        1)
+                    for ii in range(self.njoin):
+                        jic = self.join_ichans[ii]
+                        self.port[jic] = rotate_data(self.port[jic],
+                                -self.join_params[0::2][ii],
+                                -self.join_params[1::2][ii], self.Ps[0],
+                                self.freqs[0,jic], self.nu_ref)
+                        jicx = self.join_ichanxs[ii]
+                        self.portx[jicx] = rotate_data(self.port[jicx],
+                                -self.join_params[0::2][ii],
+                                -self.join_params[1::2][ii], self.Ps[0],
+                                self.freqsxs[0][jicx], self.nu_ref)
+                        self.model[jic] = rotate_data(self.model[jic],
+                                -self.join_params[0::2][ii],
+                                -self.join_params[1::2][ii], self.Ps[0],
+                                self.freqs[0,jic], self.nu_ref)
+                    self.model_masked = self.model * self.masks[0,0]
+                    self.modelx = np.compress(self.masks[0,0].mean(axis=1),
+                            self.model, axis=0)
             if not quiet:
                 print "Fitting gaussian model portrait..."
             iterator.next()
@@ -595,8 +618,9 @@ class GaussianSelector:
     Taken and tweaked from SMR's pygaussfit.py
     """
 
-    def __init__(self, ax, profile, errs, tau=0.0, fixscat=True, minspanx=None,
-            minspany=None, useblit=True, auto_gauss=0.0):
+    def __init__(self, ax, profile, errs, tau=0.0, fixscat=True,
+            auto_gauss=0.0, profile_fit_flags=None, minspanx=None,
+            minspany=None, useblit=True):
         """
         Initialize the input parameters and open the interactive window.
 
@@ -605,10 +629,12 @@ class GaussianSelector:
         errs specifies the uncertainty on the profile values.
         tau is a scattering timescale [bin].
         fixscat=True does not fit for the scattering timescale.
+        auto_gauss != 0.0 specifies the initial guess at a width [rot] of a
+            single gaussian component to be fit automatically.
+        profile_fit_flags is an array specifying which of the non-scattering
+            parameters to fit; defaults to fitting all.
         minspanx, minspany are vestigial.
         useblit should be True.
-        auto_gauss != 0.0 specifies the initial guess at a width of a single
-            gaussian component to be fit automatically.
         """
         if not auto_gauss:
             print ""
@@ -628,6 +654,7 @@ class GaussianSelector:
         self.fit_scattering = not fixscat
         if self.fit_scattering and self.tauguess == 0.0:
             self.tauguess = 0.5 #seems to break otherwise
+        self.profile_fit_flags = profile_fit_flags
         self.visible = True
         self.DCguess = sorted(profile)[len(profile)/10 + 1]
         self.init_params = [self.DCguess, self.tauguess]
@@ -663,8 +690,8 @@ class GaussianSelector:
             self.plot_gaussians(self.init_params)
             print "Auto-fitting single gaussian profile..."
             fgp = fit_gaussian_profile(self.profile, self.init_params,
-                    np.zeros(self.proflen) + self.errs, self.fit_scattering,
-                    quiet=True)
+                    np.zeros(self.proflen) + self.errs, self.profile_fit_flags,
+                    self.fit_scattering, quiet=True)
             self.fitted_params = fgp.fitted_params
             self.fit_errs = fgp.fit_errs
             self.chi2 = fgp.chi2
@@ -811,8 +838,8 @@ class GaussianSelector:
         elif event1.button == event2.button == 2:
             print "Fitting reference gaussian profile..."
             fgp = fit_gaussian_profile(self.profile, self.init_params,
-                    np.zeros(self.proflen) + self.errs, self.fit_scattering,
-                    quiet=True)
+                    np.zeros(self.proflen) + self.errs, self.profile_fit_flags,
+                    self.fit_scattering, quiet=True)
             self.fitted_params = fgp.fitted_params
             self.fit_errs = fgp.fit_errs
             self.chi2 = fgp.chi2
