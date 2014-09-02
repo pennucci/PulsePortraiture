@@ -384,28 +384,28 @@ class DataPortrait:
                             self.DM, self.Ps[0], self.freqsxs[0], self.nu_fit)
                 else:
                     if not quiet:
-                        print "\nRotating data portrait for iteration %d."%(
-                                self.itern - self.niter + 1)
-                        #print "...iteration %d..."%(self.itern - self.niter +
-                        #        1)
-                    for ii in range(self.njoin):
-                        jic = self.join_ichans[ii]
-                        self.port[jic] = rotate_data(self.port[jic],
-                                -self.join_params[0::2][ii],
-                                -self.join_params[1::2][ii], self.Ps[0],
-                                self.freqs[0,jic], self.nu_ref)
-                        jicx = self.join_ichanxs[ii]
-                        self.portx[jicx] = rotate_data(self.port[jicx],
-                                -self.join_params[0::2][ii],
-                                -self.join_params[1::2][ii], self.Ps[0],
-                                self.freqsxs[0][jicx], self.nu_ref)
-                        self.model[jic] = rotate_data(self.model[jic],
-                                -self.join_params[0::2][ii],
-                                -self.join_params[1::2][ii], self.Ps[0],
-                                self.freqs[0,jic], self.nu_ref)
-                    self.model_masked = self.model * self.masks[0,0]
-                    self.modelx = np.compress(self.masks[0,0].mean(axis=1),
-                            self.model, axis=0)
+                        #print "\nRotating data portrait for iteration %d."%(
+                        #        self.itern - self.niter + 1)
+                        print "...iteration %d..."%(self.itern - self.niter +
+                                1)
+                    #for ii in range(self.njoin):
+                    #    jic = self.join_ichans[ii]
+                    #    self.port[jic] = rotate_data(self.port[jic],
+                    #            -self.join_params[0::2][ii],
+                    #            -self.join_params[1::2][ii], self.Ps[0],
+                    #            self.freqs[0,jic], self.nu_ref)
+                    #    jicx = self.join_ichanxs[ii]
+                    #    self.portx[jicx] = rotate_data(self.port[jicx],
+                    #            -self.join_params[0::2][ii],
+                    #            -self.join_params[1::2][ii], self.Ps[0],
+                    #            self.freqsxs[0][jicx], self.nu_ref)
+                    #    self.model[jic] = rotate_data(self.model[jic],
+                    #            -self.join_params[0::2][ii],
+                    #            -self.join_params[1::2][ii], self.Ps[0],
+                    #            self.freqs[0,jic], self.nu_ref)
+                    #self.model_masked = self.model * self.masks[0,0]
+                    #self.modelx = np.compress(self.masks[0,0].mean(axis=1),
+                    #        self.model, axis=0)
             if not quiet:
                 print "Fitting gaussian model portrait..."
             iterator.next()
