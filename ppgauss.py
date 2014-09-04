@@ -101,10 +101,10 @@ class DataPortrait:
                 if hf > self.hifreq:
                     self.hifreq = hf
                 self.freqs.extend(data.freqs[0])
-                self.freqsxs.extend(data.freqs[0,data.ok_ichans[0]])
+                self.freqsxs.extend(data.freqs[0, data.ok_ichans[0]])
                 self.masks.extend(data.masks[0,0])
                 self.port.extend(data.subints[0,0] * data.masks[0,0])
-                self.portx.extend(data.subints[0,0,data.ok_ichans[0]])
+                self.portx.extend(data.subints[0,0, data.ok_ichans[0]])
                 self.flux_prof.extend(data.flux_prof)
                 self.flux_profx.extend(data.flux_prof[data.ok_ichans[0]])
                 self.noise_stds.extend(data.noise_stds[0,0])
@@ -174,7 +174,7 @@ class DataPortrait:
         Normalize each profile by its maximum.
         """
         for ichan in range(len(self.port)):
-            if self.port[ichan].sum() != 0.0:
+            if self.port[ichan].any():
                 self.port[ichan] /= self.port[ichan].max()
                 self.noise_stds[0,0,ichan] = get_noise(self.port[ichan])
         for ichan in range(len(self.portx)):
@@ -374,38 +374,13 @@ class DataPortrait:
             if self.cnvrgnc:
                 break
             else:
+                if not quiet:
+                    print "\n...iteration %d..."%(self.itern - self.niter + 1)
                 if not self.njoin:
-                    if not quiet:
-                        print "\nRotating data portrait for iteration %d."%(
-                                self.itern - self.niter + 1)
                     self.port = rotate_portrait(self.port, self.phi, self.DM,
                             self.Ps[0], self.freqs[0], self.nu_fit)
                     self.portx = rotate_portrait(self.portx, self.phi,
                             self.DM, self.Ps[0], self.freqsxs[0], self.nu_fit)
-                else:
-                    if not quiet:
-                        #print "\nRotating data portrait for iteration %d."%(
-                        #        self.itern - self.niter + 1)
-                        print "...iteration %d..."%(self.itern - self.niter +
-                                1)
-                    #for ii in range(self.njoin):
-                    #    jic = self.join_ichans[ii]
-                    #    self.port[jic] = rotate_data(self.port[jic],
-                    #            -self.join_params[0::2][ii],
-                    #            -self.join_params[1::2][ii], self.Ps[0],
-                    #            self.freqs[0,jic], self.nu_ref)
-                    #    jicx = self.join_ichanxs[ii]
-                    #    self.portx[jicx] = rotate_data(self.port[jicx],
-                    #            -self.join_params[0::2][ii],
-                    #            -self.join_params[1::2][ii], self.Ps[0],
-                    #            self.freqsxs[0][jicx], self.nu_ref)
-                    #    self.model[jic] = rotate_data(self.model[jic],
-                    #            -self.join_params[0::2][ii],
-                    #            -self.join_params[1::2][ii], self.Ps[0],
-                    #            self.freqs[0,jic], self.nu_ref)
-                    #self.model_masked = self.model * self.masks[0,0]
-                    #self.modelx = np.compress(self.masks[0,0].mean(axis=1),
-                    #        self.model, axis=0)
             if not quiet:
                 print "Fitting gaussian model portrait..."
             iterator.next()
@@ -413,9 +388,9 @@ class DataPortrait:
             #For safety, write model after each iteration
             if writemodel:
                 self.write_model(outfile=outfile, quiet=quiet)
-            self.cnvrgnc = self.check_convergence(efac=1.0, quiet=quiet)
             if writeerrfile:
                 self.write_errfile(errfile=errfile, quiet=quiet)
+            self.cnvrgnc = self.check_convergence(efac=1.0, quiet=quiet)
         if self.njoin:
             for ii in range(self.njoin):
                 jic = self.join_ichans[ii]
@@ -424,7 +399,7 @@ class DataPortrait:
                         -self.join_params[1::2][ii], self.Ps[0],
                         self.freqs[0,jic], self.nu_ref)
                 jicx = self.join_ichanxs[ii]
-                self.portx[jicx] = rotate_data(self.port[jicx],
+                self.portx[jicx] = rotate_data(self.portx[jicx],
                         -self.join_params[0::2][ii],
                         -self.join_params[1::2][ii], self.Ps[0],
                         self.freqsxs[0][jicx], self.nu_ref)
@@ -467,12 +442,7 @@ class DataPortrait:
                 self.join_params = self.fitted_params[-self.njoin*2:]
                 self.join_param_errs = self.fit_errs[-self.njoin*2:]
                 self.all_join_params[1] = self.join_params
-                #FIX, convergence can be based on residuals
-                self.phi = 0.5
-                self.phierr = 0.0
-                self.DM = 1.0
-                self.DMerr = 0.0
-                self.red_chi2 = fgp.chi2 / fgp.dof
+                #self.red_chi2 = fgp.chi2 / fgp.dof
                 #This function is a hack for now.
                 self.write_join_parameters()
             else:
@@ -484,22 +454,6 @@ class DataPortrait:
             self.model_masked = self.model * self.masks[0,0]
             self.modelx = np.compress(self.masks[0,0].mean(axis=1), self.model,
                     axis=0)
-            if not self.njoin:
-                #Currently, fit_phase_shift returns an unbounded phase
-                phase_guess = fit_phase_shift(self.portx.mean(axis=0),
-                        self.modelx.mean(axis=0)).phase
-                phase_guess %= 1
-                if phase_guess > 0.5:
-                    phase_guess -= 1.0
-                DM_guess = 0.0
-                fp = fit_portrait(self.portx, self.modelx,
-                        np.array([phase_guess, DM_guess]), self.Ps[0],
-                        self.freqsxs[0], self.nu_fit, None, None,
-                        bounds=[(None, None), (None, None)], id=None,
-                        quiet=True)
-                self.fp_results = fp
-                (self.phi, self.phierr, self.DM, self.DMerr, self.red_chi2) = (
-                        fp.phase, fp.phase_err, fp.DM, fp.DM_err, fp.red_chi2)
             self.duration = time.time() - start
             self.total_time += self.duration
             yield
@@ -511,14 +465,43 @@ class DataPortrait:
         Considers if the phase and DM in the data, as measured by the fitted
         model, are within the errors (times efac) of the measurements.
 
-        It will not work if datafiles is a metafile.  This will be improved.
-
         quiet=True suppresses output.
         """
+        if self.njoin:
+            portx = np.zeros(self.portx.shape)
+            modelx = np.zeros(self.modelx.shape)
+            for ii in range(self.njoin):
+                jic = self.join_ichans[ii]
+                jicx = self.join_ichanxs[ii]
+                portx[jicx] = rotate_data(self.portx[jicx],
+                        -self.join_params[0::2][ii],
+                        -self.join_params[1::2][ii], self.Ps[0],
+                        self.freqsxs[0][jicx], self.nu_ref)
+                modelx[jicx] = rotate_data(self.modelx[jicx],
+                        -self.join_params[0::2][ii],
+                        -self.join_params[1::2][ii], self.Ps[0],
+                        self.freqsxs[0][jicx], self.nu_ref)
+        else:
+            portx = np.copy(self.portx)
+            modelx = np.copy(self.modelx)
+        #Currently, fit_phase_shift returns an unbounded phase
+        phase_guess = fit_phase_shift(portx.mean(axis=0),
+                modelx.mean(axis=0)).phase
+        phase_guess %= 1
+        if phase_guess >= 0.5:
+            phase_guess -= 1.0
+        DM_guess = 0.0
+        fp = fit_portrait(portx, modelx, np.array([phase_guess, DM_guess]),
+                self.Ps[0], self.freqsxs[0], self.nu_fit, None, None,
+                bounds=[(None, None), (None, None)], id=None, quiet=True)
+        self.fp_results = fp
+        (self.phi, self.phierr, self.DM, self.DMerr, self.red_chi2) = (
+                fp.phase, fp.phase_err, fp.DM, fp.DM_err, fp.red_chi2)
         if not quiet:
             print "Iter %d:"%(self.itern - self.niter)
             print " duration of %.2f min"%(self.duration /  60.)
-            if not self.njoin:
+            #if not self.njoin:
+            if 1:
                 print " phase offset of %.2e +/- %.2e [rot]"%(self.phi,
                         self.phierr)
                 print " DM of %.6e +/- %.2e [cm**-3 pc]"%(self.DM, self.DMerr)
@@ -918,7 +901,7 @@ if __name__ == "__main__":
                       help="Scattering timescale [sec] at nu_ref, assuming alpha=-4.0 (which can be changed internally).  [default=0]")
     parser.add_option("--fitloc",
                       action="store_false", dest="fixloc", default=True,
-                      help="Do not fix locations of gaussians across frequency. Use this flag to allow gaussian components to drift with frequency. [default=False]")
+                      help="Do not fix locations of gaussians across frequency. Use this flag to allow gaussian components to drift with frequency (not recommended; rather, use --fgauss). [default=False]")
     parser.add_option("--fixwid",
                       action="store_true", dest="fixwid", default=False,
                       help="Fix widths of gaussians across frequency. [default=False]")
