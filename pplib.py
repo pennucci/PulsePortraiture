@@ -1045,8 +1045,10 @@ def fit_phase_shift(data, model, noise=None, bounds=[-0.5, 0.5]):
     d = np.real(np.sum(dFFT * np.conj(dFFT))) / err**2.0
     p = np.real(np.sum(mFFT * np.conj(mFFT))) / err**2.0
     other_args = (mFFT, dFFT, err)
+    start = time.time()
     results = opt.brute(fit_phase_shift_function, [tuple(bounds)],
             args=other_args, Ns=100, full_output=True)
+    duration = time.time() - start
     phase = results[0][0]
     fmin = results[1]
     scale = -fmin / p
@@ -1054,10 +1056,12 @@ def fit_phase_shift(data, model, noise=None, bounds=[-0.5, 0.5]):
     phase_error = (scale * fit_phase_shift_function_2deriv(phase, mFFT, dFFT,
         err))**-0.5
     scale_error = p**-0.5
-    #errors = [phase_error, scale_error]
     red_chi2 = (d - ((fmin**2) / p)) / (len(data) - 2)
+    #SNR of the fit, based on PDB's notes
+    snr = pow(scale**2 * p / err**2, 0.5)
     return DataBunch(phase=phase, phase_err=phase_error, scale=scale,
-            scale_error=scale_error, red_chi2=red_chi2)
+            scale_error=scale_error, snr=snr, red_chi2=red_chi2,
+            duration=duration)
 
 def fit_portrait(data, model, init_params, P, freqs, nu_fit=None, nu_out=None,
         errs=None, bounds=[(None, None), (None, None)], id=None, quiet=True):
@@ -1078,7 +1082,8 @@ def fit_portrait(data, model, init_params, P, freqs, nu_fit=None, nu_out=None,
         mean value of freqs.
     nu_out is the desired output reference frequency [MHz].  Defaults to the
         zero-covariance frequency calculated in the fit.
-    errs is the array of uncertainties on the data values.
+    errs is the array of uncertainties on the data values (time-domain); they
+        are measured if None.
     bounds is the list of 2 tuples containing the bounds on the phase and DM.
     id provides a label for the TOA.
     quiet = False produces more diagnostic output.
@@ -1090,6 +1095,8 @@ def fit_portrait(data, model, init_params, P, freqs, nu_fit=None, nu_out=None,
     if errs is None:
         #errs = np.real(dFFT[:, -len(dFFT[0])/4:]).std(axis=1)
         errs = get_noise(data, chans=True) * np.sqrt(len(data[0])/2.0)
+    else:
+        errs = np.copy(errs) * np.sqrt(len(data[0])/2.0)
     d = np.real(np.sum(np.transpose(errs**-2.0 * np.transpose(dFFT *
         np.conj(dFFT)))))
     p_n = np.real(np.sum(mFFT * np.conj(mFFT), axis=1))

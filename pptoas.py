@@ -223,8 +223,8 @@ class GetTOAs:
                     portx = subints[isub,0,ok_ichans[isub]]
                     modelx = model[ok_ichans[isub]]
                     SNRsx = SNRs[isub,0,ok_ichans[isub]]
-                    errs = noise_stds[isub,0,ok_ichans[isub]] * \
-                            np.sqrt(nbin/2.0)
+                    #NB: Time-domain uncertainties below
+                    errs = noise_stds[isub,0,ok_ichans[isub]]
                 else:
                     print "pptoas currently only takes gaussian models..."
                     sys.exit()
@@ -284,9 +284,21 @@ class GetTOAs:
                 ####################
                 if not quiet:
                     print "Fitting for TOA #%d"%(itoa)
-                results = fit_portrait(portx, modelx,
-                        np.array([phase_guess, DM_guess]), P, freqsx, nu_fit,
-                        self.nu_ref, errs, bounds=bounds, id = id, quiet=quiet)
+                if len(freqsx) > 1:
+                    results = fit_portrait(portx, modelx,
+                            np.array([phase_guess, DM_guess]), P, freqsx,
+                            nu_fit, self.nu_ref, errs, bounds=bounds, id = id,
+                            quiet=quiet)
+                else:  #1-channel hack
+                    results = fit_phase_shift(portx[0], modelx[0], errs[0])
+                    results.DM = DM_stored
+                    results.DM_err = 0.0
+                    results.nu_ref = freqsx[0]
+                    results.nfeval = 0
+                    results.return_code = -2
+                    results.scales = np.array([results.scale])
+                    results.scale_errs = np.array([results.scale_error])
+                    results.covariance = 0.0
                 results.phi = results.phase
                 results.phi_err = results.phase_err
                 fit_duration += results.duration
@@ -331,6 +343,7 @@ class GetTOAs:
                 toa_flags['f'] = frontend + "_" + backend
                 toa_flags['nbin'] = nbin
                 toa_flags['nch'] = nchan
+                toa_flags['nchx'] = len(freqsx)
                 toa_flags['subint'] = isub
                 toa_flags['tobs'] = subtimes[isub]
                 toa_flags['pp_tmplt'] = self.modelfile
