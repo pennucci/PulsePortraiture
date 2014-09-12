@@ -500,11 +500,9 @@ class DataPortrait:
         if not quiet:
             print "Iter %d:"%(self.itern - self.niter)
             print " duration of %.2f min"%(self.duration /  60.)
-            #if not self.njoin:
-            if 1:
-                print " phase offset of %.2e +/- %.2e [rot]"%(self.phi,
-                        self.phierr)
-                print " DM of %.6e +/- %.2e [cm**-3 pc]"%(self.DM, self.DMerr)
+            print " phase offset of %.2e +/- %.2e [rot]"%(self.phi,
+                    self.phierr)
+            print " DM of %.6e +/- %.2e [cm**-3 pc]"%(self.DM, self.DMerr)
             print " red. chi**2 of %.2f."%self.red_chi2
         else:
             if self.niter and (self.itern - self.niter) != 0:
