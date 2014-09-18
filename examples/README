@@ -1,0 +1,46 @@
+===================
+===Basic Examples==
+===================
+
+--To get more help:
+          ppgauss.py -h
+          pptoas.py -h
+
+--For a more involved example, run/examine example.py.
+
+--Simplest command-line use with minimum arguments:
+    >Make a gaussian model based on averaged data (eg. using psradd):
+          ppgauss.py -d average_psrfits_file.fits
+    
+    >Measure TOAs & DMs from an archive using a ppgauss model:
+          pptoas.py -d psrfits_archive.fits -m model_from_ppgauss.gmodel
+
+--More involved command-line use with some additional options (combinable):
+    >Make a gaussian model based on averaged data archives from different
+        receivers:
+          ppgauss.py -M metafile_with_archive_names --nu_ref 1500.0 --bw 200.0
+    
+    >Make a gaussian model, but first normalize the data per-channel and fix
+        the first fitted gaussian component's location (fiducial component):
+          ppgauss.py -d average_psrfits_file.fits --fgauss --norm
+    
+    >Make a gaussian model that includes a fit for a constant scattering
+        timescale (will take long[er]) and iterate:
+          ppgauss.py -d average_psrfits_file.fits --fitscat --niter 3
+    
+    >Make a gaussian model specifying some of the output:
+          ppgauss.py -d average_psrfits_file.fits -o pgauss_model.gmodel \
+            -m 2_component_820_MHz_model --verbose
+    
+    >Measure TOAs & DMs from a metafile of archives, but output only a single
+        (average) DM for each archive, and suppress all other output:
+          pptoas.py -d metafile_with_archive_names \
+            -m model_from_ppgauss.gmodel --one_DM  --quiet
+
+    >Measure only TOAs in an archive and specify an output file:
+          pptoas.py -d psrfits_archive.fits -m model_from_ppgauss.gmodel \
+            -o my_tim_file.tim  --fix_DM
+
+    >Add additonal flags (in pairs) to the output TOA lines:
+          pptoas.py -d psrfits_archive.fits -m model_from_ppgauss.gmodel \
+            --flags pta,pta_name,release,release_number

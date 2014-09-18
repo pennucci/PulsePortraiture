@@ -28,7 +28,7 @@ dDMs = np.random.normal(dDM_mean, dDM_std, nfiles)
                 #Adding scattering may slow down the fit
 t_scat = 50e-6  #Add scattering with this timescale [s] w.r.t. nu0
 scint = True    #Add random scintillation
-alpha = -4.4    #t_scat will follow a powerlaw with this spectral index
+alpha = -4.0    #t_scat will follow a powerlaw with this spectral index
 
 weights = np.ones([nsub, nchan]) #Change if you want to have an "RFI" mask
                                  #eg. band edges zapped:
@@ -81,7 +81,7 @@ dp.make_gaussian_model(ref_prof=(nu0, bw/4), tau=(t_scat * dp.nbin) / dp.Ps[0],
 print "Running pptoas.py to fit TOAs and DMs..."
 import pptoas as pt
 #Set the DM to which the offsets are referenced (eg. from the input ephemeris)
-i,o = os.popen4("grep DM %s"ephemeris)
+i,o = os.popen4("grep DM %s"%ephemeris)
 DM0 = float(o.readline().split()[1])
 #Initiate Class instance; one could also use a smoothed average of the data
 #as a model instead of the analytic gaussian model
