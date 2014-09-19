@@ -1585,7 +1585,7 @@ def load_data(filename, dedisperse=False, dededisperse=False, tscrunch=False,
     #These are NOT the bin centers...
     #phases = np.arange(nbin, dtype='d') / nbin
     #Get data
-    #PSRCHIVE indices [subint:pol:chan:bin]
+    #PSRCHIVE indices are [isub:ipol:ichan:ibin]
     subints = arch.get_data()
     Ps = np.array([sub.get_folding_period() for sub in arch], dtype=np.double)
     epochs = [sub.get_epoch() for sub in arch]
