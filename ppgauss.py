@@ -297,13 +297,17 @@ class DataPortrait:
             and residuals is desired.
         quiet=True suppresses output.
         """
-        if errfile is None and outfile is not None:
-            errfile = outfile + "_err"
         if modelfile:
+            if outfile is None:
+                outfile = modelfile
+            if errfile is None:
+                errfile = modelfile + "_err"
             (self.model_name, self.nu_ref, self.ngauss, self.init_model_params,
                     self.fit_flags) = read_model(modelfile)
             self.init_model_params[1] *= self.nbin / self.Ps[0]
         else:
+            if errfile is None and outfile is not None:
+                errfile = outfile + "_err"
             if model_name is None:
                 self.model_name = self.source
             else:
@@ -872,18 +876,27 @@ if __name__ == "__main__":
     #                  action="store_true", dest="help", default=False,
     #                  help="Show this help message and exit.")
     parser.add_option("-d", "--datafile",
+                      default=None,
                       action="store", metavar="archive", dest="datafile",
                       help="PSRCHIVE archive from which to generate gaussian model.")
     parser.add_option("-M", "--metafile",
+                      default=None,
                       action="store", metavar="metafile", dest="metafile",
                       help="(BETA) Will be able to fit several obs. from different bands.  NB: First file in metafile MUST also be the one that contains nu_ref.")
+    parser.add_option("-I", "--improve",
+                      action="store", metavar="modelfile", dest="modelfile",
+                      default=None,
+                      help="Improve/iterate on a model given input data.  The argument to -I is a ppgauss-format modelfile. Use -o and -e to avoid overwriting and --niter to specify a number of iterations.  Everything else should be specified in the modelfile.")
     parser.add_option("-o", "--outfile",
+                      default=None,
                       action="store", metavar="outfile", dest="outfile",
                       help="Name of output model file name. [default=archive.gmodel]")
     parser.add_option("-e", "--errfile",
+                      default=None,
                       action="store", metavar="errfile", dest="errfile",
                       help="Name of parameter error file name. [default=outfile_err]")
     parser.add_option("-m", "--model_name",
+                      default=None,
                       action="store", metavar="model_name", dest="model_name",
                       help="Name given to model. [default=PSRCHIVE Source name]")
     parser.add_option("--nu_ref",
@@ -896,29 +909,29 @@ if __name__ == "__main__":
                       help="Used with --nu_ref; amount of bandwidth [MHz] centered on nu_ref to average for the initial profile fit. [default=Full bandwidth]")
     parser.add_option("--tau",
                       action="store", metavar="tau", dest="tau", default=0.0,
-                      help="Scattering timescale [sec] at nu_ref, assuming alpha=-4.0 (which can be changed internally).  [default=0]")
+                      help="Scattering timescale [sec] at nu_ref, assuming alpha=-4.0 (which can be changed internally). Not used with -I. [default=0]")
     parser.add_option("--fitloc",
                       action="store_false", dest="fixloc", default=True,
-                      help="Do not fix locations of gaussians across frequency. Use this flag to allow gaussian components to drift with frequency (not recommended; rather, use --fgauss). [default=False]")
+                      help="Do not fix locations of gaussians across frequency. Use this flag to allow gaussian components to drift with frequency (not recommended; rather, use --fgauss). Not used with -I. [default=False]")
     parser.add_option("--fixwid",
                       action="store_true", dest="fixwid", default=False,
-                      help="Fix widths of gaussians across frequency. [default=False]")
+                      help="Fix widths of gaussians across frequency. Not used with -I. [default=False]")
     parser.add_option("--fixamp",
                       action="store_true", dest="fixamp", default=False,
-                      help="Fix amplitudes of gaussians across frequency. [default=False]")
+                      help="Fix amplitudes of gaussians across frequency. Not used with -I. [default=False]")
     parser.add_option("--fitscat",
                       action="store_true", dest="fitscat", default=False,
-                      help="Fit scattering timescale to tau w.r.t nu_ref.  [default=False]")
+                      help="Fit scattering timescale to tau w.r.t nu_ref. Not used with -I. [default=False]")
     parser.add_option("--niter",
                       action="store", metavar="int", dest="niter", default=0,
-                      help="Number of iterations to loop for generating better model. [default=0]")
+                      help="Number of iterations to loop for generating better model; ppgauss exits before niter iterations if internal convergence criteria are met. [default=0]")
     parser.add_option("--fgauss",
                       action="store_true", dest="fgauss", default=False,
-                      help="Sets fitloc=True except for the first gaussian component fitted in the initial profile fit.  i.e. sets a 'fiducial gaussian'.")
+                      help="Sets fitloc=True except for the first gaussian component fitted in the initial profile fit.  i.e. sets a 'fiducial gaussian'. Not used with -I. [default=False]")
     parser.add_option("--autogauss",
                       action="store", metavar="wid", dest="auto_gauss",
                       default=0.0,
-                      help="Automatically fit one gaussian to initial profile with initial width [rot] given as the argument.")
+                      help="Automatically fit one gaussian to initial profile with initial width [rot] given as the argument. Not used with -I. [default=False]")
     parser.add_option("--norm", metavar="normalize",
                       action="store_true", dest="normalize", default=False,
                       help="Normalize each channel's profile by its maximum.")
@@ -940,6 +953,7 @@ if __name__ == "__main__":
     datafile = options.datafile
     metafile = options.metafile
     if metafile is not None: datafile = metafile
+    modelfile = options.modelfile
     outfile = options.outfile
     errfile = options.errfile
     model_name = options.model_name
@@ -962,10 +976,16 @@ if __name__ == "__main__":
     dp = DataPortrait(datafile=datafile, quiet=quiet)
     if normalize: dp.normalize_portrait()
     if not quiet: dp.show_data_portrait()
-    tau *= dp.nbin / dp.Ps[0]
-    dp.make_gaussian_model(modelfile = None,
-            ref_prof=(nu_ref, bw_ref), tau=tau, fixloc=fixloc, fixwid=fixwid,
-            fixamp=fixamp, fixscat=fixscat, niter=niter,
-            fiducial_gaussian=fgauss, auto_gauss=auto_gauss, writemodel=True,
-            outfile=outfile, writeerrfile=True, errfile=errfile,
-            model_name=model_name, residplot=figure, quiet=quiet)
+    if modelfile is not None:
+        dp.make_gaussian_model(modelfile = modelfile, niter=niter,
+                writemodel=True, outfile=outfile, writeerrfile=True,
+                errfile=errfile, model_name=model_name, residplot=figure,
+                quiet=quiet)
+    else:
+        tau *= dp.nbin / dp.Ps[0]
+        dp.make_gaussian_model(modelfile=None, ref_prof=(nu_ref, bw_ref),
+                tau=tau, fixloc=fixloc, fixwid=fixwid,fixamp=fixamp,
+                fixscat=fixscat, niter=niter, fiducial_gaussian=fgauss,
+                auto_gauss=auto_gauss, writemodel=True, outfile=outfile,
+                writeerrfile=True, errfile=errfile, model_name=model_name,
+                residplot=figure, quiet=quiet)
