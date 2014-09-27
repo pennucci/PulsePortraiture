@@ -1,5 +1,5 @@
 #Arbitrary model name, usually incoporates the source
-MODEL  PSR_1234-5678_8COMP_LBand
+MODEL  PSR_1234-5678
 
 #Frequency that model parameters reference [MHz]
 FREQ   1300.0000

@@ -301,9 +301,10 @@ class DataPortrait:
             if outfile is None:
                 outfile = modelfile
             if errfile is None:
-                errfile = modelfile + "_err"
+                errfile = outfile + "_err"
             (self.model_name, self.nu_ref, self.ngauss, self.init_model_params,
                     self.fit_flags) = read_model(modelfile)
+            if model_name is not None: self.model_name = model_name
             self.init_model_params[1] *= self.nbin / self.Ps[0]
         else:
             if errfile is None and outfile is not None:
