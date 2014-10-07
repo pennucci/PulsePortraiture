@@ -262,9 +262,10 @@ class DataPortrait:
 
     def make_gaussian_model(self, modelfile=None,
             ref_prof=(None, None), tau=0.0, fixloc=False, fixwid=False,
-            fixamp=False, fixscat=True, niter=0, fiducial_gaussian=False,
-            auto_gauss=0.0, writemodel=False, outfile=None, writeerrfile=False,
-            errfile=None, model_name=None, residplot=None, quiet=False):
+            fixamp=False, fixscat=True, fixalpha=True, niter=0,
+            fiducial_gaussian=False, auto_gauss=0.0, writemodel=False,
+            outfile=None, writeerrfile=False, errfile=None, model_name=None,
+            residplot=None, quiet=False):
         """
         Fit a gaussian-component model with independently evolving components.
 
@@ -282,6 +283,7 @@ class DataPortrait:
         fixwid=True does not allow the components' width to evolve
         fixamp=True does not allow the components' height to evolve
         fixscat=True does not fit for a scattering timescale.
+        fixalpha=True does not fit for the scattering index.
         niter is the number of iterations after the initial model fit.
         fiducial_gaussian=True sets fixloc=False for all components except the
             first component fit, which is fixed.
@@ -416,6 +418,7 @@ class DataPortrait:
             self.modelx = np.compress(self.masks[0,0].mean(axis=1), self.model,
                     axis=0)
         if not quiet:
+            print ""
             print "Residuals mean: %.2e"%(self.portx - self.modelx).mean()
             print "Residuals std:  %.2e"%(self.portx - self.modelx).std()
             print "Data std:       %.2e\n"%np.median(self.noise_stdsxs)
@@ -438,9 +441,15 @@ class DataPortrait:
             fgp = fit_gaussian_portrait(self.portx, self.model_params,
                     self.portx_noise, self.fit_flags, self.phases,
                     self.freqsxs[0], self.nu_ref, self.all_join_params,
-                    self.Ps[0], quiet=quiet)
+                    self.Ps[0], not(fixalpha), quiet=quiet)
             (self.fitted_params, self.fit_errs, self.chi2, self.dof) = (
                     fgp.fitted_params, fgp.fit_errs, fgp.chi2, fgp.dof)
+            self.scattering_index, self.scattering_index_err = \
+                    fgp.scattering_index, fgp.scattering_index_err
+            if not fixalpha:
+                print ""
+                print "Scattering index = %.5f +/- %.5f"%(
+                        self.scattering_index, self.scattering_index_err)
             if self.njoin:
                 self.model_params = self.fitted_params[:-self.njoin*2]
                 self.model_param_errs = self.fit_errs[:-self.njoin*2]
@@ -554,7 +563,7 @@ class DataPortrait:
         write_model(errfile, self.model_name + "_errors", self.nu_ref,
                 model_param_errs, self.fit_flags, append=append, quiet=quiet)
 
-    def write_join_parameters(self):
+    def write_join_parameters(self, print_errs=True):
         """
         Write the JOIN parameters to file.
 
@@ -562,6 +571,7 @@ class DataPortrait:
         deal with these alignment parameters.
         """
         print "JOIN Parameters:", self.join_params
+        if print_errs: print "JOIN Parameters' Errors:", self.join_param_errs
         joinfile = self.model_name + ".join"
         jf = open(joinfile, "a")
         header = "# archive name" + " "*32 + "phase offset [rot]" + " "*2 + \
@@ -627,7 +637,7 @@ class GaussianSelector:
             print "============================================="
             print "Left mouse click to draw a Gaussian component"
             print "Middle mouse click to fit components to data"
-            print "Right mouse click to remove a component"
+            print "Right mouse click to remove last component"
         print "============================================="
         print "Press 'q' or close window when done fitting"
         print "============================================="
@@ -923,6 +933,9 @@ if __name__ == "__main__":
     parser.add_option("--fitscat",
                       action="store_true", dest="fitscat", default=False,
                       help="Fit scattering timescale to tau w.r.t nu_ref. Not used with -I. [default=False]")
+    parser.add_option("--fitalpha",
+                      action="store_true", dest="fitalpha", default=False,
+                      help="Fit power-law index for the scattering law. Not used with -I. (NB: currently need to save output to parse values) [default=False]")
     parser.add_option("--niter",
                       action="store", metavar="int", dest="niter", default=0,
                       help="Number of iterations to loop for generating better model; ppgauss exits before niter iterations if internal convergence criteria are met. [default=0]")
@@ -967,6 +980,7 @@ if __name__ == "__main__":
     fixwid = options.fixwid
     fixamp = options.fixamp
     fixscat = not options.fitscat
+    fixalpha = not options.fitalpha
     niter = int(options.niter)
     fgauss = options.fgauss
     auto_gauss = float(options.auto_gauss)
@@ -986,7 +1000,8 @@ if __name__ == "__main__":
         tau *= dp.nbin / dp.Ps[0]
         dp.make_gaussian_model(modelfile=None, ref_prof=(nu_ref, bw_ref),
                 tau=tau, fixloc=fixloc, fixwid=fixwid,fixamp=fixamp,
-                fixscat=fixscat, niter=niter, fiducial_gaussian=fgauss,
-                auto_gauss=auto_gauss, writemodel=True, outfile=outfile,
-                writeerrfile=True, errfile=errfile, model_name=model_name,
-                residplot=figure, quiet=quiet)
+                fixscat=fixscat, fixalpha=fixalpha, niter=niter,
+                fiducial_gaussian=fgauss, auto_gauss=auto_gauss,
+                writemodel=True, outfile=outfile, writeerrfile=True,
+                errfile=errfile, model_name=model_name, residplot=figure,
+                quiet=quiet)

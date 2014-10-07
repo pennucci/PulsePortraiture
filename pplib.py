@@ -256,11 +256,12 @@ def gen_gaussian_profile(params, nbin):
     return model
 
 def gen_gaussian_portrait(params, phases, freqs, nu_ref, join_ichans=[],
-        P=None):
+        P=None, scattering_index=scattering_alpha):
     """
     Return a gaussian-component model portrait based on input parameters.
 
-    join_ichans is used only in ppgauss.
+    join_ichans is used only in ppgauss, in which case the period P [sec] needs
+        to be provided.
 
     params is an array of 2 + (ngauss*6) + 2*len(join_ichans) values.
         The first value is the DC component, and the second value is the
@@ -275,9 +276,11 @@ def gen_gaussian_portrait(params, phases, freqs, nu_ref, join_ichans=[],
         gen_gaussian_profile).
     freqs in the array of frequencies at which to calculate the model.
     nu_ref is the frequency to which the locs, wids, and amps reference.
+    scattering_index is the power-law index of the scattering law; the default
+        is set in the header lines of pplib.py.
 
     The evolution parameters will either be linear slopes, or a power-law
-    indices, depending on the global settings in the header of pplib.py.
+    indices, depending on the global settings in the header lines of pplib.py.
 
     The units of the evolution parameters and the frequencies need to match
     appropriately.
@@ -328,7 +331,7 @@ def gen_gaussian_portrait(params, phases, freqs, nu_ref, join_ichans=[],
         gport[ichan] = gen_gaussian_profile(gparams[ichan], nbin)
     if tau != 0.0:
         sk = scattering_kernel(tau, nu_ref, freqs, np.arange(nbin), 1.0,
-                alpha=scattering_alpha)
+                alpha=scattering_index)
         gport = add_scattering(gport, sk, repeat=3)
     if njoin:
         for ij in xrange(njoin):
@@ -530,8 +533,8 @@ def fit_gaussian_portrait_function(params, phases, freqs, nu_ref, data=None,
     errs is the 2D array of the uncertainties on the data values.
     """
     prms = np.array([param.value for param in params.itervalues()])
-    deviates = np.ravel((data - gen_gaussian_portrait(prms, phases, freqs,
-        nu_ref, join_ichans, P)) / errs)
+    deviates = np.ravel((data - gen_gaussian_portrait(prms[:-1], phases, freqs,
+        nu_ref, join_ichans, P, scattering_index=prms[-1])) / errs)
     return deviates
 
 def fit_phase_shift_function(phase, model=None, data=None, err=None):
@@ -917,7 +920,8 @@ def fit_gaussian_profile(data, init_params, errs, fit_flags=None,
     return results
 
 def fit_gaussian_portrait(data, init_params, errs, fit_flags, phases, freqs,
-        nu_ref, join_params=[], P=None, quiet=True):
+        nu_ref, join_params=[], P=None, fit_scattering_index=False,
+        quiet=True):
     """
     Fit evolving gaussian components to a portrait.
 
@@ -941,6 +945,9 @@ def fit_gaussian_portrait(data, init_params, errs, fit_flags, phases, freqs,
     join_params specifies how to simultaneously fit several portraits; see
         ppgauss.
     P is the pulse period [sec].
+    fit_scattering_index will also fit for the power-law index of the
+        scattering law, with the initial guess set as the default in the header
+        lines of pplib.py.
     quiet=True suppresses output [default].
     """
     nparam = len(init_params)
@@ -989,13 +996,20 @@ def fit_gaussian_portrait(data, init_params, errs, fit_flags, phases, freqs,
         join_ichans = []
     other_args = {'data':data, 'errs':errs, 'phases':phases, 'freqs':freqs,
             'nu_ref':nu_ref, 'join_ichans':join_ichans, 'P':P}
+    #Fit scattering index?  Not recommended.
+    params.add('scattering_index', scattering_alpha, vary=fit_scattering_index,
+            min=None, max=None, expr=None)
     #Now fit it
     results = lm.minimize(fit_gaussian_portrait_function, params,
             kws=other_args)
     fitted_params = np.array([param.value for param in
         results.params.itervalues()])
+    scattering_index = fitted_params[-1]
+    fitted_params = fitted_params[:-1]
     fit_errs = np.array([param.stderr for param in
         results.params.itervalues()])
+    scattering_index_err = fit_errs[-1]
+    fit_errs = fit_errs[:-1]
     dof = results.nfree
     chi2 = results.chisqr
     red_chi2 = results.redchi
@@ -1013,7 +1027,8 @@ def fit_gaussian_portrait(data, init_params, errs, fit_flags, phases, freqs,
         print "data stdev: %.3g" %get_noise(data)
         print "---------------------------------------------------------------"
     results = DataBunch(fitted_params=fitted_params, fit_errs=fit_errs,
-            chi2=chi2, dof=dof)
+            scattering_index=scattering_index,
+            scattering_index_err=scattering_index_err, chi2=chi2, dof=dof)
     return results
 
 def fit_phase_shift(data, model, noise=None, bounds=[-0.5, 0.5]):
@@ -1762,7 +1777,8 @@ def read_model(modelfile, phases=None, freqs=None, P=None, quiet=False):
                 return 0
             else:
                 params[1] *= nbin / P
-        model = gen_gaussian_portrait(params, phases, freqs, nu_ref)
+        model = gen_gaussian_portrait(params, phases, freqs, nu_ref,
+                scattering_index=scattering_alpha)
     if not quiet and not read_only:
         print "Model Name: %s"%name
         print "Made %d component model with %d profile bins,"%(ngauss, nbin)
