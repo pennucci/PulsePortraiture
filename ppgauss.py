@@ -684,7 +684,7 @@ class GaussianSelector:
             self.init_params += [loc, wid, amp]
             self.ngauss += 1
             self.plot_gaussians(self.init_params)
-            print "Auto-fitting single gaussian profile..."
+            print "Auto-fitting a single gaussian component..."
             fgp = fit_gaussian_profile(self.profile, self.init_params,
                     np.zeros(self.proflen) + self.errs, self.profile_fit_flags,
                     self.fit_scattering, quiet=True)
