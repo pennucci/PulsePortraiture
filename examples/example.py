@@ -51,11 +51,11 @@ for ifile in range(nfiles):
 os.system('psredit -q -m -c rcvr:name="fake_rx" -c be:name="fake_be" example-*.fits')
 os.system("ls example-*.fits > example.meta")
 metafile = "example.meta"
-#If you wanted to add a bunch of datafiles together, you would use PSRCHIVE's
+#If you wanted to add a bunch of datafiles together, you could use PSRCHIVE's
 #psradd to get a high SNR portrait.
 print "Adding data archives..."
 outfile = "example.port"
-os.system("psradd -T -P -M %s -o %s"%(metafile, outfile))
+os.system("psradd -T -P -E %s -M %s -o %s"%(ephemeris, metafile, outfile))
 
 #Now we want to "build" our gaussian model from the data
 print "Running ppgauss.py to fit a gaussian model..."
