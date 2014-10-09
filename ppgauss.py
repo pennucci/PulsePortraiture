@@ -923,7 +923,7 @@ if __name__ == "__main__":
                       help="Scattering timescale [sec] at nu_ref, assuming alpha=-4.0 (which can be changed internally). Not used with -I. [default=0]")
     parser.add_option("--fitloc",
                       action="store_false", dest="fixloc", default=True,
-                      help="Do not fix locations of gaussians across frequency. Use this flag to allow gaussian components to drift with frequency (not recommended; rather, use --fgauss). Not used with -I. [default=False]")
+                      help="Do not fix locations of gaussians across frequency. Use this flag to allow all gaussian components to drift with frequency (cf. --fgauss). Not used with -I. [default=False]")
     parser.add_option("--fixwid",
                       action="store_true", dest="fixwid", default=False,
                       help="Fix widths of gaussians across frequency. Not used with -I. [default=False]")

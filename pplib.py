@@ -913,7 +913,7 @@ def fit_gaussian_profile(data, init_params, errs, fit_flags=None,
         print "DOF:", dof
         print "reduced chi-sq: %.2f" % red_chi2
         print "residuals mean: %.3g" % np.mean(residuals)
-        print "residuals stdev: %.3g" % np.std(residuals)
+        print "residuals std.: %.3g" % np.std(residuals)
         print "---------------------------------------------------------------"
     results = DataBunch(fitted_params=fitted_params, fit_errs=fit_errs,
             residuals=residuals, chi2=chi2, dof=dof)
@@ -1023,8 +1023,8 @@ def fit_gaussian_portrait(data, init_params, errs, fit_flags, phases, freqs,
         print "DOF:", dof
         print "reduced chi-sq: %.2g" %red_chi2
         print "residuals mean: %.3g" %np.mean(residuals)
-        print "residuals stdev: %.3g" %np.std(residuals)
-        print "data stdev: %.3g" %get_noise(data)
+        print "residuals std.: %.3g" %np.std(residuals)
+        print "data std.: %.3g" %get_noise(data)
         print "---------------------------------------------------------------"
     results = DataBunch(fitted_params=fitted_params, fit_errs=fit_errs,
             scattering_index=scattering_index,
