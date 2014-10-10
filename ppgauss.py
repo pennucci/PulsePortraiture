@@ -569,7 +569,11 @@ class DataPortrait:
 
         This function is a hack until something better is developed for how to
         deal with these alignment parameters.
+
+        NB: The join parameters are "opposite" of how they should used to
+            rotate the data with e.g. rotate_data; use a negative!
         """
+        print "Beware: JOIN Parameters should be negated!"
         print "JOIN Parameters:", self.join_params
         if print_errs: print "JOIN Parameters' Errors:", self.join_param_errs
         joinfile = self.model_name + ".join"
