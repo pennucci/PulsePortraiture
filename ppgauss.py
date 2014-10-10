@@ -578,8 +578,8 @@ class DataPortrait:
         if print_errs: print "JOIN Parameters' Errors:", self.join_param_errs
         joinfile = self.model_name + ".join"
         jf = open(joinfile, "a")
-        header = "# archive name" + " "*32 + "phase offset [rot]" + " "*2 + \
-                "delta-DM [cm**-3 pc]\n"
+        header = "# archive name" + " "*32 + "-phase offset [rot]" + " "*1 + \
+                "-delta-DM [cm**-3 pc]\n"
         jf.write(header)
         for ifile in xrange(len(self.datafiles)):
             datafile = self.datafiles[ifile]
