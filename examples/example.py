@@ -10,31 +10,34 @@ ephemeris = "example.par"
 #Generate some fake datafiles
 #These files will be homogenous, even though they don't need to be
 
-nfiles = 3      #Number of datafiles/epochs
-MJD0 = 50000.00 #Start day [MJD]
-days = 20.0     #Days between epochs
-nsub = 10       #Number of subintegrations
-npol = 1        #Number of polarization (can be 4, but will only use total I)
-nchan = 64      #Number of frequency channels
-nbin = 512      #Number of phase bins
-nu0 = 1500.0    #Center of the band [MHz]
-bw = 800.0      #Bandwidth [MHz]
-tsub = 60.0     #Length of subintegration [s]
-noise_std = 2.75#Noise level of the band, per subintegration [flux units]
-dDM_mean = 3e-4 #Add in random dispersion measure offsets with this mean value
-dDM_std = 2e-4  #Add in random dispersion measure offsets with this std
+nfiles = 3       #Number of datafiles/epochs
+MJD0 = 50000.00  #Start day [MJD]
+days = 20.0      #Days between epochs
+nsub = 10        #Number of subintegrations
+npol = 1         #Number of polarization (can be 4, but will only use total I)
+nchan = 64       #Number of frequency channels
+nbin = 512       #Number of phase bins
+nu0 = 1500.0     #Center of the band [MHz]
+bw = 800.0       #Bandwidth [MHz]
+tsub = 60.0      #Length of subintegration [s]
+noise_std = 2.75 #Noise level of the band, per subintegration [flux units]
+dDM_mean = 3e-4  #Add in random dispersion measure offsets with this mean value
+dDM_std = 2e-4   #Add in random dispersion measure offsets with this std
 dDMs = np.random.normal(dDM_mean, dDM_std, nfiles)
-#dDMs = np.zeros(nfiles) #Uncomment and set dDM_mean and dDM_std to zero for no injected dDMs
-                #Adding scattering may slow down the fit
-t_scat = 50e-6  #Add scattering with this timescale [s] w.r.t. nu0
-scint = True    #Add random scintillation
-alpha = -4.0    #t_scat will follow a powerlaw with this spectral index
+#dDMs = np.zeros(nfiles) #Uncomment and set dDM_mean and dDM_std to zero for \
+                         #no injected dDMs
+#Adding scattering may slow down the fit
+t_scat = 50e-6   #Add scattering with this timescale [s] w.r.t. nu0
+scint = True     #Add random scintillation
+alpha = -4.0     #t_scat will follow a powerlaw with this spectral index
+fitalpha = False #Fit the scattering index
 
 weights = np.ones([nsub, nchan]) #Change if you want to have an "RFI" mask
-                                 #eg. band edges zapped:
+                                 #e.g. band edges zapped:
                                  #weights[:,:10] = 0 ; weights[:,-10:] = 0
-                                 #eg. first and last subints zapped:
+                                 #e.g. first and last subints zapped:
                                  #weights[0] = 0 ; weights[-1] = 0
+
 print "Making fake data..."
 for ifile in range(nfiles):
     if ifile == 0: quiet=False
@@ -46,13 +49,13 @@ for ifile in range(nfiles):
             weights=weights, noise_std=noise_std, scale=1.0, dedispersed=False,
             t_scat=t_scat, alpha=alpha, scint=scint, state="Coherence",
             obs="GBT", quiet=quiet)
-    #NB: the input parfile cannot yet have binary parameters
-
+    #NB: the input parfile for fake data cannot yet have binary parameters
 os.system('psredit -q -m -c rcvr:name="fake_rx" -c be:name="fake_be" example-*.fits')
-os.system("ls example-*.fits > example.meta")
-metafile = "example.meta"
+
 #If you wanted to add a bunch of datafiles together, you could use PSRCHIVE's
 #psradd to get a high SNR portrait.
+metafile = "example.meta"
+os.system("ls example-*.fits > %s"%metafile)
 print "Adding data archives..."
 outfile = "example.port"
 os.system("psradd -T -P -E %s -M %s -o %s"%(ephemeris, metafile, outfile))
@@ -67,10 +70,11 @@ dp = pg.DataPortrait(datafile)
 dp.show_data_portrait()
 #Fit a model; see ppgauss.py for all options
 dp.make_gaussian_model(ref_prof=(nu0, bw/4), tau=(t_scat * dp.nbin) / dp.Ps[0],
-        fixloc=True, fixscat= not bool(t_scat), niter=3,
-        fiducial_gaussian=True, writemodel=True, outfile="example-fit.gmodel",
-        model_name="example-fit", residplot="example.png", quiet=False)
-#You can always then continue iterations using:
+        fixloc=True, fixscat=not(bool(t_scat)), fixalpha=not(fitalpha),
+        niter=3, fiducial_gaussian=True, writemodel=True,
+        outfile="example-fit.gmodel", model_name="example-fit",
+        residplot="example.png", quiet=False)
+#You can always then continue iterations using the ppgauss option -I or by:
 #niter = # 
 #modelfile = example-fit.gmodel
 #dp.make_gaussian_model(modelfile, niter=niter)
@@ -80,7 +84,7 @@ dp.make_gaussian_model(ref_prof=(nu0, bw/4), tau=(t_scat * dp.nbin) / dp.Ps[0],
 #Now we would measure TOAs and DMs
 print "Running pptoas.py to fit TOAs and DMs..."
 import pptoas as pt
-#Set the DM to which the offsets are referenced (eg. from the input ephemeris)
+#Set the DM to which the offsets are referenced (e.g. from the input ephemeris)
 i,o = os.popen4("grep DM %s"%ephemeris)
 DM0 = float(o.readline().split()[1])
 #Initiate Class instance; one could also use a smoothed average of the data

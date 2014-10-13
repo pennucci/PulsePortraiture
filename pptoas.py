@@ -38,7 +38,7 @@ class TOA:
         DM is the full DM [cm**-3 pc] associated with the TOA.
         DM_error is the DM uncertainty [cm**-3 pc].
         flags is a dictionary of arbitrary TOA flags
-            (eg. {'subint':0, 'be':'GUPPI'}).
+            (e.g. {'subint':0, 'be':'GUPPI'}).
         """
         self.archive = archive
         self.frequency = frequency
@@ -151,7 +151,7 @@ class GetTOAs:
         show_plot=True will show a plot at the end of the fitting; it is only
             useful if the number of subintegrations in a datafile > 1.
         addtnl_toa_flags are pairs making up TOA flags to be written uniformly
-            to all tempo2-formatted TOAs.  eg. ('pta','NANOGrav','version',0.1)
+            to all tempo2-formatted TOAs. e.g. ('pta','NANOGrav','version',0.1)
         quiet=True suppresses output.
         """
         self.nu_ref = nu_ref
@@ -256,7 +256,7 @@ class GetTOAs:
                 ###############
                 #Having only one initial guess doesn't speed things up (at all)
                 #Having multiple initial guesses is better for generality,
-                #eg. binary systems with poorly determined parameters.
+                #e.g. binary systems with poorly determined parameters.
                 #One may envision a system that uses the previous phase
                 #estimate as the next guess, but that could be bad, if one
                 #subint is contaminated or very poorly determined.
@@ -527,7 +527,8 @@ class GetTOAs:
         show_portrait(port=port, phases=data.phases, freqs=data.freqs[isub],
                 title=title, prof=True, fluxprof=True, rvrsd=bool(data.bw < 0))
 
-    def show_fit(self, datafile=None, isub=0, rotate=0.0, quiet=False):
+    def show_fit(self, datafile=None, isub=0, rotate=0.0, show=True,
+            return_fit=False, quiet=False):
         """
         Plot the fit results from a subintegration.
 
@@ -573,11 +574,13 @@ class GetTOAs:
         model_scaled = np.transpose(scales * np.transpose(model))
         titles = ("%s\nSubintegration %d"%(datafile, isub),
                 "Fitted Model %s"%(model_name), "Residuals")
-        show_residual_plot(port=port, model=model_scaled, resids=None,
-                phases=phases, freqs=freqs, titles=titles,
-                rvrsd=bool(data.bw < 0))
-        return (port, model_scaled, data.ok_ichans[isub], freqs,
-                data.noise_stds[isub,0])
+        if show:
+            show_residual_plot(port=port, model=model_scaled, resids=None,
+                    phases=phases, freqs=freqs, titles=titles,
+                    rvrsd=bool(data.bw < 0))
+        if return_fit:
+            return (port, model_scaled, data.ok_ichans[isub], freqs,
+                    data.noise_stds[isub,0])
 
     def show_results(self, datafile=None):
         """
@@ -705,7 +708,7 @@ if __name__ == "__main__":
     parser.add_option("--flags",
                       action="store", metavar="flags", dest="toa_flags",
                       default="",
-                      help="Pairs making up TOA flags to be written uniformly to all tempo2-formatted TOAs.  eg. ('pta','NANOGrav','version',0.1)")
+                      help="Pairs making up TOA flags to be written uniformly to all tempo2-formatted TOAs.  e.g. ('pta','NANOGrav','version',0.1)")
     parser.add_option("--nu_ref",
                       action="store", metavar="nu_ref", dest="nu_ref",
                       default=None,
@@ -715,7 +718,7 @@ if __name__ == "__main__":
                       help="Nominal DM [cm**-3 pc] from which to reference offset DM measurements.  If unspecified, will use the DM stored in each archive.")
     parser.add_option("--no_bary_DM",
                       action="store_false", dest="bary_DM", default=True,
-                      help='Do not Doppler-correct the fitted DM to make "barycentric DM".')
+                      help='Do not Doppler-correct the DM to make a "barycentric DM".')
     parser.add_option("--one_DM",
                       action="store_true", dest="one_DM", default=False,
                       help="Returns single DM value in output .tim file for all subints in the epoch instead of a fitted DM per subint.")
@@ -729,7 +732,7 @@ if __name__ == "__main__":
                       help="If specified, will write the fitted DM errors to errfile (desirable if using non-tempo2 formatted TOAs). Will append.")
     parser.add_option("--fix_DM",
                       action="store_false", dest="fit_DM", default=True,
-                      help="Do not fit for DM; you may also want to use --no_bary_DM.")
+                      help="Do not fit for DM. NB: the parfile DM will still be 'barycentered' in the TOA lines unless --no_bary_DM is used!")
     parser.add_option("--showplot",
                       action="store_true", dest="showplot", default=False,
                       help="Plot fit results for each epoch. Only useful if nsubint > 1.")

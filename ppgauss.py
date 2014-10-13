@@ -347,6 +347,7 @@ class DataPortrait:
             self.fit_flags[3::6] *= not(fixloc)
             self.fit_flags[5::6] *= not(fixwid)
             self.fit_flags[7::6] *= not(fixamp)
+            self.fixalpha = fixalpha
             if fiducial_gaussian:
                 #ifgauss = self.init_params[4::3].argmax()
                 ifgauss = 0
@@ -368,7 +369,7 @@ class DataPortrait:
         self.total_time = 0.0
         self.start = time.time()
         #if not quiet:
-        #    print "Fitting gaussian model portrait..."
+        #    print "\nFitting gaussian model portrait..."
         print "Fitting gaussian model portrait..."
         iterator = self.model_iteration(quiet)
         iterator.next()
@@ -392,12 +393,12 @@ class DataPortrait:
                 print "Fitting gaussian model portrait..."
             iterator.next()
             self.niter -= 1
+            self.cnvrgnc = self.check_convergence(efac=1.0, quiet=quiet)
             #For safety, write model after each iteration
             if writemodel:
                 self.write_model(outfile=outfile, quiet=quiet)
             if writeerrfile:
                 self.write_errfile(errfile=errfile, quiet=quiet)
-            self.cnvrgnc = self.check_convergence(efac=1.0, quiet=quiet)
         if self.njoin:
             for ii in range(self.njoin):
                 jic = self.join_ichans[ii]
@@ -441,14 +442,13 @@ class DataPortrait:
             fgp = fit_gaussian_portrait(self.portx, self.model_params,
                     self.portx_noise, self.fit_flags, self.phases,
                     self.freqsxs[0], self.nu_ref, self.all_join_params,
-                    self.Ps[0], not(fixalpha), quiet=quiet)
+                    self.Ps[0], not(self.fixalpha), quiet=quiet)
             (self.fitted_params, self.fit_errs, self.chi2, self.dof) = (
                     fgp.fitted_params, fgp.fit_errs, fgp.chi2, fgp.dof)
             self.scattering_index, self.scattering_index_err = \
                     fgp.scattering_index, fgp.scattering_index_err
-            if not fixalpha:
-                print ""
-                print "Scattering index = %.5f +/- %.5f"%(
+            if not self.fixalpha:
+                print "\nScattering index = %.5f +/- %.5f"%(
                         self.scattering_index, self.scattering_index_err)
             if self.njoin:
                 self.model_params = self.fitted_params[:-self.njoin*2]
@@ -897,7 +897,7 @@ if __name__ == "__main__":
     parser.add_option("-M", "--metafile",
                       default=None,
                       action="store", metavar="metafile", dest="metafile",
-                      help="(BETA) Will be able to fit several obs. from different bands.  NB: First file in metafile MUST also be the one that contains nu_ref.")
+                      help="(BETA) Will be able to fit several obs. from different bands. NB: First file in metafile MUST also be the one that contains nu_ref.")
     parser.add_option("-I", "--improve",
                       action="store", metavar="modelfile", dest="modelfile",
                       default=None,
@@ -935,11 +935,11 @@ if __name__ == "__main__":
                       action="store_true", dest="fixamp", default=False,
                       help="Fix amplitudes of gaussians across frequency. Not used with -I. [default=False]")
     parser.add_option("--fitscat",
-                      action="store_true", dest="fitscat", default=False,
+                      action="store_false", dest="fixscat", default=True,
                       help="Fit scattering timescale to tau w.r.t nu_ref. Not used with -I. [default=False]")
     parser.add_option("--fitalpha",
-                      action="store_true", dest="fitalpha", default=False,
-                      help="Fit power-law index for the scattering law. Not used with -I. (NB: currently need to save output to parse values) [default=False]")
+                      action="store_false", dest="fixalpha", default=True,
+                      help="Fit power-law index for the scattering law. Default fixed value is set in pplib.py. Implies --fitscat. NB: currently need to save output to parse fitted values! [default=False]")
     parser.add_option("--niter",
                       action="store", metavar="int", dest="niter", default=0,
                       help="Number of iterations to loop for generating better model; ppgauss exits before niter iterations if internal convergence criteria are met. [default=0]")
@@ -983,8 +983,9 @@ if __name__ == "__main__":
     fixloc = options.fixloc
     fixwid = options.fixwid
     fixamp = options.fixamp
-    fixscat = not options.fitscat
-    fixalpha = not options.fitalpha
+    fixscat = options.fixscat
+    fixalpha = options.fixalpha
+    if not fixalpha: fixscat = False
     niter = int(options.niter)
     fgauss = options.fgauss
     auto_gauss = float(options.auto_gauss)
@@ -996,10 +997,10 @@ if __name__ == "__main__":
     if normalize: dp.normalize_portrait()
     if not quiet: dp.show_data_portrait()
     if modelfile is not None:
-        dp.make_gaussian_model(modelfile = modelfile, niter=niter,
-                writemodel=True, outfile=outfile, writeerrfile=True,
-                errfile=errfile, model_name=model_name, residplot=figure,
-                quiet=quiet)
+        dp.make_gaussian_model(modelfile = modelfile, fixalpha=fixalpha,
+                niter=niter, writemodel=True, outfile=outfile,
+                writeerrfile=True, errfile=errfile, model_name=model_name,
+                residplot=figure, quiet=quiet)
     else:
         tau *= dp.nbin / dp.Ps[0]
         dp.make_gaussian_model(modelfile=None, ref_prof=(nu_ref, bw_ref),

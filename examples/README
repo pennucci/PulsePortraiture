@@ -9,7 +9,7 @@
 --For a more involved example, run/examine example.py.
 
 --Simplest command-line use with minimum arguments:
-    >Make a gaussian model based on averaged data (eg. using psradd):
+    >Make a gaussian model (based on averaged data e.g. having used psradd):
           ppgauss.py -d average_psrfits_file.fits
     
     >Measure TOAs & DMs from an archive using a ppgauss model:
@@ -25,21 +25,22 @@
           ppgauss.py -d average_psrfits_file.fits --fgauss --norm
     
     >Make a gaussian model that includes a fit for a constant scattering
-        timescale (will take long[er]) and iterate:
+        timescale (will take long[er]) and iterate three additional times:
           ppgauss.py -d average_psrfits_file.fits --fitscat --niter 3
     
-    >Make a gaussian model specifying some of the output:
-          ppgauss.py -d average_psrfits_file.fits -o pgauss_model.gmodel \
+    >Make a gaussian model specifying some of the output and show more output:
+          ppgauss.py -d average_psrfits_file.fits -o ppgauss_model.gmodel \
             -m 2_component_820_MHz_model --verbose
     
     >Measure TOAs & DMs from a metafile of archives, but output only a single
         (average) DM for each archive, and suppress all other output:
           pptoas.py -d metafile_with_archive_names \
-            -m model_from_ppgauss.gmodel --one_DM  --quiet
+            -m model_from_ppgauss.gmodel --one_DM --quiet
 
     >Measure only TOAs in an archive and specify an output file:
+        (NB: DMs will still be 'barycentered' unless --no_bary is also used!)
           pptoas.py -d psrfits_archive.fits -m model_from_ppgauss.gmodel \
-            -o my_tim_file.tim  --fix_DM
+            -o my_tim_file.tim --fix_DM --no_bary
 
     >Add additonal flags (in pairs) to the output TOA lines:
           pptoas.py -d psrfits_archive.fits -m model_from_ppgauss.gmodel \

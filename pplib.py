@@ -2088,7 +2088,7 @@ def filter_TOAs(TOAs, flag, cutoff, criterion=">=", pass_unflagged=False):
     TOAs is a TOA list from pptoas.
     flag is a string specifying what attribute of the toa is filtered.
     cutoff is the cutoff value for the flag.
-    criterion is a string specifying the condition eg. '>', '<=', etc.
+    criterion is a string specifying the condition e.g. '>', '<=', etc.
     pass_unflagged=True will pass TOAs if they do not have the flag.
     """
     new_toas = []
@@ -2208,7 +2208,7 @@ def show_portrait(port, phases=None, freqs=None, title=None, prof=True,
     origin tells pyplot where to put the (0,0) point (?).
     extent is a 4-element tuple setting the (lo_phase, hi_phase, lo_freq,
         hi_freq) limits on the plot.
-    **kwargs get passed to imshow.  eg. vmin, vmax...
+    **kwargs get passed to imshow.  e.g. vmin, vmax...
     """
     nn = 2*3*5  #Need something divisible by 2,3,5...
     grid = gs.GridSpec(nn, nn)
@@ -2314,7 +2314,7 @@ def show_residual_plot(port, model, resids=None, phases=None, freqs=None,
     origin tells pyplot where to put the (0,0) point (?).
     extent is a 4-element tuple setting the (lo_phase, hi_phase, lo_freq,
         hi_freq) limits on the plot.
-    **kwargs get passed to imshow.  eg. vmin, vmax...
+    **kwargs get passed to imshow.  e.g. vmin, vmax...
     """
     mm = 6
     nn = (2*mm) + (mm/3)
