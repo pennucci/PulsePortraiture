@@ -299,6 +299,7 @@ class DataPortrait:
             and residuals is desired.
         quiet=True suppresses output.
         """
+        self.fixalpha = fixalpha    #Needs to be integrated...
         if modelfile:
             if outfile is None:
                 outfile = modelfile
@@ -347,7 +348,6 @@ class DataPortrait:
             self.fit_flags[3::6] *= not(fixloc)
             self.fit_flags[5::6] *= not(fixwid)
             self.fit_flags[7::6] *= not(fixamp)
-            self.fixalpha = fixalpha
             if fiducial_gaussian:
                 #ifgauss = self.init_params[4::3].argmax()
                 ifgauss = 0
