@@ -165,6 +165,7 @@ class DataPortrait:
             if self.source is None: self.source = "noname"
             self.port = (self.masks * self.subints)[0,0]
             self.portx = self.port[self.ok_ichans[0]]
+            self.flux_profx = self.flux_prof[self.ok_ichans[0]]
             self.freqsxs = [self.freqs[0,self.ok_ichans[0]]]
             self.noise_stdsxs = self.noise_stds[0,0,self.ok_ichans[0]]
             self.SNRsxs = self.SNRs[0,0,self.ok_ichans[0]]
