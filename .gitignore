@@ -17,3 +17,4 @@ examples/example.tim
 ppalign.py
 pplib_dist.py*
 MCtests/
+ppalign*

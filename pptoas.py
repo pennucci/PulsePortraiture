@@ -87,9 +87,8 @@ class GetTOAs:
         quiet=True suppresses output.
         """
         if file_is_ASCII(datafiles):
-            self.datafiles = open(datafiles, "r").readlines()
-            self.datafiles = [self.datafiles[ifile][:-1] for ifile in
-                    xrange(len(self.datafiles))]
+            self.datafiles = [datafile[:-1] for datafile in \
+                    open(datafiles, "r").readlines()]
         else:
             self.datafiles = [datafiles]
         if len(self.datafiles) > max_nfile:
@@ -204,6 +203,13 @@ class GetTOAs:
                 DM0 = self.DM0
             if not fit_DM:
                 bounds[1] = (DM0, DM0)
+            if not self.is_gauss_model:
+                print "You are using an experimental functionality of pptoas!"
+                model_data = load_data(self.modelfile, dedisperse=True,
+                    dededisperse=False, tscrunch=True, pscrunch=True,
+                    fscrunch=False, rm_baseline=True, flux_prof=False,
+                    refresh_arch=False, return_arch=False, quiet=True)
+                model = (model_data.masks * model_data.subints)[0,0]
             if not quiet:
                 print "\nEach of the %d TOAs is approximately %.2f s"%(
                         len(ok_isubs), arch.integration_length() / nsub)
@@ -219,15 +225,16 @@ class GetTOAs:
                     self.model_name, self.ngauss, model = read_model(
                             self.modelfile, phases, freqs[isub], Ps[isub],
                             quiet=quiet)
-                    freqsx = freqs[isub,ok_ichans[isub]]
-                    portx = subints[isub,0,ok_ichans[isub]]
-                    modelx = model[ok_ichans[isub]]
-                    SNRsx = SNRs[isub,0,ok_ichans[isub]]
-                    #NB: Time-domain uncertainties below
-                    errs = noise_stds[isub,0,ok_ichans[isub]]
-                else:
-                    print "pptoas currently only takes gaussian models..."
-                    sys.exit()
+                #else:
+                ##THESE FREQUENCIES WILL BE OFF IF AVERAGED CHANNELS##
+                #    print model_data.freqs[0, ok_ichans[isub]] - \
+                #            freqs[isub,ok_ichans[isub]]
+                freqsx = freqs[isub,ok_ichans[isub]]
+                portx = subints[isub,0,ok_ichans[isub]]
+                modelx = model[ok_ichans[isub]]
+                SNRsx = SNRs[isub,0,ok_ichans[isub]]
+                #NB: Time-domain uncertainties below
+                errs = noise_stds[isub,0,ok_ichans[isub]]
                 #nu_fit is a guess at nu_zero, the zero-covariance frequency,
                 #which is calculated after. This attempts to minimize the
                 #number of function calls.  Lower frequencies mean more calls,
@@ -559,8 +566,13 @@ class GetTOAs:
         P = data.Ps[isub]
         phases = data.phases
         if not self.is_gauss_model:
-            print "pptoas currently only takes gaussian models..."
-            sys.exit()
+            print "You are using an experimental functionality of pptoas!"
+            model_data = load_data(self.modelfile, dedisperse=True,
+                    dededisperse=False, tscrunch=True, pscrunch=True,
+                    fscrunch=False, rm_baseline=True, flux_prof=False,
+                    refresh_arch=False, return_arch=False, quiet=True)
+            model = (model_data.masks * model_data.subints)[0,0]
+            model_name = self.modelfile
         else:
             model_name, ngauss, model = read_model(self.modelfile, phases,
                     freqs, data.Ps.mean(), quiet=quiet)
@@ -685,7 +697,7 @@ if __name__ == "__main__":
 
     from optparse import OptionParser
 
-    usage = "usage: %prog [options]"
+    usage = "Usage: %prog -d <datafile or metafile> -m <modelfile> [options]"
     parser = OptionParser(usage)
     #parser.add_option("-h", "--help",
     #                  action="store_true", dest="help", default=False,

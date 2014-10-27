@@ -24,18 +24,21 @@ class DataPortrait:
     an interactive python environment.
     """
 
-    def __init__(self, datafile=None, quiet=False):
+    def __init__(self, datafile=None, joinfile=None, quiet=False):
         """
         Unpack all of the data and set initial attributes.
 
         If datafile is a metafile of PSRCHIVE archives, "join" attributes are
-        set, which are used to align the archives.  A large (>3) number of
-        archives signficiantly slows the fitting process, and it has only been
-        testing for the case that each archive originates from a unique
-        receiver.
+            set, which are used to align the archives.  A large (>3) number of
+            archives signficiantly slows the fitting process, and it has only
+            been testing for the case that each archive originates from a
+            unique receiver.
+        joinfile is a file like that which is output by write_join_parameters,
+            containing optional parameters to align the multiple archives.
         quiet=True suppresses output.
         """
         self.init_params = []
+        self.joinfile = joinfile
         if file_is_ASCII(datafile):
             self.join_params = []
             self.join_fit_flags = []
@@ -146,6 +149,20 @@ class DataPortrait:
             self.freqsxs = [self.freqsxs]
             self.join_params = np.array(self.join_params)
             self.join_fit_flags = np.array(self.join_fit_flags)
+            if self.joinfile:
+                joinfile_lines = open(self.joinfile, "r").readlines()[-len(
+                    self.datafiles):]
+                joinfile_lines = [line.split() for line in joinfile_lines]
+                try:
+                    for ifile in range(len(joinfile_lines)):
+                        ijoin = self.datafiles.index(joinfile_lines[ifile][0])
+                        phi = np.double(joinfile_lines[ifile][1])
+                        DM = np.float(joinfile_lines[ifile][2])
+                        self.join_params[ijoin*2] = phi
+                        self.join_params[ijoin*2+1] = DM
+                except ValueError:
+                    print "Bad join file."
+                    sys.exit()
             self.all_join_params = [self.join_ichanxs, self.join_params,
                     self.join_fit_flags]
         else:
@@ -157,7 +174,7 @@ class DataPortrait:
             self.data = load_data(datafile, dedisperse=True,
                     dededisperse=False, tscrunch=True, pscrunch=True,
                     fscrunch=False, rm_baseline=True, flux_prof=True,
-                    return_arch=True, quiet=quiet)
+                    refresh_arch=True, return_arch=True, quiet=quiet)
             #Unpack the data dictionary into the local namespace;
             #see load_data for dictionary keys.
             for key in self.data.keys():
@@ -181,6 +198,8 @@ class DataPortrait:
         for ichan in range(len(self.portx)):
             self.portx[ichan] /= self.portx[ichan].max()
             self.noise_stdsxs[ichan] = get_noise(self.portx[ichan])
+        self.flux_prof = self.port.mean(axis=1)
+        self.flux_profx = self.portx.mean(axis=1)
 
     def fit_profile(self, profile, tau=0.0, fixscat=True, auto_gauss=0.0,
             profile_fit_flags=None, show=True):
@@ -222,7 +241,8 @@ class DataPortrait:
         """
         #Noise level below may be off
         fp = fit_powlaw(self.flux_profx, np.array([guessA,guessalpha]),
-            np.median(self.noise_stdsxs), self.freqsxs[0], self.nu0)
+            self.noise_stdsxs/(self.nbin**0.5), self.freqsxs[0], self.nu0)
+            #np.median(self.noise_stdsxs), self.freqsxs[0], self.nu0)
         if not quiet:
             print ""
             print "Flux-density power-law fit"
@@ -526,6 +546,8 @@ class DataPortrait:
             if abs(self.DM) < abs(self.DMerr)*efac:
                 print "\nIteration converged.\n"
                 return 1
+                #print "\nForcing remaining iterations, if any.\n"
+                #return 0
         else:
             return 0
 
@@ -886,7 +908,7 @@ if __name__ == "__main__":
 
     from optparse import OptionParser
 
-    usage = "usage: %prog [options]"
+    usage = "Usage: %prog -d <datafile> [options]\n         or\n       %prog -M <metafile> [options]"
     parser = OptionParser(usage)
     #parser.add_option("-h", "--help",
     #                  action="store_true", dest="help", default=False,
@@ -911,6 +933,10 @@ if __name__ == "__main__":
                       default=None,
                       action="store", metavar="errfile", dest="errfile",
                       help="Name of parameter error file name. [default=outfile_err]")
+    parser.add_option("-j", "--joinfile",
+                      default=None,
+                      action="store", metavar="joinfile", dest="joinfile",
+                      help="File containing join parameters to align files in metafile. [default=None]")
     parser.add_option("-m", "--model_name",
                       default=None,
                       action="store", metavar="model_name", dest="model_name",
@@ -975,6 +1001,7 @@ if __name__ == "__main__":
     modelfile = options.modelfile
     outfile = options.outfile
     errfile = options.errfile
+    joinfile = options.joinfile
     model_name = options.model_name
     if options.nu_ref: nu_ref = np.float64(options.nu_ref)
     else: nu_ref = options.nu_ref
@@ -994,9 +1021,9 @@ if __name__ == "__main__":
     figure = options.figure
     quiet = options.quiet
 
-    dp = DataPortrait(datafile=datafile, quiet=quiet)
+    dp = DataPortrait(datafile=datafile, joinfile=joinfile, quiet=quiet)
     if normalize: dp.normalize_portrait()
-    if not quiet: dp.show_data_portrait()
+    #if not quiet: dp.show_data_portrait()
     if modelfile is not None:
         dp.make_gaussian_model(modelfile = modelfile, fixalpha=fixalpha,
                 niter=niter, writemodel=True, outfile=outfile,

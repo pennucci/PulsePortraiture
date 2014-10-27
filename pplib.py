@@ -23,13 +23,12 @@ import scipy.optimize as opt
 import scipy.signal as ss
 import lmfit as lm
 import psrchive as pr
-nodes = False   #Used for MC testing...
+nodes = False   #Used when needing parallelized operation
 if nodes:
     import matplotlib
     matplotlib.use('Agg')
-else:
-    import matplotlib.pyplot as plt
-    import matplotlib.gridspec as gs
+import matplotlib.gridspec as gs
+import matplotlib.pyplot as plt
 
 ##########
 #settings#
@@ -1490,6 +1489,8 @@ def phase_transform(phi, DM, nu_ref1=np.inf, nu_ref2=np.inf, P=None, mod=True):
         #phi_prime %= 1
         phi_prime = np.where(abs(phi_prime) >= 0.5, phi_prime % 1, phi_prime)
         phi_prime = np.where(phi_prime >= 0.5, phi_prime - 1.0, phi_prime)
+        if not phi_prime.shape:
+            phi_prime = np.float64(phi_prime)
     return phi_prime
 
 def guess_fit_freq(freqs, SNRs=None):
