@@ -9,6 +9,9 @@
 --For a more involved example, run/examine example.py.
 
 --Simplest command-line use with minimum arguments:
+    >Average some homogeneous data together to use with ppgauss or pptoas:
+          ppalign.py -M metafile_with_archive_names
+
     >Make a gaussian model (based on averaged data e.g. having used psradd):
           ppgauss.py -d average_psrfits_file.fits
     

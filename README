@@ -28,6 +28,8 @@ In short:
     -ppgauss is a command-line utility to build gaussian-component model
         portraits.
     -pptoas is a command-line utility to measure TOAs and DMs.
+    -ppalign is a command-line utility to average homogeneous data by measuring
+        phases and DMs.
     -Both ppgauss and pptoas can be imported into ipython for additional
         flexibility of use.
     -***See examples/README for simple command-line use.***
