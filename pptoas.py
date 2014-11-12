@@ -572,7 +572,7 @@ class GetTOAs:
         phases = data.phases
         if not self.is_gauss_model:
             print "You are using an experimental functionality of pptoas!"
-            model_data = load_data(self.modelfile, dedisperse=True,
+            model_data = load_data(self.modelfile, dedisperse=False,
                     dededisperse=False, tscrunch=True, pscrunch=True,
                     fscrunch=False, rm_baseline=True, flux_prof=False,
                     refresh_arch=False, return_arch=False, quiet=True)
