@@ -205,7 +205,7 @@ class GetTOAs:
                 bounds[1] = (DM0, DM0)
             if not self.is_gauss_model:
                 print "You are using an experimental functionality of pptoas!"
-                model_data = load_data(self.modelfile, dedisperse=True,
+                model_data = load_data(self.modelfile, dedisperse=False,
                     dededisperse=False, tscrunch=True, pscrunch=True,
                     fscrunch=False, rm_baseline=True, flux_prof=False,
                     refresh_arch=False, return_arch=False, quiet=True)
@@ -281,7 +281,7 @@ class GetTOAs:
                 #so here we transform to be on the interval [-0.5, 0.5]
                 #This may not be needed, but hasn't proved dangerous yet...
                 phase_guess = phase_guess % 1
-                if phase_guess > 0.5:
+                if phase_guess >= 0.5:
                     phase_guess -= 1.0
                 DM_guess = DM_stored
                 #Need a status bar?
@@ -297,6 +297,11 @@ class GetTOAs:
                             nu_fit, self.nu_ref, errs, bounds=bounds, id = id,
                             quiet=quiet)
                 else:  #1-channel hack
+                    if not quiet:
+                        print "TOA has one frequency channel!..."
+                        print "...using Fourier phase gradient routine..."
+                        if self.nu_ref is not None:
+                            print "--nu_ref will be ignored!"
                     results = fit_phase_shift(portx[0], modelx[0], errs[0])
                     results.DM = DM_stored
                     results.DM_err = 0.0
@@ -630,7 +635,7 @@ class GetTOAs:
         #This is to obtain the TOA phase offsets w.r.t. nu_ref
         #Apparently, changing phis in place changes self.phis ???
         phi_primes = phase_transform(phis, DMs_fitted, nu_refs,
-                    self.nu0s[ifile], Ps)
+                    self.nu0s[ifile], Ps, mod=False)
         #phi_primes may have N rotations incorporated...
         milli_sec_shifts = (phi_primes) * Ps * 1e3
         #Not sure weighting works...

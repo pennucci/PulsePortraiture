@@ -1155,7 +1155,7 @@ def fit_portrait(data, model, init_params, P, freqs, nu_fit=None, nu_out=None,
             p_n, dFFT, errs, P, freqs, nu_fit)[1]
     if nu_out is None:
         nu_out = nu_zero
-    phi_out = phase_transform(phi, DM, nu_fit, nu_out, P)
+    phi_out = phase_transform(phi, DM, nu_fit, nu_out, P, mod=False)
     #Calculate Hessian
     hessian = fit_portrait_function_2deriv(np.array([phi_out, DM]),
             mFFT, p_n, dFFT, errs, P, freqs, nu_out)[0]
@@ -1468,7 +1468,8 @@ def DM_delay(DM, freq, freq_ref=np.inf, P=None):
     else:
         return delay
 
-def phase_transform(phi, DM, nu_ref1=np.inf, nu_ref2=np.inf, P=None, mod=True):
+def phase_transform(phi, DM, nu_ref1=np.inf, nu_ref2=np.inf, P=None,
+        mod=False):
     """
     Transform an input delay at nu_ref1 to a delay at nu_ref2.
 
@@ -1537,7 +1538,7 @@ def calculate_TOA(epoch, P, phi, DM=0.0, nu_ref1=np.inf, nu_ref2=np.inf):
     nu_ref2 is the reference frequency [MHz] of the output TOA.
     """
     #The pre-Doppler corrected DM must be used
-    phi_prime = phase_transform(phi, DM, nu_ref1, nu_ref2, P)
+    phi_prime = phase_transform(phi, DM, nu_ref1, nu_ref2, P, mod=False)
     TOA = epoch + pr.MJD((phi_prime * P) / (3600 * 24.))
     return TOA
 
