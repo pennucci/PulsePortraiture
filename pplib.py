@@ -1364,7 +1364,12 @@ def rotate_data(data, phase=0.0, DM=0.0, Ps=None, freqs=None, nu_ref=np.inf):
         D = Dconst * DM / (np.ones(nsub)*Ps)
         if len(D) != nsub:
             print "Wrong shape for array of periods."
-            return 0
+            sys.exit()
+        try:
+            test = float(nu_ref)
+        except TypeError:
+            print "Only one nu_ref permitted."
+            sys.exit()
         if not hasattr(freqs, 'ndim'):
             freqs = np.ones(nchan)*freqs
         if freqs.ndim == 0:
@@ -1372,18 +1377,19 @@ def rotate_data(data, phase=0.0, DM=0.0, Ps=None, freqs=None, nu_ref=np.inf):
         if freqs.ndim == 1:
             if nchan != len(freqs):
                 print "Wrong number of frequencies."
-                return 0
+                sys.exit()
             fterm = np.tile(freqs, nsub).reshape(nsub, nchan)**-2.0 - \
                     nu_ref**-2.0
         else:
             fterm = freqs**-2.0 - nu_ref**-2.0
         if fterm.shape[1] != nchan or fterm.shape[0] != nsub:
             print "Wrong shape for frequency array."
-            return 0
+            sys.exit()
         phase += np.array([D[isub]*fterm[isub] for isub in range(nsub)])
         phase = np.einsum('ij,k', phase, harmind)
         phasor = np.exp(2.0j * np.pi * phase)
         dFFT = np.array([dFFT[:,ipol,:,:]*phasor for ipol in xrange(npol)])
+        dFFT = np.einsum('jikl', dFFT)
         if ndim == 1:
             return fft.irfft(dFFT, axis=baxis)[0,0,0]
         elif ndim == 2:
@@ -1391,7 +1397,8 @@ def rotate_data(data, phase=0.0, DM=0.0, Ps=None, freqs=None, nu_ref=np.inf):
         elif ndim == 4:
             return fft.irfft(dFFT, axis=baxis)
         else:
-            return 0
+            print "Wrong number of dimensions."
+            sys.exit()
 
 def rotate_portrait(port, phase=0.0, DM=None, P=None, freqs=None,
         nu_ref=np.inf):
