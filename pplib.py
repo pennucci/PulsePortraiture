@@ -337,7 +337,7 @@ def gen_gaussian_portrait(params, phases, freqs, nu_ref, join_ichans=[],
             join_ichan = join_ichans[ij]
             phi = join_params[0::2][ij]
             DM =  join_params[1::2][ij]
-            gport[join_ichan] = rotate_portrait(gport[join_ichan], phi,
+            gport[join_ichan] = rotate_data(gport[join_ichan], phi,
                     DM, P, freqs[join_ichan], nu_ref)
     return gport
 
@@ -1310,41 +1310,37 @@ def get_scales(data, model, phase, DM, P, freqs, nu_ref=np.inf):
     scales /= p_n
     return scales
 
-def rotate_data(data, phase=0.0, DM=0.0, Ps=None, freqs=None,
-        nu_ref=np.inf, taxis=None, faxis=-2, baxis=-1,):
+def rotate_data(data, phase=0.0, DM=0.0, Ps=None, freqs=None, nu_ref=np.inf):
     """
-    Rotate and/or dedisperse a data cube.
+    Rotate and/or dedisperse data.
 
     Positive values of phase and DM rotate the data to earlier phases
     (i.e. it "dedisperses").
 
     Simpler functions are rotate_portrait or rotate_profile.
 
-    data is a 1-, 2-, 3- or 4-D array of data.
+    data is a 1-, 2-, or 4-D array of data -- i.e. either an array of nbin (a
+        profile), nchan x nbin (a portrait), or nsub x npol x nchan x nbin
+        (a subint) values.
     phase is a value specifying the amount of achromatic rotation [rot].
     DM is a value specifying the amount of rotation based on the cold-plasma
         dispersion law [cm**-3 pc].
-    Ps is an array of periods [sec], needed if there is a nsub axis.
-    freqs is an array of frequencies [MHz], needed if there is a nchan axis.
-    nu_ref is the reference frequency [MHz] that has zero delay for any value
-        of DM.
-    taxis is an integer specfiying which axis is the temporal axis; needed if
-        len(Ps) > 1.
-    faxis is an integer specifying which axis is the frequency axis.
-    baxis is an integer specifying which axis is the phase axis.
+    Ps is a single float or an array of nsub periods [sec] needed if DM != 0.0.
+    freqs is a single float or an array of either nchan or nsub x nchan
+        frequencies [MHz].
+    nu_ref is the reference frequency [MHz] that has zero dispersive delay.
     """
     shape = data.shape
-    ndim = len(shape)
-    idim = 'ijklmnop'
-    idim = idim[:ndim]
-    iaxis = range(ndim)
-    baxis = iaxis[baxis]
-    bdim = list(idim)[baxis]
-    dFFT = fft.rfft(data, axis=baxis)
-    nharm = dFFT.shape[baxis]
-    harmind = np.arange(nharm)
+    ndim = data.ndim
     if DM == 0.0:
-        D = 0.0
+        idim = 'ijkl'
+        idim = idim[:ndim]
+        iaxis = range(ndim)
+        baxis = iaxis[-1]
+        bdim = list(idim)[baxis]
+        dFFT = fft.rfft(data, axis=baxis)
+        nharm = dFFT.shape[baxis]
+        harmind = np.arange(nharm)
         baxis = iaxis.pop(baxis)
         othershape = np.take(shape, iaxis)
         ones = np.ones(othershape)
@@ -1353,42 +1349,49 @@ def rotate_data(data, phase=0.0, DM=0.0, Ps=None, freqs=None,
         phasor = np.exp(harmind * 2.0j * np.pi * phase)
         phasor = np.einsum(order + ',' + bdim, ones, phasor)
         dFFT *= phasor
+        return fft.irfft(dFFT, axis=baxis)
     else:
-        D = Dconst * DM / Ps
-        if taxis:
-            taxis = iaxis[taxis]
-            tdim = list(idim)[taxis]
-            nsub = D.shape[0]
+        datacopy = np.copy(data)
+        while(datacopy.ndim != 4):
+            datacopy = np.array([datacopy])
+        baxis = 3
+        nsub = datacopy.shape[0]
+        npol = datacopy.shape[1]
+        nchan = datacopy.shape[2]
+        dFFT = fft.rfft(datacopy, axis=baxis)
+        nharm = dFFT.shape[baxis]
+        harmind = np.arange(nharm)
+        D = Dconst * DM / (np.ones(nsub)*Ps)
+        if len(D) != nsub:
+            print "Wrong shape for array of periods."
+            return 0
+        if not hasattr(freqs, 'ndim'):
+            freqs = np.ones(nchan)*freqs
+        if freqs.ndim == 0:
+            freqs = np.ones(nchan)*float(freqs)
+        if freqs.ndim == 1:
+            if nchan != len(freqs):
+                print "Wrong number of frequencies."
+                return 0
+            fterm = np.tile(freqs, nsub).reshape(nsub, nchan)**-2.0 - \
+                    nu_ref**-2.0
         else:
-            pass
-        faxis = iaxis[faxis]
-        fdim = list(idim)[faxis]
-        nchan = shape[faxis]
-        fterm = freqs**-2.0 - nu_ref**-2.0
-        if taxis:
-            phase += np.einsum('i,j', D, fterm)
-            phase = np.einsum('ij,k', phase, harmind)
-        else:
-            phase += D * fterm
-            phase = np.einsum('i,j', phase, harmind)
+            fterm = freqs**-2.0 - nu_ref**-2.0
+        if fterm.shape[1] != nchan or fterm.shape[0] != nsub:
+            print "Wrong shape for frequency array."
+            return 0
+        phase += np.array([D[isub]*fterm[isub] for isub in range(nsub)])
+        phase = np.einsum('ij,k', phase, harmind)
         phasor = np.exp(2.0j * np.pi * phase)
-        if taxis:
-            inds = np.array([taxis, faxis, baxis])
+        dFFT = np.array([dFFT[:,ipol,:,:]*phasor for ipol in xrange(npol)])
+        if ndim == 1:
+            return fft.irfft(dFFT, axis=baxis)[0,0,0]
+        elif ndim == 2:
+            return fft.irfft(dFFT, axis=baxis)[0,0]
+        elif ndim == 4:
+            return fft.irfft(dFFT, axis=baxis)
         else:
-            inds = np.array([faxis, baxis])
-        inds.sort()
-        inds = inds[::-1]
-        inds = np.array([iaxis.pop(ii) for ii in inds])
-        othershape = np.take(shape, iaxis)
-        order = np.take(list(idim), iaxis)
-        order = ''.join([order[xx] for xx in xrange(len(order))])
-        ones = np.ones(othershape)
-        if taxis:
-            phasor = np.einsum(order + ',' + tdim + fdim + bdim, ones, phasor)
-        else:
-            phasor = np.einsum(order + ',' + fdim + bdim, ones, phasor)
-        dFFT *= phasor
-    return fft.irfft(dFFT, axis=baxis)
+            return 0
 
 def rotate_portrait(port, phase=0.0, DM=None, P=None, freqs=None,
         nu_ref=np.inf):
@@ -2057,7 +2060,7 @@ def make_fake_pulsar(modelfile, ephemeris, outfile="fake_pulsar.fits", nsub=1,
         for ipol in xrange(npol):
             name, ngauss, model = read_model(modelfile, phases, freqs, P,
                     quiet=True)
-            rotmodel = rotate_portrait(model, -phase, -(DM+dDM), P, freqs, nu0)
+            rotmodel = rotate_data(model, -phase, -(DM+dDM), P, freqs, nu0)
             #rotmodel = model
             if t_scat:
                 sk = scattering_kernel(t_scat, nu0, freqs, phases, P,

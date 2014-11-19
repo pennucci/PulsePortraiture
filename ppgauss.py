@@ -406,9 +406,9 @@ class DataPortrait:
                 if not quiet:
                     print "\n...iteration %d..."%(self.itern - self.niter + 1)
                 if not self.njoin:
-                    self.port = rotate_portrait(self.port, self.phi, self.DM,
+                    self.port = rotate_data(self.port, self.phi, self.DM,
                             self.Ps[0], self.freqs[0], self.nu_fit)
-                    self.portx = rotate_portrait(self.portx, self.phi,
+                    self.portx = rotate_data(self.portx, self.phi,
                             self.DM, self.Ps[0], self.freqsxs[0], self.nu_fit)
             if not quiet:
                 print "Fitting gaussian model portrait..."
@@ -540,8 +540,8 @@ class DataPortrait:
             print " DM of %.6e +/- %.2e [cm**-3 pc]"%(self.DM, self.DMerr)
             print " red. chi**2 of %.2f."%self.red_chi2
         else:
-            if self.niter and (self.itern - self.niter) != 0:
-                print "Iter %d..."%(self.itern - self.niter)
+            if self.niter: #and (self.itern - self.niter) != 0:
+                print "Iter %d..."%(self.itern - self.niter + 1)
         if min(abs(self.phi), abs(1 - self.phi)) < abs(self.phierr)*efac:
             if abs(self.DM) < abs(self.DMerr)*efac:
                 print "\nIteration converged.\n"
@@ -596,8 +596,8 @@ class DataPortrait:
         NB: The join parameters are "opposite" of how they should used to
             rotate the data with e.g. rotate_data; use a negative!
         """
-        print "Beware: JOIN Parameters should be negated!"
-        print "JOIN Parameters:", self.join_params
+        #print "Beware: JOIN Parameters should be negated!"
+        #print "JOIN Parameters:", self.join_params
         if print_errs: print "JOIN Parameters' Errors:", self.join_param_errs
         joinfile = self.model_name + ".join"
         jf = open(joinfile, "a")

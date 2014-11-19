@@ -102,7 +102,7 @@ def align_archives(metafile, initial_guess, outfile=None, rot_phase=0.0,
                 SNRs = data.SNRs[isub,0,data.ok_ichans[isub]]
                 errs = data.noise_stds[isub,0,data.ok_ichans[isub]]
                 nu_fit = guess_fit_freq(freqs, SNRs)
-                rot_port = rotate_portrait(port, 0.0, DM_guess, P, freqs,
+                rot_port = rotate_data(port, 0.0, DM_guess, P, freqs,
                         nu_fit)
                 phase_guess = fit_phase_shift(rot_port.mean(axis=0),
                         model.mean(axis=0)).phase

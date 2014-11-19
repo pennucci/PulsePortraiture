@@ -269,7 +269,7 @@ class GetTOAs:
                 #subint is contaminated or very poorly determined.
                 #Also have to be careful below, since the subints are 
                 #dedispersed at different nu_fit
-                rot_port = rotate_portrait(portx, 0.0,
+                rot_port = rotate_data(portx, 0.0,
                         DM_stored, P, freqsx, nu_fit)
                 #PSRCHIVE Dedisperses w.r.t. center of band, which is
                 #different, in general, from nu_fit; this results in a
