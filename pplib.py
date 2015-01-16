@@ -23,7 +23,7 @@ import scipy.optimize as opt
 import scipy.signal as ss
 import lmfit as lm
 import psrchive as pr
-nodes = False   #Used when needing parallelized operation
+nodes = False  #Used when needing parallelized operation
 if nodes:
     import matplotlib
     matplotlib.use('Agg')

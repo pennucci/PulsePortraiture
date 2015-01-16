@@ -127,7 +127,8 @@ def align_archives(metafile, initial_guess, outfile=None, rot_phase=0.0,
                 total_weights[data.ok_ichans[isub]] +=  weights
                 nsub += 1
             load_quiet = True
-        aligned_port /= total_weights
+        aligned_port[np.where(total_weights > 0)[0]] /= \
+                total_weights[np.where(total_weights > 0)[0]]
         model_port = aligned_port
         niter -= 1
         count += 1
@@ -143,6 +144,8 @@ def align_archives(metafile, initial_guess, outfile=None, rot_phase=0.0,
                 #subint.set_weight(ichan, weight)
                 prof = subint.get_Profile(ipol, ichan)
                 prof.get_amps()[:] = aligned_port[ichan]
+                if total_weights[ichan].sum() == 0.0:
+                    subint.set_weight(ichan, 0.0)
     arch.unload(outfile)
     if not quiet: print "\nUnloaded %s.\n"%outfile
 
@@ -206,7 +209,7 @@ if __name__ == "__main__":
 
     rm = False
     if initial_guess is None:
-        tmp_file = "ppalign.tmp"
+        tmp_file = "ppalign.tmp.fits"
         psradd_archives(metafile, outfile=tmp_file, palign=palign)
         initial_guess = tmp_file
         rm = True
