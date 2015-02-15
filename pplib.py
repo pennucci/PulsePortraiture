@@ -830,7 +830,8 @@ def fit_powlaw(data, init_params, errs, freqs, nu_ref):
     dof = results.nfree
     chi2 = results.chisqr
     red_chi2 = results.redchi
-    residuals = results.residual
+    #There is some issue with the lmfit residuals; needs to be scaled by errs!!
+    residuals = results.residual * errs
     #fit_errs = np.array([param.stderr for param in
     #    results.params.itervalues()])
     results = DataBunch(alpha=results.params['alpha'].value,
@@ -902,7 +903,9 @@ def fit_gaussian_profile(data, init_params, errs, fit_flags=None,
     dof = results.nfree
     chi2 = results.chisqr
     red_chi2 = results.redchi
-    residuals = results.residual
+    #There is some issue with the lmfit residuals; needs to be scaled by errs!!
+    residuals = results.residual * errs
+    #residuals = data - gen_gaussian_profile(fitted_params, len(data))
     if not quiet:
         print "---------------------------------------------------------------"
         print "Multi-Gaussian Profile Fit Results"
@@ -1012,7 +1015,8 @@ def fit_gaussian_portrait(data, init_params, errs, fit_flags, phases, freqs,
     dof = results.nfree
     chi2 = results.chisqr
     red_chi2 = results.redchi
-    residuals = results.residual
+    #There is some issue with the lmfit residuals; needs to be scaled by errs!!
+    residuals = results.residual.reshape(errs.shape) * errs
     if not quiet:
         print "---------------------------------------------------------------"
         print "Gaussian Portrait Fit"
