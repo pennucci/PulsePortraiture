@@ -2386,7 +2386,7 @@ def show_residual_plot(port, model, resids=None, phases=None, freqs=None,
     weights = port.mean(axis=1)
     portx = np.compress(weights, port, axis=0)
     residsx = np.compress(weights, resids, axis=0)
-    text =  "Residuals mean ~ %.2e\nResiduals std ~ %.2e\nData std ~ %.2e"%(
+    text =  "Residuals mean ~ %.2e\nResiduals std ~ %.2e\nData noise ~ %.2e"%(
             residsx.mean(), residsx.std(), np.median(get_noise(portx,
                 chans=True)))
     ax4.text(0.5, 0.5, text, ha="center", va="center")
