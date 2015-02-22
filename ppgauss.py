@@ -478,7 +478,7 @@ class DataPortrait:
                 self.all_join_params[1] = self.join_params
                 #self.red_chi2 = fgp.chi2 / fgp.dof
                 #This function is a hack for now.
-                self.write_join_parameters()
+                self.write_join_parameters(print_errs=True)
             else:
                 self.model_params = self.fitted_params[:]
                 self.model_param_errs = self.fit_errs[:]
@@ -598,7 +598,10 @@ class DataPortrait:
         #print "Beware: JOIN Parameters should be negated!"
         #print "JOIN Parameters:", self.join_params
         if print_errs: print "JOIN Parameters' Errors:", self.join_param_errs
-        joinfile = self.model_name + ".join"
+        if self.joinfile is not None:
+            joinfile = self.joinfile
+        else:
+            joinfile = self.model_name + ".join"
         jf = open(joinfile, "a")
         header = "# archive name" + " "*32 + "-phase offset [rot]" + " "*1 + \
                 "-delta-DM [cm**-3 pc]\n"

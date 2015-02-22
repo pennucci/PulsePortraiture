@@ -52,7 +52,7 @@ def psrsmooth_archive(archive, options="-W"):
     psrsmooth_call.wait()
 
 def align_archives(metafile, initial_guess, outfile=None, rot_phase=0.0,
-        niter=1, quiet=False):
+        place=None, niter=1, quiet=False):
     """
     Iteratively align and average archives.
 
@@ -134,6 +134,11 @@ def align_archives(metafile, initial_guess, outfile=None, rot_phase=0.0,
         count += 1
     if rot_phase:
         aligned_port = rotate_data(aligned_port, rot_phase)
+    if place is not None:
+        prof = aligned_port.mean(axis=0)
+        delta = prof.max() * gaussian_profile(len(prof), place, 0.0001)
+        phase = fit_phase_shift(prof, delta).phase
+        aligned_port = rotate_data(aligned_port, phase)
     arch = model_data.arch
     arch.tscrunch()
     arch.pscrunch()
@@ -183,6 +188,10 @@ if __name__ == "__main__":
                       default=0.0,
                       action="store", metavar="phase", dest="rot_phase",
                       help="Additional rotation to add to averaged archive. [default=0.0]")
+    parser.add_option("--place",
+                      default=None,
+                      action="store", metavar="place", dest="place",
+                      help="Roughly place pulse to be at the phase of the provided argument.  Overrides --rot. [default=None]")
     parser.add_option("--niter",
                       action="store", metavar="int", dest="niter", default=1,
                       help="Number of iterations to complete. [default=1]")
@@ -204,6 +213,9 @@ if __name__ == "__main__":
     palign = options.palign
     smooth = options.smooth
     rot_phase = np.float64(options.rot_phase)
+    place = np.float64(options.place)
+    if place is not None:
+        rot_phase=0.0
     niter = int(options.niter)
     quiet = options.quiet
 
@@ -214,7 +226,7 @@ if __name__ == "__main__":
         initial_guess = tmp_file
         rm = True
     align_archives(metafile, initial_guess=initial_guess, outfile=outfile,
-            rot_phase=rot_phase, niter=niter, quiet=quiet)
+            rot_phase=rot_phase, place=place, niter=niter, quiet=quiet)
     if smooth:
         if outfile is None:
             outfile = metafile + ".algnd.fits"
