@@ -467,6 +467,7 @@ class DataPortrait:
                     fgp.fitted_params, fgp.fit_errs, fgp.chi2, fgp.dof)
             self.scattering_index, self.scattering_index_err = \
                     fgp.scattering_index, fgp.scattering_index_err
+            self.fgp = fgp
             if not self.fixalpha:
                 print "\nScattering index = %.5f +/- %.5f"%(
                         self.scattering_index, self.scattering_index_err)
