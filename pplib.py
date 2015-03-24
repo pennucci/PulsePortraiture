@@ -305,17 +305,17 @@ def gen_gaussian_portrait(params, phases, freqs, nu_ref, join_ichans=[],
     #Scattering term - first make unscattered portrait
     gparams[:,1] = refparams[1]
     #Locs
-    if PL_model:
+    if PL_model:    #Power-law model
         gparams[:,2::3] = np.exp(np.outer(np.log(freqs) - np.log(nu_ref),
             locparams) + np.outer(np.ones(nchan), np.log(refparams[2::3])))
-    else:
+    else:           #Linear model
         gparams[:,2::3] = np.outer(freqs - nu_ref, locparams) + \
                 np.outer(np.ones(nchan), refparams[2::3])
     #Wids
-    if PL_model:
+    if PL_model:    #Power-law model
         gparams[:,3::3] = np.exp(np.outer(np.log(freqs) - np.log(nu_ref),
             widparams) + np.outer(np.ones(nchan), np.log(refparams[3::3])))
-    else:
+    else:           #Linear model
         gparams[:,3::3] = np.outer(freqs - nu_ref, widparams) + \
                 np.outer(np.ones(nchan), refparams[3::3])
     #Amps
