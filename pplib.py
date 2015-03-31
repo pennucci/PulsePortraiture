@@ -1438,6 +1438,44 @@ def rotate_portrait(port, phase=0.0, DM=None, P=None, freqs=None,
             pFFT[nn,:] *= phasor
     return fft.irfft(pFFT)
 
+def add_DM_nu(port, phase=0.0, DM=None, P=None, freqs=None, xs=[-2.0],
+        Cs=[1.0], nu_ref=np.inf):
+    """
+    Rotate a portrait to simulate a frequency-dependent DM.
+
+    This function is identical to rotate_portrait, but allows for an arbitrary
+        power-law frequency dependence in the DM rotation.  Note that the
+        default behavior is (should be) identical to rotate_portrait and that
+        "DM" is the overall constant in front of the frequency term.  The
+        additional arguments for this function are:
+
+    xs is an array of powers that determine the observed frequency dependence
+        of the dispersion law.  The terms are added to the frequency term
+        of the phasor in the form + C*(nu**x - nu_ref**x), where the
+        coefficients are given by Cs.
+    Cs coefficients for the above.  They will always be assumed to be 1.0,
+        unless specified.
+    """
+    pFFT = fft.rfft(port, axis=1)
+    for nn in xrange(len(pFFT)):
+        if DM is None and freqs is None:
+            pFFT[nn,:] *= np.exp(np.arange(len(pFFT[nn])) * 2.0j * np.pi *
+                    phase)
+        else:
+            D = Dconst * DM / P
+            freq = freqs[nn]
+            freq_term = 0.0
+            if not hasattr(Cs, "__iter__"):
+                Cs = np.ones(len(xs))
+            if len(Cs) < len(xs):
+                Cs = list(Cs) + list(np.ones(len(xs)-len(Cs)))
+            for C,x in zip(Cs,xs):
+                freq_term += C*(freq**x - nu_ref**x)
+            phasor = np.exp(np.arange(len(pFFT[nn])) * 2.0j * np.pi * (phase +
+                (D * (freq_term))))
+            pFFT[nn,:] *= phasor
+    return fft.irfft(pFFT)
+
 def rotate_profile(profile, phase=0.0):
     """
     Rotate a profile by phase.
@@ -1697,8 +1735,8 @@ def unpack_dict(data):
     for key in data.keys():
         exec(key + " = data['" + key + "']")
 
-def write_model(filename, name, nu_ref, model_params, fit_flags, append=False,
-        quiet=False):
+def write_model(filename, name, nu_ref, model_params, fit_flags,
+        alpha=scattering_alpha, append=False, quiet=False):
     """
     Write a gaussian-component model.
 
@@ -1708,6 +1746,7 @@ def write_model(filename, name, nu_ref, model_params, fit_flags, append=False,
     model_params is the list of 2 + 6*ngauss model parameters, where index 1 is
         the scattering timescale [sec].
     fit_flags is the list of 2 + 6*ngauss flags (1 or 0) designating a fit.
+    alpha is the scattering index; cannot be fit with a fit flag yet.
     append=True will append to a file named filename.
     quiet=True suppresses output.
     """
@@ -1719,6 +1758,7 @@ def write_model(filename, name, nu_ref, model_params, fit_flags, append=False,
     outfile.write("FREQ   %.4f\n"%nu_ref)
     outfile.write("DC     %.8f  %d\n"%(model_params[0], fit_flags[0]))
     outfile.write("TAU    %.8f  %d\n"%(model_params[1], fit_flags[1]))
+    outfile.write("ALPHA  %.3f\n"%alpha)
     ngauss = (len(model_params) - 2) / 6
     for igauss in xrange(ngauss):
         comp = model_params[(2 + igauss*6):(8 + igauss*6)]
@@ -1749,6 +1789,7 @@ def read_model(modelfile, phases=None, freqs=None, P=None, quiet=False):
     else:
         read_only = False
     ngauss = 0
+    alpha = scattering_alpha  #pplib.py default if not specified below
     comps = []
     if not quiet:
         print "Reading model from %s..."%modelfile
@@ -1766,6 +1807,9 @@ def read_model(modelfile, phases=None, freqs=None, P=None, quiet=False):
             elif info[0] == "TAU":
                 tau = np.float64(info[1])
                 fit_tau = int(info[2])
+            elif info[0] == "ALPHA":
+                alpha = np.float64(info[1])
+                #fit_alpha == int(info[2]))  #Not yet implemented
             elif info[0][:4] == "COMP":
                 comps.append(line)
                 ngauss += 1
@@ -1794,7 +1838,7 @@ def read_model(modelfile, phases=None, freqs=None, P=None, quiet=False):
             else:
                 params[1] *= nbin / P
         model = gen_gaussian_portrait(params, phases, freqs, nu_ref,
-                scattering_index=scattering_alpha)
+                scattering_index=alpha)
     if not quiet and not read_only:
         print "Model Name: %s"%name
         print "Made %d component model with %d profile bins,"%(ngauss, nbin)
@@ -1806,6 +1850,8 @@ def read_model(modelfile, phases=None, freqs=None, P=None, quiet=False):
         print "with model parameters referenced at %.3f MHz."%nu_ref
     #This could be changed to a DataBunch
     if read_only:
+        if alpha != scattering_alpha and not quiet:
+            print "Note: scattering alpha = %.2f"%alpha
         return name, nu_ref, ngauss, params, fit_flags
     else:
         return name, ngauss, model
@@ -1940,9 +1986,9 @@ def write_archive(data, ephemeris, freqs, nu0=None, bw=None,
 
 def make_fake_pulsar(modelfile, ephemeris, outfile="fake_pulsar.fits", nsub=1,
         npol=1, nchan=512, nbin=1048, nu0=1500.0, bw=800.0, tsub=300.0,
-        phase=0.0, dDM=0.0, start_MJD=None, weights=None, noise_std=1.0,
-        scale=1.0, dedispersed=False, t_scat=0.0, alpha=scattering_alpha,
-        scint=False, state="Stokes", obs="GBT", quiet=False):
+        phase=0.0, dDM=0.0, start_MJD=None, weights=None, noise_stds=1.0,
+        scales=1.0, dedispersed=False, t_scat=0.0, alpha=scattering_alpha,
+        scint=False, xs=None, Cs=None, state="Stokes", obs="GBT", quiet=False):
     """
     Generate fake pulsar data written to a PSRCHIVE psrfits archive.
 
@@ -1962,15 +2008,25 @@ def make_fake_pulsar(modelfile, ephemeris, outfile="fake_pulsar.fits", nsub=1,
     phase is an arbitrary rotation [rot] to all subints, with respect to nu0.
     dDM is a dispersion measure [cm**-3 pc] added to what is given by the
         ephemeris. Dispersion occurs at infinite frequency. (??)
-    start_MJD is the starting epoch of the data in PSRCHIVE MJD format.
+    start_MJD is the starting epoch of the data in PSRCHIVE MJD format,
+        e.g. pr.MJD(57000.123456789012345).
     weights is a nsub x nchan array of weights.
-    noise_std is the frequency-independent noise-level added to the data.
-    scale is an arbitrary scaling to the amplitude parameters in modelfile.
+    noise_stds is the level of the RMS additive noise injected into the data;
+        can be either a single float or an array of length nchan.
+    scales is an arbitrary scaling to the amplitude parameters in modelfile;
+        can be either a single float or an array of length nchan.
     dedispersed=True, will save the archive as dedispered.
-    t_scat != 0.0 convolves the data with a scattering timscale t_scat [sec].
+    t_scat != 0.0 convolves the data with a scattering timescale t_scat [sec],
+        referenced at nu0.
+        NB: Should only be used if not provided in modelfile!
     alpha is the scattering index.
+        NB: Should only be used if not provided in modelfile!
     scint=True adds random scintillation, based on default parameters. scint
         can also be a list of parameters taken by add_scintillation.
+    xs is an array of powers to simulate a DM(nu) effect; see add_DM_nu for
+        details.
+    Cs is an array of coefficients to simulate a DM(nu) effect; see add_DM_nu
+        for details.
     state is the polarization state of the data ("Coherence" or "Stokes" for
         npol == 4, or "Intensity" for npol == 1).
     obs is the telescope code.
@@ -1987,11 +2043,18 @@ def make_fake_pulsar(modelfile, ephemeris, outfile="fake_pulsar.fits", nsub=1,
     phases = np.linspace(0.0 + (nbin*2)**-1, 1.0 - (nbin*2)**-1, nbin)
     #Channel noise
     try:
-        if len(noise_std) != nchan:
-            print "\nlen(noise_std) != nchan\n"
+        if len(noise_stds) != nchan:
+            print "\nlen(noise_stds) != nchan\n"
             return 0
     except TypeError:
-        noise_std = noise_std * np.ones(nchan)
+        noise_stds = noise_stds * np.ones(nchan)
+    #Channel amplitudes
+    try:
+        if len(scales) != nchan:
+            print "\nlen(scales) != nchan\n"
+            return 0
+    except TypeError:
+        scales = scales * np.ones(nchan)
     #Create the Archive instance.
     #This is kind of a weird hack, if we create a PSRFITS
     #Archive directly, some header info does not get filled
@@ -2047,7 +2110,8 @@ def make_fake_pulsar(modelfile, ephemeris, outfile="fake_pulsar.fits", nsub=1,
     if start_MJD is None:
         start_MJD = pr.MJD(PEPOCH)
     else:
-        start_MJD = pr.MJD(start_MJD)
+        #start_MJD = pr.MJD(start_MJD)
+        start_MJD = start_MJD
     epoch = start_MJD
     epoch += tsub/2.0
     for subint in arch:
@@ -2059,21 +2123,26 @@ def make_fake_pulsar(modelfile, ephemeris, outfile="fake_pulsar.fits", nsub=1,
     #Fill in polycos
     arch.set_ephemeris(ephemeris)
     #Now finally, fill in the data!
-    #NB the different pols are not realistic: same model, same noise_std
+    #NB the different pols are not realistic: same model, same noise_stds
     #If wanting to use PSRCHIVE's rotation scheme, uncomment the dedisperse and
     #dededisperse lines, and set rotmodel = model.
     arch.set_dedispersed(False)
     arch.dededisperse()
     if weights is None: weights = np.ones([nsub, nchan])
     isub = 0
+    name, nu_ref, ngauss, params, fit_flags = read_model(modelfile, quiet=True)
     for subint in arch:
         P = subint.get_folding_period()
         for ipol in xrange(npol):
             name, ngauss, model = read_model(modelfile, phases, freqs, P,
                     quiet=True)
-            rotmodel = rotate_data(model, -phase, -(DM+dDM), P, freqs, nu0)
+            if xs is None:
+                rotmodel = rotate_data(model, -phase, -(DM+dDM), P, freqs, nu0)
+            else:
+                rotmodel = add_DM_nu(model, -phase, -(DM+dDM), P, freqs, xs,
+                        Cs, nu0)
             #rotmodel = model
-            if t_scat:
+            if t_scat and not params[1]:    #modelfile overrides
                 sk = scattering_kernel(t_scat, nu0, freqs, phases, P,
                         alpha=alpha)
                 rotmodel = add_scattering(rotmodel, sk, repeat=3)
@@ -2084,14 +2153,14 @@ def make_fake_pulsar(modelfile, ephemeris, outfile="fake_pulsar.fits", nsub=1,
                 else:
                     rotmodel = add_scintillation(rotmodel, scint)
             for ichan in xrange(nchan):
-                subint.set_weight(ichan, weights[isub, ichan])
+                subint.set_weight(ichan, float(weights[isub, ichan]))
                 prof = subint.get_Profile(ipol, ichan)
-                noise = noise_std[ichan]
+                noise = noise_stds[ichan]
                 if noise:
-                    prof.get_amps()[:] = scale*rotmodel[ichan] + \
+                    prof.get_amps()[:] = scales[ichan]*rotmodel[ichan] + \
                             np.random.normal(0.0, noise, nbin)
                 else:
-                    prof.get_amps()[:] = scale*rotmodel[ichan]
+                    prof.get_amps()[:] = scales[ichan]*rotmodel[ichan]
         isub += 1
     if dedispersed: arch.dedisperse()
     arch.unload(outfile)

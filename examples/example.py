@@ -10,7 +10,7 @@ ephemeris = "example.par"
 #Generate some fake datafiles
 #These files will be homogenous, even though they don't need to be
 
-nfiles = 3       #Number of datafiles/epochs
+nfiles = 2       #Number of datafiles/epochs
 MJD0 = 50000.00  #Start day [MJD]
 days = 20.0      #Days between epochs
 nsub = 10        #Number of subintegrations
@@ -26,9 +26,10 @@ dDM_std = 2e-4   #Add in random dispersion measure offsets with this std
 dDMs = np.random.normal(dDM_mean, dDM_std, nfiles)
 #dDMs = np.zeros(nfiles) #Uncomment and set dDM_mean and dDM_std to zero for \
                          #no injected dDMs
-#Adding scattering may slow down the fit
-t_scat = 50e-6   #Add scattering with this timescale [s] w.r.t. nu0
 scint = True     #Add random scintillation
+#Adding scattering to the fake data may slow down the fit:
+#t_scat and alpha will be read from the gmodel file if TAU is non-zero there.
+t_scat = 50e-6   #Add scattering with this timescale [s] w.r.t. nu0
 alpha = -4.0     #t_scat will follow a powerlaw with this spectral index
 fitalpha = False #Fit the scattering index
 
@@ -46,9 +47,9 @@ for ifile in range(nfiles):
     make_fake_pulsar(modelfile, ephemeris, outfile="example-%d.fits"%(ifile+1),
             nsub=nsub, npol=npol, nchan=nchan, nbin=nbin, nu0=nu0, bw=bw,
             tsub=tsub, phase=0.0, dDM=dDMs[ifile], start_MJD=None,
-            weights=weights, noise_std=noise_std, scale=1.0, dedispersed=False,
-            t_scat=t_scat, alpha=alpha, scint=scint, state="Coherence",
-            obs="GBT", quiet=quiet)
+            weights=weights, noise_stds=noise_std, scales=1.0,
+            dedispersed=False, t_scat=t_scat, alpha=alpha, scint=scint,
+            state="Coherence", obs="GBT", quiet=quiet)
     #NB: the input parfile for fake data cannot yet have binary parameters
 os.system('psredit -q -m -c rcvr:name="fake_rx" -c be:name="fake_be" example-*.fits')
 

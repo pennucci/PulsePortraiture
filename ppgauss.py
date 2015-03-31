@@ -149,7 +149,7 @@ class DataPortrait:
             self.freqsxs = [self.freqsxs]
             self.join_params = np.array(self.join_params)
             self.join_fit_flags = np.array(self.join_fit_flags)
-            if self.joinfile:
+            if self.joinfile:  #Read joinfile
                 joinfile_lines = open(self.joinfile, "r").readlines()[-len(
                     self.datafiles):]
                 joinfile_lines = [line.split() for line in joinfile_lines]
@@ -157,10 +157,13 @@ class DataPortrait:
                     for ifile in range(len(joinfile_lines)):
                         ijoin = self.datafiles.index(joinfile_lines[ifile][0])
                         phi = np.double(joinfile_lines[ifile][1])
-                        DM = np.float(joinfile_lines[ifile][2])
+                        if len(joinfile_lines[ifile]) > 3:  #New joinfiles...
+                            DM = np.float(joinfile_lines[ifile][3])
+                        else:  #Old joinfiles...
+                            DM = np.float(joinfile_lines[ifile][2])
                         self.join_params[ijoin*2] = phi
                         self.join_params[ijoin*2+1] = DM
-                except ValueError:
+                except:
                     print "Bad join file."
                     sys.exit()
             self.all_join_params = [self.join_ichanxs, self.join_params,
@@ -319,7 +322,9 @@ class DataPortrait:
             and residuals is desired.
         quiet=True suppresses output.
         """
-        self.fixalpha = fixalpha    #Needs to be integrated...
+        #Needs to be integrated with fit flag; only way to specify starting
+        #  quantity is via scattering_alpha default in pplib.py header.
+        self.fixalpha = fixalpha
         if modelfile:
             if outfile is None:
                 outfile = modelfile
@@ -468,9 +473,6 @@ class DataPortrait:
             self.scattering_index, self.scattering_index_err = \
                     fgp.scattering_index, fgp.scattering_index_err
             self.fgp = fgp
-            if not self.fixalpha:
-                print "\nScattering index = %.5f +/- %.5f"%(
-                        self.scattering_index, self.scattering_index_err)
             if self.njoin:
                 self.model_params = self.fitted_params[:-self.njoin*2]
                 self.model_param_errs = self.fit_errs[:-self.njoin*2]
@@ -479,7 +481,7 @@ class DataPortrait:
                 self.all_join_params[1] = self.join_params
                 #self.red_chi2 = fgp.chi2 / fgp.dof
                 #This function is a hack for now.
-                self.write_join_parameters(print_errs=True)
+                self.write_join_parameters()
             else:
                 self.model_params = self.fitted_params[:]
                 self.model_param_errs = self.fit_errs[:]
@@ -568,7 +570,8 @@ class DataPortrait:
         #Convert tau (scattering timescale) to sec
         model_params[1] *= self.Ps[0] / self.nbin
         write_model(outfile, self.model_name, self.nu_ref, model_params,
-                self.fit_flags, append=append, quiet=quiet)
+                self.fit_flags, self.scattering_index, append=append,
+                quiet=quiet)
 
     def write_errfile(self, errfile=None, append=False, quiet=False):
         """
@@ -584,9 +587,10 @@ class DataPortrait:
         #Convert tau (scattering timescale) to sec
         model_param_errs[1] *= self.Ps[0] / self.nbin
         write_model(errfile, self.model_name + "_errors", self.nu_ref,
-                model_param_errs, self.fit_flags, append=append, quiet=quiet)
+                model_param_errs, self.fit_flags, self.scattering_index_err,
+                append=append, quiet=quiet)
 
-    def write_join_parameters(self, print_errs=True):
+    def write_join_parameters(self):
         """
         Write the JOIN parameters to file.
 
@@ -597,22 +601,22 @@ class DataPortrait:
             rotate the data with e.g. rotate_data; use a negative!
         """
         #print "Beware: JOIN Parameters should be negated!"
-        #print "JOIN Parameters:", self.join_params
-        if print_errs: print "JOIN Parameters' Errors:", self.join_param_errs
         if self.joinfile is not None:
             joinfile = self.joinfile
         else:
             joinfile = self.model_name + ".join"
         jf = open(joinfile, "a")
-        header = "# archive name" + " "*32 + "-phase offset [rot]" + " "*1 + \
-                "-delta-DM [cm**-3 pc]\n"
+        header = "# archive name" + " "*32 + "-phase offset & err [rot]" + \
+                " "*2 + "-delta-DM & err [cm**-3 pc]\n"
         jf.write(header)
         for ifile in xrange(len(self.datafiles)):
             datafile = self.datafiles[ifile]
             phase = self.join_params[ifile*2]
             dm = self.join_params[ifile*2 + 1]
             line = datafile + " "*abs(45-len(datafile)) + "% .10f"%phase + \
-                    " "*7 + "% .6f"%dm + "\n"
+                    " "*1 + "%.10f"%self.join_param_errs[::2][ifile] + \
+                    " "*2 + "% .6f"%dm + " "*1 + \
+                    "%.6f"%self.join_param_errs[1::2][ifile] + "\n"
             jf.write(line)
         jf.close()
 
