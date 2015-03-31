@@ -1446,8 +1446,9 @@ def add_DM_nu(port, phase=0.0, DM=None, P=None, freqs=None, xs=[-2.0],
     This function is identical to rotate_portrait, but allows for an arbitrary
         power-law frequency dependence in the DM rotation.  Note that the
         default behavior is (should be) identical to rotate_portrait and that
-        "DM" is the overall constant in front of the frequency term.  The
-        additional arguments for this function are:
+        "DM" is the overall constant in front of the frequency term.  Also note
+        that nu_ref doubles as nu_DM.  The additional arguments for this
+        function are:
 
     xs is an array of powers that determine the observed frequency dependence
         of the dispersion law.  The terms are added to the frequency term
@@ -1989,7 +1990,8 @@ def make_fake_pulsar(modelfile, ephemeris, outfile="fake_pulsar.fits", nsub=1,
         npol=1, nchan=512, nbin=1048, nu0=1500.0, bw=800.0, tsub=300.0,
         phase=0.0, dDM=0.0, start_MJD=None, weights=None, noise_stds=1.0,
         scales=1.0, dedispersed=False, t_scat=0.0, alpha=scattering_alpha,
-        scint=False, xs=None, Cs=None, state="Stokes", obs="GBT", quiet=False):
+        scint=False, xs=None, Cs=None, nu_DM=np.inf, state="Stokes", obs="GBT",
+        quiet=False):
     """
     Generate fake pulsar data written to a PSRCHIVE psrfits archive.
 
@@ -2028,6 +2030,8 @@ def make_fake_pulsar(modelfile, ephemeris, outfile="fake_pulsar.fits", nsub=1,
         details.
     Cs is an array of coefficients to simulate a DM(nu) effect; see add_DM_nu
         for details.
+    nu_DM is the frequency [MHz] to which the DM refers to, if simulating
+        DM(nu) with xs and Cs.
     state is the polarization state of the data ("Coherence" or "Stokes" for
         npol == 4, or "Intensity" for npol == 1).
     obs is the telescope code.
@@ -2140,8 +2144,9 @@ def make_fake_pulsar(modelfile, ephemeris, outfile="fake_pulsar.fits", nsub=1,
             if xs is None:
                 rotmodel = rotate_data(model, -phase, -(DM+dDM), P, freqs, nu0)
             else:
+                phase = phase_transform(phase, DM+dDM, nu0, nu_DM, P)
                 rotmodel = add_DM_nu(model, -phase, -(DM+dDM), P, freqs, xs,
-                        Cs, nu0)
+                        Cs, nu_DM)
             #rotmodel = model
             if t_scat and not params[1]:    #modelfile overrides
                 sk = scattering_kernel(t_scat, nu0, freqs, phases, P,
