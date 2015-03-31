@@ -1891,7 +1891,8 @@ def write_archive(data, ephemeris, freqs, nu0=None, bw=None,
     bw is the bandwidth; if None, is calculated from freqs.
     outfile is the desired output file name.
     tsub is the duration of each subintegration [sec].
-    start_MJD is the starting epoch of the data in PSRCHIVE MJD format.
+    start_MJD is the starting epoch of the data in PSRCHIVE MJD format,
+        e.g. pr.MJD(56700.123456789012345).
     weights is a nsub x nchan array of weights.
     dedispersed=True, will save the archive as dedispered.
     state is the polarization state of the data ("Coherence" or "Stokes" for
@@ -1959,7 +1960,7 @@ def write_archive(data, ephemeris, freqs, nu0=None, bw=None,
     if start_MJD is None:
         start_MJD = pr.MJD(50000, 0, 0.0)
     epoch = start_MJD
-    epoch += tsub/2.0
+    epoch += tsub/2.0   #*Yes* add seconds to days, this is how it works...
     for subint in arch:
         subint.set_epoch(epoch)
         subint.set_duration(tsub)
@@ -2113,7 +2114,7 @@ def make_fake_pulsar(modelfile, ephemeris, outfile="fake_pulsar.fits", nsub=1,
         #start_MJD = pr.MJD(start_MJD)
         start_MJD = start_MJD
     epoch = start_MJD
-    epoch += tsub/2.0
+    epoch += tsub/2.0   #*Yes* add seconds to days, this is how it works...
     for subint in arch:
         subint.set_epoch(epoch)
         subint.set_duration(tsub)

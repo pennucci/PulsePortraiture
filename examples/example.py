@@ -43,10 +43,10 @@ print "Making fake data..."
 for ifile in range(nfiles):
     if ifile == 0: quiet=False
     else: quiet = True
-    start_MJD = MJD0 + ifile*days
+    start_MJD = pr.MJD(MJD0 + ifile*days)
     make_fake_pulsar(modelfile, ephemeris, outfile="example-%d.fits"%(ifile+1),
             nsub=nsub, npol=npol, nchan=nchan, nbin=nbin, nu0=nu0, bw=bw,
-            tsub=tsub, phase=0.0, dDM=dDMs[ifile], start_MJD=None,
+            tsub=tsub, phase=0.0, dDM=dDMs[ifile], start_MJD=start_MJD,
             weights=weights, noise_stds=noise_std, scales=1.0,
             dedispersed=False, t_scat=t_scat, alpha=alpha, scint=scint,
             state="Coherence", obs="GBT", quiet=quiet)
