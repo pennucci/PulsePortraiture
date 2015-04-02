@@ -224,7 +224,7 @@ class GetTOAs:
                     #Read model
                     self.model_name, self.ngauss, model = read_model(
                             self.modelfile, phases, freqs[isub], Ps[isub],
-                            quiet=quiet)
+                            quiet=bool(quiet+(itoa-1)))
                 #else:
                 ##THESE FREQUENCIES WILL BE OFF IF AVERAGED CHANNELS##
                 #    print model_data.freqs[0, ok_ichans[isub]] - \
@@ -581,7 +581,7 @@ class GetTOAs:
         else:
             model_name, ngauss, model = read_model(self.modelfile, phases,
                     freqs, data.Ps.mean(), quiet=quiet)
-                    #freqs, data.Ps[isub], quiet=quiet)
+                    #freqs, data.Ps[isub], quiet=quiet)     #Track down
         port = rotate_data(data.subints[isub,0], phi, DM_fitted, P, freqs,
                 nu_ref)
         if rotate:
