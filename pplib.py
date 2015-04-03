@@ -838,7 +838,7 @@ def fit_powlaw(data, init_params, errs, freqs, nu_ref):
             alpha_err=results.params['alpha'].stderr,
             amp=results.params['amp'].value,
             amp_err=results.params['amp'].stderr, residuals=residuals,
-            chi2=chi2, dof=dof)
+            nu_ref=nu_ref, chi2=chi2, dof=dof)
     return results
 
 def fit_gaussian_profile(data, init_params, errs, fit_flags=None,
