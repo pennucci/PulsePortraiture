@@ -190,18 +190,36 @@ class DataPortrait:
             self.noise_stdsxs = self.noise_stds[0,0,self.ok_ichans[0]]
             self.SNRsxs = self.SNRs[0,0,self.ok_ichans[0]]
 
-    def normalize_portrait(self):
+    def normalize_portrait(self, method="max"):
         """
-        Normalize each profile by its maximum.
+        Normalize each profile.
+
+        method is either "max" or "rms"
+            if "max", then normalize by the profile maximum.
+            if "rms", then normalize by the noise level, such that
+                get_noise(profile) = 1.
         """
+        if method != "max" and method != "rms":
+            print "Unknown method for normalize_portrait, '%s'"%method
+            return 0
+        #Full portrait
         for ichan in range(len(self.port)):
             if self.port[ichan].any():
-                self.port[ichan] /= self.port[ichan].max()
+                if method == "max":
+                    norm = self.port[ichan].max()
+                else:
+                    norm = get_noise(self.port[ichan])
+                self.port[ichan] /= norm
                 self.noise_stds[0,0,ichan] = get_noise(self.port[ichan])
-        for ichan in range(len(self.portx)):
-            self.portx[ichan] /= self.portx[ichan].max()
-            self.noise_stdsxs[ichan] = get_noise(self.portx[ichan])
         self.flux_prof = self.port.mean(axis=1)
+        #Reduced portrait
+        for ichanx in range(len(self.portx)):
+            if method == "max":
+                norm = self.portx[ichanx].max()
+            else:
+                norm = get_noise(self.portx[ichanx])
+            self.portx[ichanx] /= norm
+            self.noise_stdsxs[ichanx] = get_noise(self.portx[ichanx])
         self.flux_profx = self.portx.mean(axis=1)
 
     def fit_profile(self, profile, tau=0.0, fixscat=True, auto_gauss=0.0,
