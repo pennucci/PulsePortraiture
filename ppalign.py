@@ -7,12 +7,12 @@
 #ppalign is a command-line program used to align homogeneous data (i.e. from
 #    the receiver, with the same center frequency, bandwidth, and number of
 #    channels).  This is useful for making averaged portraits to either pass to
-#    ppgauss.py with -M to make a gaussian model, or to smooth and use as a
+#    ppgauss.py with -M to make a Gaussian model, or to smooth and use as a
 #    model with pptoas.py.
 
 #Written by Timothy T. Pennucci (TTP; pennucci@virginia.edu).
 
-#Need option for constant gaussian initial guess.
+#Need option for constant Gaussian initial guess.
 
 import os, shlex
 import subprocess as sub

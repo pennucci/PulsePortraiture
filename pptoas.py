@@ -13,6 +13,13 @@
 
 from pplib import *
 
+#cfitsio defines a maximum number of files (NMAXFILES) that can be opened in
+#the header file fitsio2.h.  Without calling unload() with PSRCHIVE, which
+#touches the archive, I am not sure how to close the files.  So, to avoid the
+#loop crashing, set a maximum number of archives for pptoas.  Modern machines
+#should be able to handle almost 1000.
+max_nfile = 999
+
 #See DC_fact in pplib.py
 if DC_fact:
     rm_baseline = True
@@ -81,7 +88,7 @@ class GetTOAs:
         datafiles is either a single PSRCHIVE file name, or a name of a
             metafile containing a list of archive names.
         modelfile is a a write_model(...)-type of model file specifying the
-            gaussian model parameters.  modelfile can also be an arbitrary
+            Gaussian model parameters.  modelfile can also be an arbitrary
             PSRCHIVE archive, although this feature is
             *not*quite*implemented*yet*.
         quiet=True suppresses output.
@@ -92,8 +99,7 @@ class GetTOAs:
         else:
             self.datafiles = [datafiles]
         if len(self.datafiles) > max_nfile:
-            print "Too many archives.  See/change max_nfile(=%d) in pplib.py."\
-                    %max_nfile
+            print "Too many archives.  See/change max_nfile(=%d) in pptoas.py."%max_nfile
             sys.exit()
         self.is_gauss_model = file_is_ASCII(modelfile)
         self.modelfile = modelfile

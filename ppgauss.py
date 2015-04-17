@@ -5,7 +5,7 @@
 #########
 
 #ppgauss is a command-line program used to make frequency-dependent,
-#    gaussian-component models of pulse portraits.  Full-functionality is
+#    Gaussian-component models of pulse portraits.  Full-functionality is
 #    obtained when using ppgauss within an interactive python environment.
 
 #Written by Timothy T. Pennucci (TTP; pennucci@virginia.edu).
@@ -225,14 +225,14 @@ class DataPortrait:
     def fit_profile(self, profile, tau=0.0, fixscat=True, auto_gauss=0.0,
             profile_fit_flags=None, show=True):
         """
-        Fit gaussian components to a profile.
+        Fit Gaussian components to a profile.
 
         profile is the array containing the profile of length nbin.
         tau != 0.0 is the scattering timescale [bin] added to the fitted
-            gaussians; it is also the initial parameter if fixscat=False.
+            Gaussians; it is also the initial parameter if fixscat=False.
         fixscat=False fits for a scattering timescale.
         auto_gauss != 0.0 specifies the initial guess at a width [rot] of a
-            single gaussian component to be fit automatically.
+            single Gaussian component to be fit automatically.
         profile_fit_flags is an array specifying which of the non-scattering
             parameters to fit; defaults to fitting all.
         show=False is used if you want auto_gauss to work without checking it.
@@ -303,12 +303,13 @@ class DataPortrait:
 
     def make_gaussian_model(self, modelfile=None,
             ref_prof=(None, None), tau=0.0, fixloc=False, fixwid=False,
-            fixamp=False, fixscat=True, fixalpha=True, niter=0,
-            fiducial_gaussian=False, auto_gauss=0.0, writemodel=False,
+            fixamp=False, fixscat=True, fixalpha=True,
+            scattering_index=scattering_alpha, model_code=default_model,
+            niter=0, fiducial_gaussian=False, auto_gauss=0.0, writemodel=False,
             outfile=None, writeerrfile=False, errfile=None, model_name=None,
             residplot=None, quiet=False):
         """
-        Fit a gaussian-component model with independently evolving components.
+        Fit a Gaussian-component model with independently evolving components.
 
         This is the main function within ppgauss.
 
@@ -316,7 +317,7 @@ class DataPortrait:
             fit will use its parameters and flags as a starting point for a
             new fit.
         ref_prof is a tuple specifying the (reference frequency, bandwidth)
-            [MHz] of the profile used for an initial fit of gaussian
+            [MHz] of the profile used for an initial fit of Gaussian
             components.  The reference frequency will be the model reference
             frequency.
         tau is a scattering timescale [bin]
@@ -325,11 +326,15 @@ class DataPortrait:
         fixamp=True does not allow the components' height to evolve
         fixscat=True does not fit for a scattering timescale.
         fixalpha=True does not fit for the scattering index.
+        scattering_index is the power-law index for the scattering evolution.
+        model_code is a three digit string specifying the evolutionary
+            functions to be used for the three Gaussian parameters
+            (loc,wid,amp); see pplib.py header for details.
         niter is the number of iterations after the initial model fit.
         fiducial_gaussian=True sets fixloc=False for all components except the
             first component fit, which is fixed.
         auto_gauss != 0.0 specifies the initial guess at a width [rot] of a
-            single gaussian component to be fit automatically.
+            single Gaussian component to be fit automatically.
         writemodel=True writes the fitted model to file.
         outfile is a string designating the name of the output model file name.
         writeerrfile=True writes a model file containing errors on the fitted
@@ -340,19 +345,23 @@ class DataPortrait:
             and residuals is desired.
         quiet=True suppresses output.
         """
-        #Needs to be integrated with fit flag; only way to specify starting
-        #  quantity is via scattering_alpha default in pplib.py header.
-        self.fixalpha = fixalpha
         if modelfile:
             if outfile is None:
                 outfile = modelfile
             if errfile is None:
                 errfile = outfile + "_err"
-            (self.model_name, self.nu_ref, self.ngauss, self.init_model_params,
-                    self.fit_flags) = read_model(modelfile)
+            (self.model_name, self.model_code, self.nu_ref, self.ngauss,
+                    self.init_model_params, self.fit_flags,
+                    self.scattering_index, self.fitalpha) = read_model(
+                            modelfile)
+            self.fixalpha = not(self.fitalpha)
             if model_name is not None: self.model_name = model_name
             self.init_model_params[1] *= self.nbin / self.Ps[0]
         else:
+            self.model_code = model_code
+            self.scattering_index = scattering_index
+            self.fixalpha = fixalpha
+            self.fitalpha = int(not self.fixalpha)
             if errfile is None and outfile is not None:
                 errfile = outfile + "_err"
             if model_name is None:
@@ -412,8 +421,8 @@ class DataPortrait:
         self.total_time = 0.0
         self.start = time.time()
         #if not quiet:
-        #    print "\nFitting gaussian model portrait..."
-        print "Fitting gaussian model portrait..."
+        #    print "\nFitting Gaussian model portrait..."
+        print "Fitting Gaussian model portrait..."
         iterator = self.model_iteration(quiet)
         iterator.next()
         self.cnvrgnc = self.check_convergence(efac=1.0, quiet=quiet)
@@ -433,7 +442,7 @@ class DataPortrait:
                     self.portx = rotate_data(self.portx, self.phi,
                             self.DM, self.Ps[0], self.freqsxs[0], self.nu_fit)
             if not quiet:
-                print "Fitting gaussian model portrait..."
+                print "Fitting Gaussian model portrait..."
             iterator.next()
             self.niter -= 1
             self.cnvrgnc = self.check_convergence(efac=1.0, quiet=quiet)
@@ -482,10 +491,11 @@ class DataPortrait:
         """
         while (1):
             start = time.time()
-            fgp = fit_gaussian_portrait(self.portx, self.model_params,
-                    self.portx_noise, self.fit_flags, self.phases,
+            fgp = fit_gaussian_portrait(self.model_code, self.portx,
+                    self.model_params, self.scattering_index, self.portx_noise,
+                    self.fit_flags, not(self.fixalpha), self.phases,
                     self.freqsxs[0], self.nu_ref, self.all_join_params,
-                    self.Ps[0], not(self.fixalpha), quiet=quiet)
+                    self.Ps[0], quiet=quiet)
             (self.fitted_params, self.fit_errs, self.chi2, self.dof) = (
                     fgp.fitted_params, fgp.fit_errs, fgp.chi2, fgp.dof)
             self.scattering_index, self.scattering_index_err = \
@@ -503,9 +513,9 @@ class DataPortrait:
             else:
                 self.model_params = self.fitted_params[:]
                 self.model_param_errs = self.fit_errs[:]
-            self.model = gen_gaussian_portrait(self.fitted_params,
-                    self.phases, self.freqs[0], self.nu_ref,
-                    self.join_ichans, self.Ps[0])
+            self.model = gen_gaussian_portrait(self.model_code,
+                    self.fitted_params, self.scattering_index, self.phases,
+                    self.freqs[0], self.nu_ref, self.join_ichans, self.Ps[0])
             self.model_masked = self.model * self.masks[0,0]
             self.modelx = np.compress(self.masks[0,0].mean(axis=1), self.model,
                     axis=0)
@@ -587,9 +597,9 @@ class DataPortrait:
                 model_params[2::6] % 1, model_params[2::6])
         #Convert tau (scattering timescale) to sec
         model_params[1] *= self.Ps[0] / self.nbin
-        write_model(outfile, self.model_name, self.nu_ref, model_params,
-                self.fit_flags, self.scattering_index, append=append,
-                quiet=quiet)
+        write_model(outfile, self.model_name, self.model_code, self.nu_ref,
+                model_params, self.fit_flags, self.scattering_index,
+                self.fitalpha, append=append, quiet=quiet)
 
     def write_errfile(self, errfile=None, append=False, quiet=False):
         """
@@ -604,9 +614,10 @@ class DataPortrait:
         model_param_errs = np.copy(self.model_param_errs)
         #Convert tau (scattering timescale) to sec
         model_param_errs[1] *= self.Ps[0] / self.nbin
-        write_model(errfile, self.model_name + "_errors", self.nu_ref,
-                model_param_errs, self.fit_flags, self.scattering_index_err,
-                append=append, quiet=quiet)
+        write_model(errfile, self.model_name + "_errors", self.model_code,
+                self.nu_ref, model_param_errs, self.fit_flags,
+                self.scattering_index_err, self.fitalpha, append=append,
+                quiet=quiet)
 
     def write_join_parameters(self):
         """
@@ -661,7 +672,7 @@ class DataPortrait:
 
 class GaussianSelector:
     """
-    GaussianSelector is a class for hand-fitting gaussian components.
+    GaussianSelector is a class for hand-fitting Gaussian components.
 
     Taken and tweaked from SMR's pygaussfit.py
     """
@@ -678,7 +689,7 @@ class GaussianSelector:
         tau is a scattering timescale [bin].
         fixscat=True does not fit for the scattering timescale.
         auto_gauss != 0.0 specifies the initial guess at a width [rot] of a
-            single gaussian component to be fit automatically.
+            single Gaussian component to be fit automatically.
         profile_fit_flags is an array specifying which of the non-scattering
             parameters to fit; defaults to fitting all.
         minspanx, minspany are vestigial.
@@ -736,7 +747,7 @@ class GaussianSelector:
             self.init_params += [loc, wid, amp]
             self.ngauss += 1
             self.plot_gaussians(self.init_params)
-            print "Auto-fitting a single gaussian component..."
+            print "Auto-fitting a single Gaussian component..."
             fgp = fit_gaussian_profile(self.profile, self.init_params,
                     np.zeros(self.proflen) + self.errs, self.profile_fit_flags,
                     self.fit_scattering, quiet=True)
@@ -850,7 +861,7 @@ class GaussianSelector:
             self.close()
 
     def plot_gaussians(self, params):
-        """plot gaussian components and profile"""
+        """plot Gaussian components and profile"""
         plt.subplot(211)
         plt.cla()
         # Re-plot the original profile
@@ -860,7 +871,7 @@ class GaussianSelector:
         plt.ylabel('Pulse Amplitude')
         DC = params[0]
         tau = params[1]
-        # Plot the individual gaussians
+        # Plot the individual Gaussians
         for igauss in xrange(self.ngauss):
             loc, wid, amp = params[(2 + igauss*3):(5 + igauss*3)]
             plt.plot(self.phases, DC + amp*gaussian_profile(self.proflen, loc,
@@ -870,7 +881,7 @@ class GaussianSelector:
         """on select event"""
         event1 = self.eventpress
         event2 = self.eventrelease
-        # Left mouse button = add a gaussian
+        # Left mouse button = add a Gaussian
         if event1.button == event2.button == 1:
             x1, y1 = event1.xdata, event1.ydata
             x2, y2 = event2.xdata, event2.ydata
@@ -882,9 +893,9 @@ class GaussianSelector:
             self.ngauss += 1
             self.plot_gaussians(self.init_params)
             plt.draw()
-        # Middle mouse button = fit the gaussians
+        # Middle mouse button = fit the Gaussians
         elif event1.button == event2.button == 2:
-            print "Fitting reference gaussian profile..."
+            print "Fitting reference Gaussian profile..."
             fgp = fit_gaussian_profile(self.profile, self.init_params,
                     np.zeros(self.proflen) + self.errs, self.profile_fit_flags,
                     self.fit_scattering, quiet=True)
@@ -910,7 +921,7 @@ class GaussianSelector:
             plt.xlabel('Pulse Phase')
             plt.ylabel('Data-Fit Residuals')
             plt.draw()
-        # Right mouse button = remove last gaussian
+        # Right mouse button = remove last Gaussian
         elif event1.button == event2.button == 3:
             if self.ngauss:
                 self.init_params = self.init_params[:-3]
@@ -941,7 +952,7 @@ if __name__ == "__main__":
     parser.add_option("-d", "--datafile",
                       default=None,
                       action="store", metavar="archive", dest="datafile",
-                      help="PSRCHIVE archive from which to generate gaussian model.")
+                      help="PSRCHIVE archive from which to generate Gaussian model.")
     parser.add_option("-M", "--metafile",
                       default=None,
                       action="store", metavar="metafile", dest="metafile",
@@ -969,7 +980,7 @@ if __name__ == "__main__":
     parser.add_option("--nu_ref",
                       action="store", metavar="nu_ref", dest="nu_ref",
                       default=None,
-                      help="Reference frequency [MHz] for the gaussian model; the initial profile to fit will be centered on this freq. [default=PSRCHIVE center frequency]")
+                      help="Reference frequency [MHz] for the Gaussian model; the initial profile to fit will be centered on this freq. [default=PSRCHIVE center frequency]")
     parser.add_option("--bw",
                       action="store", metavar="bw", dest="bw_ref",
                       default=None,
@@ -979,29 +990,33 @@ if __name__ == "__main__":
                       help="Scattering timescale [sec] at nu_ref, assuming alpha=-4.0 (which can be changed internally). Not used with -I. [default=0]")
     parser.add_option("--fitloc",
                       action="store_false", dest="fixloc", default=True,
-                      help="Do not fix locations of gaussians across frequency. Use this flag to allow all gaussian components to drift with frequency (cf. --fgauss). Not used with -I. [default=False]")
+                      help="Do not fix locations of Gaussians across frequency. Use this flag to allow all Gaussian components to drift with frequency (cf. --fgauss). Not used with -I. [default=False]")
     parser.add_option("--fixwid",
                       action="store_true", dest="fixwid", default=False,
-                      help="Fix widths of gaussians across frequency. Not used with -I. [default=False]")
+                      help="Fix widths of Gaussians across frequency. Not used with -I. [default=False]")
     parser.add_option("--fixamp",
                       action="store_true", dest="fixamp", default=False,
-                      help="Fix amplitudes of gaussians across frequency. Not used with -I. [default=False]")
+                      help="Fix amplitudes of Gaussians across frequency. Not used with -I. [default=False]")
     parser.add_option("--fitscat",
                       action="store_false", dest="fixscat", default=True,
                       help="Fit scattering timescale to tau w.r.t nu_ref. Not used with -I. [default=False]")
     parser.add_option("--fitalpha",
                       action="store_false", dest="fixalpha", default=True,
-                      help="Fit power-law index for the scattering law. Default fixed value is set in pplib.py. Implies --fitscat. NB: currently need to save output to parse fitted values! [default=False]")
+                      help="Fit power-law index for the scattering law. Default fixed value is set in pplib.py. Implies --fitscat. [default=False]")
+    parser.add_option("--mcode",
+                      action="store", metavar="###", dest="model_code",
+                      default=default_model,
+                      help="Three-digit string specifying the evolutionary functions for each Gaussian parameter (loc,wid,amp). See evolve_parameter function for details. Not used with -I. [default=%s]"%default_model)
     parser.add_option("--niter",
                       action="store", metavar="int", dest="niter", default=0,
                       help="Number of iterations to loop for generating better model; ppgauss exits before niter iterations if internal convergence criteria are met. [default=0]")
     parser.add_option("--fgauss",
                       action="store_true", dest="fgauss", default=False,
-                      help="Sets fitloc=True except for the first gaussian component fitted in the initial profile fit.  i.e. sets a 'fiducial gaussian'. Not used with -I. [default=False]")
+                      help="Sets fitloc=True except for the first Gaussian component fitted in the initial profile fit. i.e. sets a 'fiducial Gaussian'. Not used with -I. [default=False]")
     parser.add_option("--autogauss",
                       action="store", metavar="wid", dest="auto_gauss",
                       default=0.0,
-                      help="Automatically fit one gaussian to initial profile with initial width [rot] given as the argument. Not used with -I. [default=False]")
+                      help="Automatically fit one Gaussian to initial profile with initial width [rot] given as the argument. Not used with -I. [default=False]")
     parser.add_option("--norm", metavar="normalize",
                       action="store_true", dest="normalize", default=False,
                       help="Normalize each channel's profile by its maximum.")
@@ -1015,7 +1030,7 @@ if __name__ == "__main__":
     (options, args) = parser.parse_args()
 
     if options.datafile is None and options.metafile is None:
-        print "\nppgauss.py - generate a gaussian-component model pulse portrait\n"
+        print "\nppgauss.py - generate a Gaussian-component model pulse portrait\n"
         parser.print_help()
         print ""
         parser.exit()
@@ -1039,6 +1054,7 @@ if __name__ == "__main__":
     fixscat = options.fixscat
     fixalpha = options.fixalpha
     if not fixalpha: fixscat = False
+    model_code = options.model_code
     niter = int(options.niter)
     fgauss = options.fgauss
     auto_gauss = float(options.auto_gauss)
@@ -1051,15 +1067,15 @@ if __name__ == "__main__":
     #if not quiet: dp.show_data_portrait()
     if modelfile is not None:
         dp.make_gaussian_model(modelfile = modelfile, fixalpha=fixalpha,
-                niter=niter, writemodel=True, outfile=outfile,
-                writeerrfile=True, errfile=errfile, model_name=model_name,
-                residplot=figure, quiet=quiet)
+                model_code=model_code, niter=niter, writemodel=True,
+                outfile=outfile, writeerrfile=True, errfile=errfile,
+                model_name=model_name, residplot=figure, quiet=quiet)
     else:
         tau *= dp.nbin / dp.Ps[0]
         dp.make_gaussian_model(modelfile=None, ref_prof=(nu_ref, bw_ref),
-                tau=tau, fixloc=fixloc, fixwid=fixwid,fixamp=fixamp,
-                fixscat=fixscat, fixalpha=fixalpha, niter=niter,
-                fiducial_gaussian=fgauss, auto_gauss=auto_gauss,
+                tau=tau, fixloc=fixloc, fixwid=fixwid, fixamp=fixamp,
+                fixscat=fixscat, fixalpha=fixalpha, model_code=model_code,
+                niter=niter, fiducial_gaussian=fgauss, auto_gauss=auto_gauss,
                 writemodel=True, outfile=outfile, writeerrfile=True,
                 errfile=errfile, model_name=model_name, residplot=figure,
                 quiet=quiet)

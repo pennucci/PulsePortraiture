@@ -58,16 +58,14 @@ DC_fact = 0
 #Should be either None or > 0.0.
 wid_max = 0.25
 
-#If PL_model == True, the wid and loc of the gaussian parameters will be
-#modeled with power-law functions instead of linear ones.
-PL_model = True
-
-#cfitsio defines a maximum number of files (NMAXFILES) that can be opened in
-#the header file fitsio2.h.  Without calling unload() with PSRCHIVE, which
-#touches the archive, I am not sure how to close the files.  So, to avoid the
-#loop crashing, set a maximum number of archives for pptoas.  Modern machines
-#should be able to handle almost 1000.
-max_nfile = 999
+#default_model is the default model_code used for generating Gaussian models.
+#The value of a digit labels an evolutionary function that has one evolutionary
+#parameter, in addition to the reference value.  0 = power-law, 1 = linear,
+#...add your own below (see evolve_parameter function).  The order of the
+#digits corresponds to the Gaussian model parameter (loc,wid,amp).  Unless
+#otherwise specified in the model file after CODE, this set of evolutionary
+#functions will be used.  This will eventually be overhauled...!!!
+default_model = '000'
 
 #########
 #display#
@@ -157,11 +155,11 @@ def set_colormap(colormap):
 
 def gaussian_function(xs, loc, wid, norm=False):
     """
-    Evaluates a gaussian function with parameters loc and wid at values xs.
+    Evaluates a Gaussian function with parameters loc and wid at values xs.
 
     xs is the array of values that are evaluated in the function.
     loc is the pulse phase location (0-1) [rot].
-    wid is the gaussian pulse's full width at half-max (FWHM) [rot].
+    wid is the Gaussian pulse's full width at half-max (FWHM) [rot].
     norm=True returns the profile such that the integrated density = 1.
     """
     mean = loc
@@ -176,16 +174,16 @@ def gaussian_function(xs, loc, wid, norm=False):
 
 def gaussian_profile(nbin, loc, wid, norm=False, abs_wid=False, zeroout=True):
     """
-    Return a gaussian pulse profile with nbin bins and peak amplitude of 1.
+    Return a Gaussian pulse profile with nbin bins and peak amplitude of 1.
 
     nbin is the number of bins in the profile.
     loc is the pulse phase location (0-1) [rot].
-    wid is the gaussian pulse's full width at half-max (FWHM) [rot].
+    wid is the Gaussian pulse's full width at half-max (FWHM) [rot].
     norm=True returns the profile such that the integrated density = 1.
     abs_wid=True, will use abs(wid).
     zeroout=True and wid <= 0, return a zero array.
 
-    Note: The FWHM of a gaussian is approx 2.35482 "sigma", or exactly
+    Note: The FWHM of a Gaussian is approx 2.35482 "sigma", or exactly
           2*sqrt(2*ln(2)).
 
     Taken and tweaked from SMR's pygaussfit.py
@@ -227,16 +225,17 @@ def gaussian_profile(nbin, loc, wid, norm=False, abs_wid=False, zeroout=True):
             else:
                 return retval / np.max(abs(retval))  #TTP hack
     except OverflowError:
-        print "Problem in gaussian prof:  mean = %f  sigma = %f" %(mean, sigma)
+        print "Problem in gaussian_profile:  mean = %f  sigma = %f" %(mean,
+                sigma)
         return np.zeros(nbin, 'd')
 
 def gen_gaussian_profile(params, nbin):
     """
-    Return a model-profile with ngauss gaussian components.
+    Return a model-profile with ngauss Gaussian components.
 
     params is a sequence of 2 + (ngauss*3) values where the first value is
         the DC component, the second value is the scattering timescale [bin]
-        and each remaining group of three represents the gaussians' loc (0-1),
+        and each remaining group of three represents the Gaussians' loc (0-1),
         wid (i.e. FWHM) (0-1), and amplitude (>0.0).
     nbin is the number of bins in the model.
 
@@ -250,36 +249,35 @@ def gen_gaussian_profile(params, nbin):
     if params[1] != 0.0:
         bins = np.arange(nbin)
         sk = scattering_kernel(params[1], 1.0, np.array([1.0]), bins, P=1.0,
-                alpha=scattering_alpha)[0]
+                alpha=scattering_alpha)[0]  #alpha here does not matter
         model = add_scattering(model, sk, repeat=3)
     return model
 
-def gen_gaussian_portrait(params, phases, freqs, nu_ref, join_ichans=[],
-        P=None, scattering_index=scattering_alpha):
+def gen_gaussian_portrait(model_code, params, scattering_index, phases, freqs,
+        nu_ref, join_ichans=[], P=None):
     """
-    Return a gaussian-component model portrait based on input parameters.
+    Return a Gaussian-component model portrait based on input parameters.
 
-    join_ichans is used only in ppgauss, in which case the period P [sec] needs
-        to be provided.
-
+    model_code is a three digit string specifying the evolutionary functions
+        to be used for the three Gaussian parameters (loc,wid,amp); see
+        pplib.py header for details.
     params is an array of 2 + (ngauss*6) + 2*len(join_ichans) values.
         The first value is the DC component, and the second value is the
         scattering timescale [bin].  The next ngauss*6 values represent the
-        gaussians' loc (0-1), evolution parameter in loc, wid (i.e. FWHM)
+        Gaussians' loc (0-1), evolution parameter in loc, wid (i.e. FWHM)
         (0-1), evolution parameter in wid, amplitude (>0,0), and spectral
         index alpha (no implicit negative).  The remaining 2*len(join_ichans)
         parameters are pairs of phase and DM.  The iith list of channels in
         join_ichans gets rotated in the generated model by the iith pair of
         phase and DM.
+    scattering_index is the power-law index of the scattering law; the default
+        is set in the header lines of pplib.py.
     phases is the array of phase values (will pass nbin to
         gen_gaussian_profile).
     freqs in the array of frequencies at which to calculate the model.
     nu_ref is the frequency to which the locs, wids, and amps reference.
-    scattering_index is the power-law index of the scattering law; the default
-        is set in the header lines of pplib.py.
-
-    The evolution parameters will either be linear slopes, or a power-law
-    indices, depending on the global settings in the header lines of pplib.py.
+    join_ichans is used only in ppgauss, in which case the period P [sec] needs
+        to be provided.
 
     The units of the evolution parameters and the frequencies need to match
     appropriately.
@@ -305,25 +303,14 @@ def gen_gaussian_portrait(params, phases, freqs, nu_ref, join_ichans=[],
     #Scattering term - first make unscattered portrait
     gparams[:,1] = refparams[1]
     #Locs
-    if PL_model:    #Power-law model
-        gparams[:,2::3] = np.exp(np.outer(np.log(freqs) - np.log(nu_ref),
-            locparams) + np.outer(np.ones(nchan), np.log(refparams[2::3])))
-    else:           #Linear model
-        gparams[:,2::3] = np.outer(freqs - nu_ref, locparams) + \
-                np.outer(np.ones(nchan), refparams[2::3])
+    gparams[:,2::3] = evolve_parameter(freqs, nu_ref, refparams[2::3],
+            locparams, model_code[0])
     #Wids
-    if PL_model:    #Power-law model
-        gparams[:,3::3] = np.exp(np.outer(np.log(freqs) - np.log(nu_ref),
-            widparams) + np.outer(np.ones(nchan), np.log(refparams[3::3])))
-    else:           #Linear model
-        gparams[:,3::3] = np.outer(freqs - nu_ref, widparams) + \
-                np.outer(np.ones(nchan), refparams[3::3])
+    gparams[:,3::3] = evolve_parameter(freqs, nu_ref, refparams[3::3],
+            widparams, model_code[1])
     #Amps
-    gparams[:,4::3] = np.exp(np.outer(np.log(freqs) - np.log(nu_ref),
-        ampparams) + np.outer(np.ones(nchan), np.log(refparams[4::3])))
-    #Amps; I am unsure why I needed this fix at some point
-    #gparams[:, 0::3][:, 1:] = np.exp(np.outer(np.log(freqs) - np.log(nu_ref),
-    #    ampparams) + np.outer(np.ones(nchan), np.log(refparams[0::3][1:])))
+    gparams[:,4::3] = evolve_parameter(freqs, nu_ref, refparams[4::3],
+            ampparams, model_code[2])
     for ichan in xrange(nchan):
         #Need to contrain so values don't go negative, etc., which is currently
         #done in gaussian_profile
@@ -340,6 +327,58 @@ def gen_gaussian_portrait(params, phases, freqs, nu_ref, join_ichans=[],
             gport[join_ichan] = rotate_data(gport[join_ichan], phi,
                     DM, P, freqs[join_ichan], nu_ref)
     return gport
+
+def power_law_evolution(freqs, nu_ref, parameter, index):
+    """
+    Evolve the parameter over freqs by a power-law with index = index.
+
+    F(freq) = parameter * (freq/nu_ref)**index
+
+    freqs is an array of frequencies [MHz] to evolve parameter over.
+    nu_ref is the reference frequency [MHz] for parameter (= F(nu_ref)).
+    parameter is an array of length ngauss containing the values of the
+        parameter at nu_ref.
+    index is an array of length ngauss containing the values of the power-law
+        index.
+    """
+    nchan = len(freqs)
+    return np.exp(np.outer(np.log(freqs) - np.log(nu_ref), index) + \
+            np.outer(np.ones(nchan), np.log(parameter)))
+
+def linear_evolution(freqs, nu_ref, parameter, slope):
+    """
+    Evolve the parameter over freqs by a power-law with slope = slope.
+
+    F(freq) = parameter + slope*(freqs - nu_ref)
+
+    freqs is an array of frequencies [MHz] to evolve parameter over.
+    nu_ref is the reference frequency [MHz] for parameter (= F(nu_ref)).
+    parameter is an array of length ngauss containing the values of the
+        parameter at nu_ref.
+    slope is an array of length ngauss containing the values of the linear
+        slope.
+    """
+    nchan = len(freqs)
+    return np.outer(freqs - nu_ref, slope) + \
+            np.outer(np.ones(nchan), parameter)
+
+def evolve_parameter(freqs, nu_ref, parameter, evol_parameter, code):
+    """
+    Evolve parameter over freqs using a function based on code.
+
+    freqs is an array of frequencies [MHz] to evolve parameter over.
+    nu_ref is the reference frequency [MHz] for parameter (= F(nu_ref)).
+    parameter is an array of length ngauss containing the values of the
+        parameter at nu_ref.
+    evol_parameter is an array of length ngauss containing the values of the
+       single parameter used by the evolution function.
+    code is a single digit string that specifies the evolution function to be
+       used; the dictionary of such functions is defined in _this_ function.
+    """
+    #Dictionary containing the labels for model_code and the function names.
+    evolution_functions = {'0':power_law_evolution,
+                           '1':linear_evolution}
+    return evolution_functions[code](freqs, nu_ref, parameter, evol_parameter)
 
 def powlaw(nu, nu_ref, A, alpha):
     """
@@ -391,7 +430,7 @@ def powlaw_freqs(lo, hi, N, alpha, mid=False):
         nus = midnus
     return nus
 
-def scattering_kernel(tau, nu_ref, freqs, phases, P, alpha=scattering_alpha):
+def scattering_kernel(tau, nu_ref, freqs, phases, P, alpha):
     """
     Return a scattering kernel based on input parameters.
 
@@ -513,7 +552,7 @@ def fit_powlaw_function(params, freqs, nu_ref, data=None, errs=None):
 
 def fit_gaussian_profile_function(params, data=None, errs=None):
     """
-    Return the weighted residuals from a gaussian profile model and data.
+    Return the weighted residuals from a Gaussian profile model and data.
 
     See gen_gaussian_profile for form of input params.
     data is the array of data values.
@@ -522,18 +561,18 @@ def fit_gaussian_profile_function(params, data=None, errs=None):
     prms = np.array([param.value for param in params.itervalues()])
     return (data - gen_gaussian_profile(prms, len(data))) / errs
 
-def fit_gaussian_portrait_function(params, phases, freqs, nu_ref, data=None,
-        errs=None, join_ichans=None, P=None):
+def fit_gaussian_portrait_function(params, model_code, phases, freqs, nu_ref,
+        data=None, errs=None, join_ichans=None, P=None,):
     """
-    Return the weighted residuals from a gaussian-component model and data.
+    Return the weighted residuals from a Gaussian-component model and data.
 
     See gen_gaussian_portrait for form of input.
     data is the 2D array of data values.
     errs is the 2D array of the uncertainties on the data values.
     """
     prms = np.array([param.value for param in params.itervalues()])
-    deviates = np.ravel((data - gen_gaussian_portrait(prms[:-1], phases, freqs,
-        nu_ref, join_ichans, P, scattering_index=prms[-1])) / errs)
+    deviates = np.ravel((data - gen_gaussian_portrait(model_code, prms[:-1],
+        prms[-1], phases, freqs, nu_ref, join_ichans, P)) / errs)
     return deviates
 
 def fit_phase_shift_function(phase, model=None, data=None, err=None):
@@ -695,7 +734,7 @@ def estimate_portrait(phase, DM, scales, data, errs, P, freqs, nu_ref=np.inf):
     Return an average over all data portraits.
 
     An early attempt to make a '2-D' version of PBD's autotoa.  That is, to
-    iterate over all epochs of data portraits to build a non-gaussian model
+    iterate over all epochs of data portraits to build a non-Gaussian model
     that can be smoothed.
 
     <UNDER CONSTRUCTION>
@@ -844,7 +883,7 @@ def fit_powlaw(data, init_params, errs, freqs, nu_ref):
 def fit_gaussian_profile(data, init_params, errs, fit_flags=None,
         fit_scattering=False, quiet=True):
     """
-    Fit gaussian functions to a profile.
+    Fit Gaussian functions to a profile.
 
     lmfit is used for the minimization.
     Returns an object containing an array of fitted parameter values, an array
@@ -855,7 +894,7 @@ def fit_gaussian_profile(data, init_params, errs, fit_flags=None,
     init_params is a list of initial guesses for the 2 + (ngauss*3) values;
         the first value is the DC component, the second value is the
         scattering timescale [bin] and each remaining group of three represents
-        the gaussians' loc (0-1), wid (i.e. FWHM) (0-1), and amplitude (>0.0).
+        the Gaussians' loc (0-1), wid (i.e. FWHM) (0-1), and amplitude (>0.0).
     errs is the array of uncertainties on the data values.
     fit_flags is an array specifying which of the non-scattering parameters to
         fit; defaults to fitting all.
@@ -911,7 +950,7 @@ def fit_gaussian_profile(data, init_params, errs, fit_flags=None,
         print "Multi-Gaussian Profile Fit Results"
         print "---------------------------------------------------------------"
         print "lmfit status:", results.message
-        print "gaussians:", ngauss
+        print "Gaussians:", ngauss
         print "DOF:", dof
         print "reduced chi-sq: %.2f" % red_chi2
         print "residuals mean: %.3g" % np.mean(residuals)
@@ -921,35 +960,38 @@ def fit_gaussian_profile(data, init_params, errs, fit_flags=None,
             residuals=residuals, chi2=chi2, dof=dof)
     return results
 
-def fit_gaussian_portrait(data, init_params, errs, fit_flags, phases, freqs,
-        nu_ref, join_params=[], P=None, fit_scattering_index=False,
-        quiet=True):
+def fit_gaussian_portrait(model_code, data, init_params, scattering_index,
+        errs, fit_flags, fit_scattering_index, phases, freqs, nu_ref,
+        join_params=[], P=None, quiet=True):
     """
-    Fit evolving gaussian components to a portrait.
+    Fit evolving Gaussian components to a portrait.
 
     lmfit is used for the minimization.
     Returns an object containing an array of fitted parameter values, an array
     of parameter errors, the chi-squared value, and the number of degrees of
     freedom.
 
+    model_code is a three digit string specifying the evolutionary functions
+        to be used for the three Gaussian parameters (loc,wid,amp); see
+        pplib.py header for details.
     data is the nchan x nbin phase-frequency data portrait used in the fit.
     init_params is a list of initial guesses for the 1 + (ngauss*6)
         parameters in the model; the first value is the DC component.  Each
-        remaining group of six represent the gaussians loc (0-1), linear slope
+        remaining group of six represent the Gaussians loc (0-1), linear slope
         in loc, wid (i.e. FWHM) (0-1), linear slope in wid, amplitude (>0,0),
         and spectral index alpha (no implicit negative).
+    scattering_index is the scattering index for the model.
     errs is the array of uncertainties on the data values.
     fit_flags is an array of 1 + (ngauss*6) values, where non-zero entries
         signify that the parameter should be fit.
+    fit_scattering_index will also fit for the power-law index of the
+        scattering law, with the initial guess as scattering_index.
     phases is the array of phase values.
     freqs in the array of frequencies at which to calculate the model.
     nu_ref [MHz] is the frequency to which the locs, wids, and amps reference.
     join_params specifies how to simultaneously fit several portraits; see
         ppgauss.
     P is the pulse period [sec].
-    fit_scattering_index will also fit for the power-law index of the
-        scattering law, with the initial guess set as the default in the header
-        lines of pplib.py.
     quiet=True suppresses output [default].
     """
     nparam = len(init_params)
@@ -996,10 +1038,11 @@ def fit_gaussian_portrait(data, init_params, errs, fit_flags, phases, freqs,
                         expr=None)
     else:
         join_ichans = []
-    other_args = {'data':data, 'errs':errs, 'phases':phases, 'freqs':freqs,
-            'nu_ref':nu_ref, 'join_ichans':join_ichans, 'P':P}
+    other_args = {'model_code':model_code, 'data':data, 'errs':errs,
+            'phases':phases, 'freqs':freqs, 'nu_ref':nu_ref,
+            'join_ichans':join_ichans, 'P':P}
     #Fit scattering index?  Not recommended.
-    params.add('scattering_index', scattering_alpha, vary=fit_scattering_index,
+    params.add('scattering_index', scattering_index, vary=fit_scattering_index,
             min=None, max=None, expr=None)
     #Now fit it
     results = lm.minimize(fit_gaussian_portrait_function, params,
@@ -1022,7 +1065,7 @@ def fit_gaussian_portrait(data, init_params, errs, fit_flags, phases, freqs,
         print "Gaussian Portrait Fit"
         print "---------------------------------------------------------------"
         print "lmfit status:", results.message
-        print "gaussians:", ngauss
+        print "Gaussians:", ngauss
         print "DOF:", dof
         print "reduced chi-sq: %.2g" %red_chi2
         print "residuals mean: %.3g" %np.mean(residuals)
@@ -1736,18 +1779,23 @@ def unpack_dict(data):
     for key in data.keys():
         exec(key + " = data['" + key + "']")
 
-def write_model(filename, name, nu_ref, model_params, fit_flags,
-        alpha=scattering_alpha, append=False, quiet=False):
+def write_model(filename, name, model_code, nu_ref, model_params, fit_flags,
+        alpha, fit_alpha, append=False, quiet=False):
     """
-    Write a gaussian-component model.
+    Write a Gaussian-component model.
 
     filename is the output file name.
     name is the name of the model.
+    model_code is a three digit string specifying the evolutionary functions
+        to be used for the three Gaussian parameters (loc,wid,amp); see
+        pplib.py header for details.
     nu_ref is the reference frequency [MHz] of the model.
     model_params is the list of 2 + 6*ngauss model parameters, where index 1 is
         the scattering timescale [sec].
     fit_flags is the list of 2 + 6*ngauss flags (1 or 0) designating a fit.
-    alpha is the scattering index; cannot be fit with a fit flag yet.
+    alpha is the scattering index
+    fit_alpha is the fit flag for fitting the scattering index; not yet
+        fully-implemented.
     append=True will append to a file named filename.
     quiet=True suppresses output.
     """
@@ -1755,11 +1803,12 @@ def write_model(filename, name, nu_ref, model_params, fit_flags,
         outfile = open(filename, "a")
     else:
         outfile = open(filename, "w")
-    outfile.write("MODEL  %s\n"%name)
-    outfile.write("FREQ   %.4f\n"%nu_ref)
-    outfile.write("DC     %.8f  %d\n"%(model_params[0], fit_flags[0]))
-    outfile.write("TAU    %.8f  %d\n"%(model_params[1], fit_flags[1]))
-    outfile.write("ALPHA  %.3f\n"%alpha)
+    outfile.write("MODEL   %s\n"%name)
+    outfile.write("CODE    %s\n"%model_code)
+    outfile.write("FREQ    %.5f\n"%nu_ref)
+    outfile.write("DC     % .8f %d\n"%(model_params[0], fit_flags[0]))
+    outfile.write("TAU    % .8f %d\n"%(model_params[1], fit_flags[1]))
+    outfile.write("ALPHA  % .3f      %d\n"%(alpha, fit_alpha))
     ngauss = (len(model_params) - 2) / 6
     for igauss in xrange(ngauss):
         comp = model_params[(2 + igauss*6):(8 + igauss*6)]
@@ -1771,10 +1820,10 @@ def write_model(filename, name, nu_ref, model_params, fit_flags,
 
 def read_model(modelfile, phases=None, freqs=None, P=None, quiet=False):
     """
-    Read-in a gaussian-component model.
+    Read-in a Gaussian-component model.
 
     If only modelfile is specified, returns the contents of the modelfile:
-        (model name, model reference frequency, number of gaussian components,
+        (model name, model reference frequency, number of Gaussian components,
         list of parameters, list of fit flags).
     Otherwise, builds a model based on the input phases, frequencies, and
     period (if scattering timescale != 0.0).
@@ -1790,7 +1839,6 @@ def read_model(modelfile, phases=None, freqs=None, P=None, quiet=False):
     else:
         read_only = False
     ngauss = 0
-    alpha = scattering_alpha  #pplib.py default if not specified below
     comps = []
     if not quiet:
         print "Reading model from %s..."%modelfile
@@ -1800,6 +1848,8 @@ def read_model(modelfile, phases=None, freqs=None, P=None, quiet=False):
         try:
             if info[0] == "MODEL":
                 name = info[1]
+            elif info[0] == "CODE":
+                model_code = info[1]
             elif info[0] == "FREQ":
                 nu_ref = np.float64(info[1])
             elif info[0] == "DC":
@@ -1810,7 +1860,7 @@ def read_model(modelfile, phases=None, freqs=None, P=None, quiet=False):
                 fit_tau = int(info[2])
             elif info[0] == "ALPHA":
                 alpha = np.float64(info[1])
-                #fit_alpha == int(info[2]))  #Not yet implemented
+                fit_alpha = int(info[2])
             elif info[0][:4] == "COMP":
                 comps.append(line)
                 ngauss += 1
@@ -1838,8 +1888,8 @@ def read_model(modelfile, phases=None, freqs=None, P=None, quiet=False):
                 return 0
             else:
                 params[1] *= nbin / P
-        model = gen_gaussian_portrait(params, phases, freqs, nu_ref,
-                scattering_index=alpha)
+        model = gen_gaussian_portrait(model_code, params, alpha, phases, freqs,
+                nu_ref)
     if not quiet and not read_only:
         print "Model Name: %s"%name
         print "Made %d component model with %d profile bins,"%(ngauss, nbin)
@@ -1851,11 +1901,10 @@ def read_model(modelfile, phases=None, freqs=None, P=None, quiet=False):
         print "with model parameters referenced at %.3f MHz."%nu_ref
     #This could be changed to a DataBunch
     if read_only:
-        if alpha != scattering_alpha and not quiet:
-            print "Note: scattering alpha = %.2f"%alpha
-        return name, nu_ref, ngauss, params, fit_flags
+        return (name, model_code, nu_ref, ngauss, params, fit_flags, alpha,
+                fit_alpha)
     else:
-        return name, ngauss, model
+        return (name, ngauss, model)
 
 def file_is_ASCII(filename):
     """
@@ -1998,7 +2047,7 @@ def make_fake_pulsar(modelfile, ephemeris, outfile="fake_pulsar.fits", nsub=1,
     Not guaranteed to work perfectly.
 
     modelfile is the write_model(...)-type of file specifying the
-        gaussian-component model to use.
+        Gaussian-component model to use.
     ephemeris is the timing ephemeris to be installed.
     outfile is the desired output file name.
     nsub is the number of subintegrations in the data.
@@ -2135,7 +2184,8 @@ def make_fake_pulsar(modelfile, ephemeris, outfile="fake_pulsar.fits", nsub=1,
     arch.dededisperse()
     if weights is None: weights = np.ones([nsub, nchan])
     isub = 0
-    name, nu_ref, ngauss, params, fit_flags = read_model(modelfile, quiet=True)
+    (name, model_code, nu_ref, ngauss, params, fit_flags, scattering_index,
+            fit_scattering_index) = read_model(modelfile, quiet=True)
     for subint in arch:
         P = subint.get_folding_period()
         for ipol in xrange(npol):
