@@ -628,8 +628,15 @@ class DataPortrait:
 
         NB: The join parameters are "opposite" of how they should used to
             rotate the data with e.g. rotate_data; use a negative!
+        ALSO NB: In order to get "proper barycentic DMs" from these delta-DMs,
+                 one must do something like DM = (DM0 + delta-DM)*df, where df
+                 is the doppler factor and DM0 is the nominal dispersion
+                 measure, both obtained from the archive via PSRCHIVE:
+                 e.g.  df = archive.get_Integration(0).get_doppler_factor and
+                      DM0 = archive.get_dispersion_measure().
         """
         #print "Beware: JOIN Parameters should be negated!"
+        #print "Beware: JOIN DMs are offsets and not doppler corrected!"
         if self.joinfile is not None:
             joinfile = self.joinfile
         else:

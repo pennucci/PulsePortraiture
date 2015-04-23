@@ -365,7 +365,8 @@ class GetTOAs:
                 toa_flags['subint'] = isub
                 toa_flags['tobs'] = subtimes[isub]
                 toa_flags['pp_tmplt'] = self.modelfile
-                #toa_flags['pp_cov'] = results.covariance
+                if self.nu_ref is not None:
+                    toa_flags['pp_cov'] = results.covariance
                 toa_flags['pp_gof'] = results.red_chi2
                 #toa_flags['pp_phs'] = results.phi
                 toa_flags['pp_snr'] = results.snr

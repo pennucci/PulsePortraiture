@@ -1,5 +1,3 @@
-#!/usr/bin/env python
-
 #######
 #pplib#
 #######
@@ -101,9 +99,9 @@ obs_codes = {'bary':'@', '???':'0', 'gbt':'1', 'atca':'2', 'ao':'3',
 #Dictionary of two-character observatory codes recognized by tempo/2.
 #Taken and lowered from $TEMPO/obsys.dat
 tempo_codes = {'arecibo':'ao', 'chime':'ch', 'effelsberg':'ef', 'gbt':'gb',
-               'gmrt':'gm', 'jodrell':'jb', 'lofar':'lf', 'lwa':'lw',
-               'nancay':'nc', 'parkes':'pk', 'shao':'sh', 'vla':'v2',
-               'wsrt':'wb'}
+               'gmrt':'gm', 'jodrell':'jb', 'lofar':'lf', 'lwa1':'lw',
+               'nancay':'nc', 'parkes':'pk', 'shao':'sh', 'srt':'sr',
+               'vla':'v2', 'wsrt':'wb'}
 
 #RCSTRINGS dictionary, for the return codes given by scipy.optimize.fmin_tnc.
 #These are only needed for debugging.
@@ -152,6 +150,18 @@ def set_colormap(colormap):
     if im is not None:
         exec("im.set_cmap(plt.cm.%s)"%colormap)
     plt.draw_if_interactive()
+
+def weighted_mean(data, errs=1.0):
+    """
+    Return the weighted mean and its standard error.
+
+    data is a 1-D array of data values.
+    errs is a 1-D array of data errors a la 1-sigma uncertainties (errs**-2 are
+        the weights in the weighted mean).
+    """
+    mean = (data*(errs**-2.0)).sum() / (errs**-2.0).sum()
+    mean_std_err = (errs**-2.0).sum()**-0.5
+    return mean, mean_std_err
 
 def gaussian_function(xs, loc, wid, norm=False):
     """
@@ -2384,12 +2394,12 @@ def show_portrait(port, phases=None, freqs=None, title=None, prof=True,
         fi = 1
     if colorbar: ci = 1
     ax1 = plt.subplot(grid[(pi*nn/6):, (fi*nn/6):])
-    im = plt.imshow(port, aspect=aspect, origin=origin, extent=extent,
+    im = ax1.imshow(port, aspect=aspect, origin=origin, extent=extent,
         interpolation=interpolation, **kwargs)
     if colorbar: plt.colorbar(im, ax=ax1, use_gridspec=False)
-    plt.xlabel(xlabel)
+    ax1.set_xlabel(xlabel)
     if not fi:
-        plt.ylabel(ylabel)
+        ax1.set_ylabel(ylabel)
     else:
         #ytklbs = ax1.get_yticklabels()
         ax1.set_yticklabels(())
@@ -2405,10 +2415,10 @@ def show_portrait(port, phases=None, freqs=None, title=None, prof=True,
         ax2.set_xticks(ax1.get_xticks())
         ax2.set_xticklabels(())
         ax2.set_yticks([0, round(prof.max() / 2, 1), round(prof.max(), 1)])
-        plt.xlim(phases.min(), phases.max())
+        ax2.set_xlim(phases.min(), phases.max())
         rng = prof.max() - prof.min()
-        plt.ylim(prof.min() - 0.03*rng, prof.max() + 0.05*rng)
-        plt.ylabel("Flux Units")
+        ax2.set_ylim(prof.min() - 0.03*rng, prof.max() + 0.05*rng)
+        ax2.set_ylabel("Flux Units")
         if title: plt.title(title)
     if fi:
         ax3 = plt.subplot(grid[(pi*nn/6):, :(fi*nn/6)])
@@ -2416,12 +2426,13 @@ def show_portrait(port, phases=None, freqs=None, title=None, prof=True,
         ax3.set_xticks([0, round(fluxprofx.max() / 2, 2),
             round(fluxprofx.max(), 2)])
         rng = fluxprofx.max() - fluxprofx.min()
-        plt.xlim(fluxprofx.max() + 0.03*rng, fluxprofx.min() - 0.01*rng)
-        plt.xlabel("Flux Units")
+        ax3.set_xlim(fluxprofx.max() + 0.03*rng, fluxprofx.min() - 0.01*rng)
+        ax3.set_xlabel("Flux Units")
         ax3.set_yticks(ax1.get_yticks())
         #ax3.set_yticklabels(ytklbs)
-        plt.ylim(freqs[0], freqs[-1])
-        plt.ylabel(ylabel)
+        #ax3.set_ylim(freqs[0], freqs[-1])
+        ax3.set_ylim(ax1.get_ylim()[0],ax1.get_ylim()[1])
+        ax3.set_ylabel(ylabel)
     #if title: plt.suptitle(title)
     #plt.tight_layout(pad = 1.0, h_pad=0.0, w_pad=0.0)
     if savefig:
@@ -2477,36 +2488,36 @@ def show_residual_plot(port, model, resids=None, phases=None, freqs=None,
     if extent is None:
         extent = (phases[0], phases[-1], freqs[0], freqs[-1])
     ax1 = plt.subplot(grid[:mm, :mm])
-    im = plt.imshow(port, aspect=aspect, origin=origin, extent=extent,
+    im = ax1.imshow(port, aspect=aspect, origin=origin, extent=extent,
             interpolation=interpolation, **kwargs)
     if colorbar: plt.colorbar(im, ax=ax1, use_gridspec=False)
-    plt.xlabel(xlabel)
-    plt.ylabel(ylabel)
+    ax1.set_xlabel(xlabel)
+    ax1.set_ylabel(ylabel)
     if titles[0] is None:
-        plt.title("")
+        ax1.set_title("")
     else:
-        plt.title(titles[0])
+        ax1.set_title(titles[0])
     ax2 = plt.subplot(grid[:mm, -mm:])
-    im = plt.imshow(model, aspect=aspect, origin=origin, extent=extent,
+    im = ax2.imshow(model, aspect=aspect, origin=origin, extent=extent,
             interpolation=interpolation, vmin=im.properties()['clim'], **kwargs)
     if colorbar: plt.colorbar(im, ax=ax2, use_gridspec=False)
-    plt.xlabel(xlabel)
-    plt.ylabel(ylabel)
+    ax2.set_xlabel(xlabel)
+    ax2.set_ylabel(ylabel)
     if titles[1] is None:
-        plt.title("")
+        ax2.set_title("")
     else:
-        plt.title(titles[1])
+        ax2.set_title(titles[1])
     ax3 = plt.subplot(grid[-mm:, :mm])
     if resids is None: resids = port - model
-    im = plt.imshow(resids, aspect=aspect, origin=origin, extent=extent,
+    im = ax3.imshow(resids, aspect=aspect, origin=origin, extent=extent,
             interpolation=interpolation, **kwargs)
     if colorbar: plt.colorbar(im, ax=ax3, use_gridspec=False)
-    plt.xlabel(xlabel)
-    plt.ylabel(ylabel)
+    ax3.set_xlabel(xlabel)
+    ax3.set_ylabel(ylabel)
     if titles[2] is None:
-        plt.title("")
+        ax3.set_title("")
     else:
-        plt.title(titles[2])
+        ax3.set_title(titles[2])
     ax4 = plt.subplot(grid[-mm:, -mm:])
     weights = port.mean(axis=1)
     portx = np.compress(weights, port, axis=0)
