@@ -190,6 +190,34 @@ class DataPortrait:
             self.noise_stdsxs = self.noise_stds[0,0,self.ok_ichans[0]]
             self.SNRsxs = self.SNRs[0,0,self.ok_ichans[0]]
 
+    def apply_joinfile(self, nu_ref, undo=False):
+        """
+        Apply parameters in joinfile.
+
+        nu_ref is the reference frequency [MHz], which should be the fitted
+            model's reference frequency.
+        undo=True rotates the data the other way.
+        """
+        undo = (-1)**(int(undo))
+        for ii in range(self.njoin):
+            jic = self.join_ichans[ii]
+            self.port[jic] = rotate_data(self.port[jic],
+                    -self.join_params[0::2][ii]*undo,
+                    -self.join_params[1::2][ii]*undo, self.Ps[0],
+                    self.freqs[0,jic], nu_ref)
+            jicx = self.join_ichanxs[ii]
+            self.portx[jicx] = rotate_data(self.portx[jicx],
+                    -self.join_params[0::2][ii]*undo,
+                    -self.join_params[1::2][ii]*undo, self.Ps[0],
+                    self.freqsxs[0][jicx], nu_ref)
+        #    self.model[jic] = rotate_data(self.model[jic],
+        #            -self.join_params[0::2][ii]*undo,
+        #            -self.join_params[1::2][ii]*undo, self.Ps[0],
+        #            self.freqs[0,jic], nu_ref)
+        #self.model_masked = self.model * self.masks[0,0]
+        #self.modelx = np.compress(self.masks[0,0].mean(axis=1), self.model,
+        #        axis=0)
+
     def normalize_portrait(self, method="max"):
         """
         Normalize each profile.
