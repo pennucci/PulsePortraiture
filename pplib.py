@@ -1046,6 +1046,17 @@ def fit_gaussian_portrait(model_code, data, init_params, scattering_index,
             params.add('DM%s'%str(ii+1), join_params[1][1::2][ii],
                     vary=bool(join_params[2][1::2][ii]), min=None, max=None,
                         expr=None)
+            #Comment out above DM param line and uncomment below to fix
+            #join DM params to be the same!
+            #if ii == 0:
+            #    params.add('DM%s'%str(ii+1), join_params[1][1::2][ii],
+            #            vary=bool(join_params[2][1::2][ii]), min=None,
+            #            max=None, expr=None)
+            #else:
+            #    params.add('DM%s'%str(ii+1), join_params[1][1::2][ii],
+            #            vary=bool(join_params[2][1::2][ii]), min=None,
+            #            max=None, expr='DM1')
+
     else:
         join_ichans = []
     other_args = {'model_code':model_code, 'data':data, 'errs':errs,

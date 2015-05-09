@@ -290,7 +290,7 @@ class DataPortrait:
         """
         #Noise level below may be off
         fp = fit_powlaw(self.flux_profx, np.array([guessA,guessalpha]),
-            np.ones(self.nchanx), self.freqsxs[0], self.nu0)
+            np.ones(len(self.freqsxs[0])), self.freqsxs[0], self.nu0)
         if not quiet:
             print ""
             print "Flux-density power-law fit"
