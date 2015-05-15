@@ -159,8 +159,9 @@ def weighted_mean(data, errs=1.0):
     errs is a 1-D array of data errors a la 1-sigma uncertainties (errs**-2 are
         the weights in the weighted mean).
     """
-    mean = (data*(errs**-2.0)).sum() / (errs**-2.0).sum()
-    mean_std_err = (errs**-2.0).sum()**-0.5
+    iis = np.where(errs > 0.0)[0]
+    mean = (data[iis]*(errs[iis]**-2.0)).sum() / (errs[iis]**-2.0).sum()
+    mean_std_err = (errs[iis]**-2.0).sum()**-0.5
     return mean, mean_std_err
 
 def gaussian_function(xs, loc, wid, norm=False):
