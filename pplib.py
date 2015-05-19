@@ -70,14 +70,14 @@ default_model = '000'
 #########
 
 #Set colormap preference
-#Decent monocolor: pink, gist_heat, copper, hot, gray, Blues_r
-#Decent multicolor: cubehelix, terrain, spectral, seismic
+#Decent sequential colormaps: gist_heat, pink, copper, Oranges_r, gray, bone,
+#    Blues_r, cubehelix, terrain, YlOrBr_r
 #see plt.cm for list of available colormaps.
 default_colormap = 'gist_heat'
 if hasattr(plt.cm, default_colormap):
     plt.rc('image', cmap=default_colormap)
 else:
-    plt.rc('image', cmap='pink')
+    plt.rc('image', cmap='YlOrBr_r')
 
 #List of colors; can do this better...
 cols = ['b', 'g', 'r', 'c', 'm', 'y', 'k', 'orange', 'brown', 'purple', 'pink',
