@@ -891,6 +891,32 @@ def fit_powlaw(data, init_params, errs, freqs, nu_ref):
             nu_ref=nu_ref, chi2=chi2, dof=dof)
     return results
 
+def fit_DM_to_freq_resids(freqs, frequency_residuals, errs):
+    """
+    A simple linear fit of a DM and reference frequency to frequency residuals.
+
+    freqs is the nchan arrray of frequencies
+    frequency_residuals is the nchan array of residuals.
+    errs is the array of uncertainties on the frequency residuals.
+    """
+    x = freqs**-2
+    y = frequency_residuals
+    w = errs ** -2
+    p,V = np.polyfit(x=x, y=y, deg=1, w=w, cov=True)
+    a,b = p[0],p[1]
+    DM = a / Dconst
+    nu_ref = (-b/a)**-0.5
+    a_err = np.diag(V)[0]/Dconst
+    b_err = np.diag(V)[1]
+    cov = V.ravel()[1]
+    DM_err = a_err / Dconst
+    nu_ref_err = (((nu_ref**2)/4.0) * \
+            (((a_err**2)/a) + ((b_err**2)/b) - (2*cov/(a*b))))**0.5
+    residuals = frequency_residuals - 
+    results = DataBunch(DM=DM, DM_err=DM_err, nu_ref=nu_ref,
+            nu_ref_err=nu_ref_err, ab_cov = cov, residuals=residuals)
+    return results
+
 def fit_gaussian_profile(data, init_params, errs, fit_flags=None,
         fit_scattering=False, quiet=True):
     """
