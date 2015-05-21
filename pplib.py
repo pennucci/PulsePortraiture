@@ -893,28 +893,34 @@ def fit_powlaw(data, init_params, errs, freqs, nu_ref):
 
 def fit_DM_to_freq_resids(freqs, frequency_residuals, errs):
     """
-    A simple linear fit of a DM and reference frequency to frequency residuals.
+    Fit for a DM and reference frequency from frequency residuals.
 
-    freqs is the nchan arrray of frequencies
-    frequency_residuals is the nchan array of residuals.
-    errs is the array of uncertainties on the frequency residuals.
+    freqs is the nchan arrray of frequencies [MHz]
+    frequency_residuals is the nchan array of residuals [s].
+    errs is the array of uncertainties on the frequency residuals [s].
+
+    Returned covariance is of the linear coefficients ax + b.
     """
     x = freqs**-2
     y = frequency_residuals
-    w = errs ** -2
+    w = errs**-2
     p,V = np.polyfit(x=x, y=y, deg=1, w=w, cov=True)
     a,b = p[0],p[1]
     DM = a / Dconst
     nu_ref = (-b/a)**-0.5
-    a_err = np.diag(V)[0]/Dconst
-    b_err = np.diag(V)[1]
+    a_err = (np.diag(V)[0])**0.5
+    b_err = (np.diag(V)[1])**0.5
     cov = V.ravel()[1]
     DM_err = a_err / Dconst
     nu_ref_err = (((nu_ref**2)/4.0) * \
-            (((a_err**2)/a) + ((b_err**2)/b) - (2*cov/(a*b))))**0.5
-    residuals = frequency_residuals - 
+            (((a_err/a)**2) + ((b_err/b)**2) - (2*cov/(a*b))))**0.5
+    residuals = frequency_residuals - (a*(freqs**-2) + b)
+    chi2 = ((residuals/errs)**2).sum()
+    dof = len(frequency_residuals) - 2
+    red_chi2 = chi2 / dof
     results = DataBunch(DM=DM, DM_err=DM_err, nu_ref=nu_ref,
-            nu_ref_err=nu_ref_err, ab_cov = cov, residuals=residuals)
+            nu_ref_err=nu_ref_err, ab_cov = cov, residuals=residuals,
+            chi2=chi2, dof=dof, red_chi2=red_chi2)
     return results
 
 def fit_gaussian_profile(data, init_params, errs, fit_flags=None,
@@ -988,7 +994,7 @@ def fit_gaussian_profile(data, init_params, errs, fit_flags=None,
         print "---------------------------------------------------------------"
         print "lmfit status:", results.message
         print "Gaussians:", ngauss
-        print "DOF:", dof
+        print "DoF:", dof
         print "reduced chi-sq: %.2f" % red_chi2
         print "residuals mean: %.3g" % np.mean(residuals)
         print "residuals std.: %.3g" % np.std(residuals)
@@ -1114,7 +1120,7 @@ def fit_gaussian_portrait(model_code, data, init_params, scattering_index,
         print "---------------------------------------------------------------"
         print "lmfit status:", results.message
         print "Gaussians:", ngauss
-        print "DOF:", dof
+        print "DoF:", dof
         print "reduced chi-sq: %.2g" %red_chi2
         print "residuals mean: %.3g" %np.mean(residuals)
         print "residuals std.: %.3g" %np.std(residuals)
@@ -1259,8 +1265,8 @@ def fit_portrait(data, model, init_params, P, freqs, nu_fit=None, nu_out=None,
     covariance = covariance_matrix[0,1]
     #These are true 1-sigma errors iff covariance == 0
     param_errs = list(covariance_matrix.diagonal()**0.5)
-    DoF = len(data.ravel()) - (len(freqs) + 2)
-    red_chi2 = (d + results.fun) / DoF
+    dof = len(data.ravel()) - (len(freqs) + 2)
+    red_chi2 = (d + results.fun) / dof
     #Calculate scales
     scales = get_scales(data, model, phi, DM, P, freqs, nu_fit)
     #Errors on scales, if ever needed (these may be wrong b/c of covariances)
