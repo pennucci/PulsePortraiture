@@ -916,8 +916,11 @@ def fit_DM_to_freq_resids(freqs, frequency_residuals, errs):
     freqs is the nchan arrray of frequencies [MHz]
     frequency_residuals is the nchan array of residuals [s].
     errs is the array of uncertainties on the frequency residuals [s].
-
-    Returned covariance is of the linear coefficients ax + b.
+    
+    Returned parameters are DM, offset, nu_ref for:
+       res = Dconst*DM*(freqs**-2) + offset
+       res = Dconst*DM*(freqs**-2 - nu_ref**-2)
+    Returned covariance is of the linear coefficients a,b: ax + b.
     """
     x = freqs**-2
     y = frequency_residuals
@@ -925,20 +928,23 @@ def fit_DM_to_freq_resids(freqs, frequency_residuals, errs):
     p,V = np.polyfit(x=x, y=y, deg=1, w=w, cov=True)
     a,b = p[0],p[1]
     DM = a / Dconst
+    offset = b
     nu_ref = (-b/a)**-0.5
     a_err = (np.diag(V)[0])**0.5
     b_err = (np.diag(V)[1])**0.5
     cov = V.ravel()[1]
     DM_err = a_err / Dconst
+    offset_err = b_err
     nu_ref_err = (((nu_ref**2)/4.0) * \
             (((a_err/a)**2) + ((b_err/b)**2) - (2*cov/(a*b))))**0.5
     residuals = frequency_residuals - (a*(freqs**-2) + b)
     chi2 = ((residuals/errs)**2).sum()
     dof = len(frequency_residuals) - 2
     red_chi2 = chi2 / dof
-    results = DataBunch(DM=DM, DM_err=DM_err, nu_ref=nu_ref,
-            nu_ref_err=nu_ref_err, ab_cov = cov, residuals=residuals,
-            chi2=chi2, dof=dof, red_chi2=red_chi2)
+    results = DataBunch(DM=DM, DM_err=DM_err, offset=offset,
+            offset_err = offset_err, nu_ref=nu_ref, nu_ref_err=nu_ref_err,
+            ab_cov = cov, residuals=residuals, chi2=chi2, dof=dof,
+            red_chi2=red_chi2)
     return results
 
 def fit_gaussian_profile(data, init_params, errs, fit_flags=None,
