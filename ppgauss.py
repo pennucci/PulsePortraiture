@@ -222,12 +222,13 @@ class DataPortrait:
         """
         Normalize each profile.
 
-        method is either "max" or "rms"
+        method is either "max", "mean", or "rms"
             if "max", then normalize by the profile maximum.
+            if "mean", then normalize by the profile mean (flux).
             if "rms", then normalize by the noise level, such that
                 get_noise(profile) = 1.
         """
-        if method != "max" and method != "rms":
+        if method != "max" and method != "mean" and method != "rms":
             print "Unknown method for normalize_portrait, '%s'"%method
             return 0
         #Full portrait
@@ -235,6 +236,8 @@ class DataPortrait:
             if self.port[ichan].any():
                 if method == "max":
                     norm = self.port[ichan].max()
+                elif method == "mean":
+                    norm = self.port[ichan].mean()
                 else:
                     norm = get_noise(self.port[ichan])
                 self.port[ichan] /= norm
@@ -244,6 +247,8 @@ class DataPortrait:
         for ichanx in range(len(self.portx)):
             if method == "max":
                 norm = self.portx[ichanx].max()
+            elif method = "mean":
+                norm = self.portx[ichanx].mean()
             else:
                 norm = get_noise(self.portx[ichanx])
             self.portx[ichanx] /= norm
