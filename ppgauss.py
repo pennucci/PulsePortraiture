@@ -247,7 +247,7 @@ class DataPortrait:
         for ichanx in range(len(self.portx)):
             if method == "max":
                 norm = self.portx[ichanx].max()
-            elif method = "mean":
+            elif method == "mean":
                 norm = self.portx[ichanx].mean()
             else:
                 norm = get_noise(self.portx[ichanx])
