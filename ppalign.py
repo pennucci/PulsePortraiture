@@ -51,8 +51,8 @@ def psrsmooth_archive(archive, options="-W"):
     psrsmooth_call = sub.Popen(shlex.split(psrsmooth_cmd))
     psrsmooth_call.wait()
 
-def align_archives(metafile, initial_guess, outfile=None, rot_phase=0.0,
-        place=None, niter=1, quiet=False):
+def align_archives(metafile, initial_guess, pscrunch=True, outfile=None,
+        rot_phase=0.0, place=None, niter=1, quiet=False):
     """
     Iteratively align and average archives.
 
@@ -64,6 +64,9 @@ def align_archives(metafile, initial_guess, outfile=None, rot_phase=0.0,
 
     metafile is a file containing PSRFITS archive names to be averaged.
     initial_guess is the PSRFITS archive providing the initial alignment guess.
+    pscrunch=False will average the available polarizations as well as average
+        intensity.  Alignment and weighting is still performed only via the
+        total intensity portrait.
     outfile is the name of the output archive; defaults to
         <metafile>.algnd.fits.
     rot_phase is an overall rotation to be applied to the final output archive.
@@ -77,6 +80,8 @@ def align_archives(metafile, initial_guess, outfile=None, rot_phase=0.0,
     vap_cmd = "vap -c nchan,nbin %s"%initial_guess
     nchan,nbin = map(int, sub.Popen(shlex.split(vap_cmd), stdout=sub.PIPE
             ).stdout.readlines()[1].split()[-2:])
+    if pscrunch: npol = 1
+    else: npol = 4
     model_data = load_data(initial_guess, dedisperse=True, dededisperse=False,
             tscrunch=True, pscrunch=True, fscrunch=False, rm_baseline=True,
             flux_prof=False, refresh_arch=True, return_arch=True, quiet=quiet)
@@ -84,14 +89,14 @@ def align_archives(metafile, initial_guess, outfile=None, rot_phase=0.0,
     count = 1
     while(niter):
         print "Doing iteration %d..."%count
-        nsub = 0
         load_quiet = quiet
-        aligned_port = np.zeros((nchan,nbin))
+        aligned_port = np.zeros((npol,nchan,nbin))
         total_weights = np.zeros((nchan,nbin))
         for ifile in xrange(len(datafiles)):
             data = load_data(datafiles[ifile], dedisperse=False,
-                    tscrunch=False, pscrunch=True, fscrunch=False,
+                    tscrunch=False, pscrunch=pscrunch, fscrunch=False,
                     rm_baseline=True, quiet=load_quiet)
+            if data.arch.get_state() != 'Stokes' or data.arch.get_stat() != 'Intensity', #Need to make sure it works on Coherence, Stokes, Intensity, and returns the right thing.
             DM_guess = data.DM
             for isub in data.ok_isubs:
                 port = data.subints[isub,0,data.ok_ichans[isub]]
@@ -121,21 +126,23 @@ def align_archives(metafile, initial_guess, outfile=None, rot_phase=0.0,
                     results.scale_errs = np.array([results.scale_error])
                     results.covariance = 0.0
                 weights = np.outer(results.scales / errs**2, np.ones(nbin))
-                aligned_port[data.ok_ichans[isub]] += weights * \
-                        rotate_data(port, results.phase, results.DM, P, freqs,
-                                results.nu_ref)
+                for ipol in range(npol):
+                    aligned_port[ipol, data.ok_ichans[isub]] += weights * \
+                            rotate_data(data.subints[isub,ipol,
+                                data.ok_ichans[isub]], results.phase,
+                                results.DM, P,freqs, results.nu_ref)
                 total_weights[data.ok_ichans[isub]] +=  weights
-                nsub += 1
             load_quiet = True
-        aligned_port[np.where(total_weights > 0)[0]] /= \
-                total_weights[np.where(total_weights > 0)[0]]
-        model_port = aligned_port
+        for ipol in range(npol):
+            aligned_port[ipol, np.where(total_weights > 0)[0]] /= \
+                    total_weights[np.where(total_weights > 0)[0]]
+        model_port = aligned_port[0]
         niter -= 1
         count += 1
     if rot_phase:
         aligned_port = rotate_data(aligned_port, rot_phase)
     if place is not None:
-        prof = aligned_port.mean(axis=0)
+        prof = aligned_port[0].mean(axis=0)
         delta = prof.max() * gaussian_profile(len(prof), place, 0.0001)
         phase = fit_phase_shift(prof, delta).phase
         aligned_port = rotate_data(aligned_port, phase)
@@ -148,7 +155,7 @@ def align_archives(metafile, initial_guess, outfile=None, rot_phase=0.0,
             for ichan in xrange(model_data.arch.get_nchan()):
                 #subint.set_weight(ichan, weight)
                 prof = subint.get_Profile(ipol, ichan)
-                prof.get_amps()[:] = aligned_port[ichan]
+                prof.get_amps()[:] = aligned_port[ipol,ichan]
                 if total_weights[ichan].sum() == 0.0:
                     subint.set_weight(ichan, 0.0)
     arch.unload(outfile)
@@ -172,6 +179,10 @@ if __name__ == "__main__":
                       action="store", metavar="initial_guess",
                       dest="initial_guess",
                       help="Archive containing initial alignment guess.  psradd is used if -I is not used. [default=None]")
+    parser.add_option("-p", "--poln",
+                      default=True,
+                      action="store_false",dest="pscrunch",
+                      help="Output averaged polarizations.")
     parser.add_option("-o", "--outfile",
                       default=None,
                       action="store", metavar="outfile", dest="outfile",
@@ -209,6 +220,7 @@ if __name__ == "__main__":
 
     metafile = options.metafile
     initial_guess = options.initial_guess
+    pscrunch = options.pscrunch
     outfile = options.outfile
     palign = options.palign
     smooth = options.smooth
@@ -225,8 +237,9 @@ if __name__ == "__main__":
         psradd_archives(metafile, outfile=tmp_file, palign=palign)
         initial_guess = tmp_file
         rm = True
-    align_archives(metafile, initial_guess=initial_guess, outfile=outfile,
-            rot_phase=rot_phase, place=place, niter=niter, quiet=quiet)
+    align_archives(metafile, initial_guess=initial_guess, pscrunch=pscrunch,
+            outfile=outfile, rot_phase=rot_phase, place=place, niter=niter,
+            quiet=quiet)
     if smooth:
         if outfile is None:
             outfile = metafile + ".algnd.fits"
