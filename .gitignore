@@ -12,7 +12,6 @@ examples/*~
 examples/example-*
 examples/example.meta
 examples/example.port
-examples/example.png
 examples/example.tim
 pplib_dist.py*
 MCtests/

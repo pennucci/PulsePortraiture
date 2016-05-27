@@ -6,7 +6,7 @@
 #programs ppgauss and pptoas, as well as some additional functions used in our
 #wideband timing analysis.
 
-#Written by Timothy T. Pennucci (TTP; pennucci@virginia.edu).
+#Written by Timothy T. Pennucci (TTP; pennucci@email.virginia.edu).
 #Contributions by Scott M. Ransom (SMR) and Paul B. Demorest (PBD) 
 
 #########
@@ -2256,10 +2256,11 @@ def make_fake_pulsar(modelfile, ephemeris, outfile="fake_pulsar.fits", nsub=1,
     arch.set_ephemeris(ephemeris)
     #Now finally, fill in the data!
     #NB the different pols are not realistic: same model, same noise_stds
-    #If wanting to use PSRCHIVE's rotation scheme, uncomment the dedisperse and
-    #dededisperse lines, and set rotmodel = model.
-    arch.set_dedispersed(False)
-    arch.dededisperse()
+    #rotmodel is now set to the unrotated model, and all rotation done by
+    #PSRCHIVE since whether or not the PSRCHIVE configuration is set to use the
+    #barycentric correction will matter
+    arch.set_dedispersed(True)
+    arch.dedisperse()
     if weights is None: weights = np.ones([nsub, nchan])
     isub = 0
     (name, model_code, nu_ref, ngauss, params, fit_flags, scattering_index,
@@ -2270,11 +2271,14 @@ def make_fake_pulsar(modelfile, ephemeris, outfile="fake_pulsar.fits", nsub=1,
             name, ngauss, model = read_model(modelfile, phases, freqs, P,
                     quiet=True)
             if xs is None:
-                rotmodel = rotate_data(model, -phase, -(DM+dDM), P, freqs, nu0)
+                rotmodel = model
+                #rotmodel=rotate_data(model, -phase, -(DM+dDM), P, freqs, nu0)
             else:
                 phase = phase_transform(phase, DM+dDM, nu0, nu_DM, P)
-                rotmodel = add_DM_nu(model, -phase, -(DM+dDM), P, freqs, xs,
-                        Cs, nu_DM)
+                #rotmodel = add_DM_nu(model, -phase, -(DM+dDM), P, freqs, xs,
+                #        Cs, nu_DM)
+                rotmodel = add_DM_nu(model, -phase, -dDM, P, freqs, xs, Cs,
+                        nu_DM)
             #rotmodel = model
             if t_scat and not params[1]:    #modelfile overrides
                 sk = scattering_kernel(t_scat, nu0, freqs, phases, P,
@@ -2297,6 +2301,7 @@ def make_fake_pulsar(modelfile, ephemeris, outfile="fake_pulsar.fits", nsub=1,
                     prof.get_amps()[:] = scales[ichan]*rotmodel[ichan]
         isub += 1
     if dedispersed: arch.dedisperse()
+    else: arch.dededisperse()
     arch.unload(outfile)
     if not quiet: print "\nUnloaded %s.\n"%outfile
 

@@ -24,13 +24,12 @@ noise_std = 2.75 #Noise level of the band, per subintegration [flux units]
 dDM_mean = 3e-4  #Add in random dispersion measure offsets with this mean value
 dDM_std = 2e-4   #Add in random dispersion measure offsets with this std
 dDMs = np.random.normal(dDM_mean, dDM_std, nfiles)
-#dDMs = np.zeros(nfiles) #Uncomment and set dDM_mean and dDM_std to zero for \
+#dDMs = np.zeros(nfiles) #Uncomment this line and comment previous line for \
                          #no injected dDMs
 scint = True     #Add random scintillation
-#Adding scattering to the fake data may slow down the fit:
-#t_scat and alpha will be read from the gmodel file if TAU is non-zero there.
-t_scat = 50e-6   #Add scattering with this timescale [s] w.r.t. nu0
-alpha = -4.0     #t_scat will follow a powerlaw with this spectral index
+#Scattering parameters will be read from the modelfile.
+#Adding/fitting scattering to the fake data may slow down the fit:
+fitscat = True   #Fit scattering timescale
 fitalpha = False #Fit the scattering index
 
 weights = np.ones([nsub, nchan]) #Change if you want to have an "RFI" mask
@@ -48,18 +47,22 @@ for ifile in range(nfiles):
             nsub=nsub, npol=npol, nchan=nchan, nbin=nbin, nu0=nu0, bw=bw,
             tsub=tsub, phase=0.0, dDM=dDMs[ifile], start_MJD=start_MJD,
             weights=weights, noise_stds=noise_std, scales=1.0,
-            dedispersed=False, t_scat=t_scat, alpha=alpha, scint=scint,
-            state="Coherence", obs="GBT", quiet=quiet)
+            dedispersed=False, scint=scint, state="Stokes", obs="GBT",
+            quiet=quiet)
     #NB: the input parfile for fake data cannot yet have binary parameters
 os.system('psredit -q -m -c rcvr:name="fake_rx" -c be:name="fake_be" example-*.fits')
 
-#If you wanted to add a bunch of datafiles together, you could use PSRCHIVE's
-#psradd to get a high SNR portrait.
-metafile = "example.meta"
-os.system("ls example-*.fits > %s"%metafile)
-print "Adding data archives..."
-outfile = "example.port"
-os.system("psradd -T -P -E %s -M %s -o %s"%(ephemeris, metafile, outfile))
+#Here we build an average portrait from the data
+if nfiles > 1:
+    import ppalign as pa
+    metafile = "example.meta"
+    os.system("ls example-*.fits > %s"%metafile)
+    outfile = "example.port"
+    print "Adding data archives..."
+    pa.align_archives(metafile=metafile, initial_guess="example-1.fits",
+            tscrunch=True, pscrunch=True, outfile=outfile, niter=1, quiet=True)
+    #...or you could use PSRCHIVE's psradd to get a high SNR portrait.
+    #os.system("psradd -T -P -E %s -M %s -o %s"%(ephemeris, metafile, outfile))
 
 #Now we want to "build" our gaussian model from the data
 print "Running ppgauss.py to fit a gaussian model..."
@@ -70,11 +73,10 @@ dp = pg.DataPortrait(datafile)
 #Have a look at the data you're fitting
 dp.show_data_portrait()
 #Fit a model; see ppgauss.py for all options
-dp.make_gaussian_model(ref_prof=(nu0, bw/4), tau=(t_scat * dp.nbin) / dp.Ps[0],
-        fixloc=True, fixscat=not(bool(t_scat)), fixalpha=not(fitalpha),
-        niter=3, fiducial_gaussian=True, writemodel=True,
-        outfile="example-fit.gmodel", model_name="example-fit",
-        residplot="example.png", quiet=False)
+dp.make_gaussian_model(ref_prof=(nu0, bw/4), fixloc=True, fixscat=not(fitscat),
+        fixalpha=not(fitalpha), niter=3, fiducial_gaussian=True,
+        writemodel=True, outfile="example-fit.gmodel", writeerrfile=True,
+        model_name="example-fit", residplot="example-fit.png", quiet=False)
 #You can always then continue iterations using the ppgauss option -I or by:
 #niter = # 
 #modelfile = example-fit.gmodel

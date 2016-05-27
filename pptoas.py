@@ -8,7 +8,7 @@
 #    and dispersion measures (DMs).  Full-functionality is obtained when using
 #    pptoas within an interactive python environment.
 
-#Written by Timothy T. Pennucci (TTP; pennucci@virginia.edu).
+#Written by Timothy T. Pennucci (TTP; pennucci@email.virginia.edu).
 #Contributions by Scott M. Ransom (SMR) and Paul B. Demorest (PBD)
 
 from pplib import *
