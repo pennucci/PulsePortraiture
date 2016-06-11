@@ -200,7 +200,6 @@ def gaussian_function(xs, loc, wid, norm=False):
         scale *= (sigma**2.0 * 2.0 * np.pi)**-0.5
     return scale * ys
 
-
 def gaussian_profile(nbin, loc, wid, norm=False, abs_wid=False, zeroout=True):
     """
     Return a Gaussian pulse profile with nbin bins and peak amplitude of 1.
