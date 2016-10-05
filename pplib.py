@@ -259,7 +259,7 @@ def gaussian_profile(nbin, loc, wid, norm=False, abs_wid=False, zeroout=True):
 
 def gen_gaussian_profile(params, nbin):
     """
-    Return a model-profile with ngauss Gaussian components.
+    Return a model profile with ngauss Gaussian components.
 
     params is a sequence of 2 + (ngauss*3) values where the first value is
         the DC component, the second value is the scattering timescale [bin]
@@ -341,7 +341,7 @@ def gen_gaussian_portrait(model_code, params, scattering_index, phases, freqs,
             ampparams, model_code[2])
     for ichan in xrange(nchan):
         #Need to contrain so values don't go negative, etc., which is currently
-        #done in gaussian_profile
+        #taken care of in gaussian_profile
         gport[ichan] = gen_gaussian_profile(gparams[ichan], nbin)
     if tau != 0.0:
         sk = scattering_kernel(tau, nu_ref, freqs, np.arange(nbin), 1.0,
@@ -464,8 +464,9 @@ def scattering_kernel(tau, nu_ref, freqs, phases, P, alpha):
 
     tau is the scattering timescale in [sec] or [bin].
     nu_ref is the reference frequency for tau.
-    freqs is the array of center frequencies in the nchan x nbin kernel
-    phases gives the phase-bin centers of the nchan x nbin kernel
+    freqs is the array of center frequencies in the nchan x nbin kernel.
+    phases [rot] gives the phase-bin centers of the nchan x nbin kernel; phases
+        is in [bin] if tau is also in [bin].
     P is the period [sec]; use P = 1.0 if tau is in units of [bin].
     alpha is the power-law index for the scattering evolution.
     """

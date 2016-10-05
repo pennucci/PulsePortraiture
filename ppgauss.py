@@ -31,7 +31,7 @@ class DataPortrait:
         If datafile is a metafile of PSRCHIVE archives, "join" attributes are
             set, which are used to align the archives.  A large (>3) number of
             archives signficiantly slows the fitting process, and it has only
-            been testing for the case that each archive originates from a
+            been tested for the case that each archive originates from a
             unique receiver.
         joinfile is a file like that which is output by write_join_parameters,
             containing optional parameters to align the multiple archives.
@@ -218,26 +218,26 @@ class DataPortrait:
         #self.modelx = np.compress(self.masks[0,0].mean(axis=1), self.model,
         #        axis=0)
 
-    def normalize_portrait(self, method="max"):
+    def normalize_portrait(self, method="mean"):
         """
         Normalize each profile.
 
-        method is either "max", "mean", or "rms"
-            if "max", then normalize by the profile maximum.
+        method is either "mean", "max", or "rms"
             if "mean", then normalize by the profile mean (flux).
+            if "max", then normalize by the profile maximum.
             if "rms", then normalize by the noise level, such that
                 get_noise(profile) = 1.
         """
-        if method != "max" and method != "mean" and method != "rms":
+        if method != "mean" and method != "max" and method != "rms":
             print "Unknown method for normalize_portrait, '%s'"%method
             return 0
         #Full portrait
         for ichan in range(len(self.port)):
             if self.port[ichan].any():
-                if method == "max":
-                    norm = self.port[ichan].max()
-                elif method == "mean":
+                if method == "mean":
                     norm = self.port[ichan].mean()
+                elif method == "max":
+                    norm = self.port[ichan].max()
                 else:
                     norm = get_noise(self.port[ichan])
                 self.port[ichan] /= norm
@@ -245,10 +245,10 @@ class DataPortrait:
         self.flux_prof = self.port.mean(axis=1)
         #Reduced portrait
         for ichanx in range(len(self.portx)):
-            if method == "max":
-                norm = self.portx[ichanx].max()
-            elif method == "mean":
+            if method == "mean":
                 norm = self.portx[ichanx].mean()
+            elif method == "max":
+                norm = self.portx[ichanx].max()
             else:
                 norm = get_noise(self.portx[ichanx])
             self.portx[ichanx] /= norm
@@ -279,6 +279,7 @@ class DataPortrait:
                 minspanx=None, minspany=None, useblit=True)
         if show: plt.show()
         self.init_params = self.interactor.fitted_params
+        self.init_param_errs = self.interactor.fit_errs
         self.ngauss = (len(self.init_params) - 2) / 3
 
     def fit_flux_profile(self, guessA=1.0, guessalpha=0.0, plot=True,
@@ -659,8 +660,8 @@ class DataPortrait:
         This function is a hack until something better is developed for how to
         deal with these alignment parameters.
 
-        NB: The join parameters are "opposite" of how they should used to
-            rotate the data with e.g. rotate_data; use a negative!
+        NB: The join parameters are "opposite" of how they are used to rotate
+            the data with e.g. rotate_data; use a negative!
         ALSO NB: In order to get "proper barycentic DMs" from these delta-DMs,
                  one must do something like DM = (DM0 + delta-DM)*df, where df
                  is the doppler factor and DM0 is the nominal dispersion
@@ -827,7 +828,7 @@ class GaussianSelector:
         # If no button was pressed yet ignore the event if it was out
         # of the axes
         if self.eventpress == None:
-            return event.inaxes!= self.ax
+            return event.inaxes != self.ax
         # If a button was pressed, check if the release-button is the
         # same.
         return (event.inaxes != self.ax or
@@ -909,13 +910,23 @@ class GaussianSelector:
         plt.plot(self.phases, self.profile, c='black', lw=3, alpha=0.3)
         plt.xlabel('Pulse Phase')
         plt.ylabel('Pulse Amplitude')
+        buff = 0.1
+        ymin,ymax = plt.ylim()
+        ymax = self.profile.max() + buff * \
+                (self.profile.max()-self.profile.min())
+        plt.ylim(ymin, ymax)
         DC = params[0]
         tau = params[1]
         # Plot the individual Gaussians
+        max_amp = 0.0
         for igauss in xrange(self.ngauss):
             loc, wid, amp = params[(2 + igauss*3):(5 + igauss*3)]
+            if amp >= max_amp:
+                max_amp = amp
             plt.plot(self.phases, DC + amp*gaussian_profile(self.proflen, loc,
                 wid), '%s'%cols[igauss])
+            if max_amp > ymax:
+                plt.ylim(ymin, max_amp + buff * (max_amp - self.profile.min()))
 
     def onselect(self):
         """on select event"""
@@ -1059,7 +1070,7 @@ if __name__ == "__main__":
                       help="Automatically fit one Gaussian to initial profile with initial width [rot] given as the argument. Not used with -I. [default=False]")
     parser.add_option("--norm", metavar="normalize",
                       action="store_true", dest="normalize", default=False,
-                      help="Normalize each channel's profile by its maximum.")
+                      help="Normalize each channel's profile by the channel mean.")
     parser.add_option("--figure", metavar="figurename",
                       action="store", dest="figure", default=False,
                       help="Save PNG figure of final fit to figurename. [default=Not saved]")
