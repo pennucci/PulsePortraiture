@@ -228,32 +228,50 @@ class DataPortrait:
             if "rms", then normalize by the noise level, such that
                 get_noise(profile) = 1.
         """
-        if method != "mean" and method != "max" and method != "rms":
+        if method not in ("mean", "max", "rms"):
             print "Unknown method for normalize_portrait, '%s'"%method
-            return 0
-        #Full portrait
-        for ichan in range(len(self.port)):
-            if self.port[ichan].any():
+            return 1
+        else:
+            #Full portrait
+            self.norm_values = np.ones(len(self.port))
+            for ichan in range(len(self.port)):
+                if self.port[ichan].any():
+                    if method == "mean":
+                        norm = self.port[ichan].mean()
+                    elif method == "max":
+                        norm = self.port[ichan].max()
+                    else:
+                        norm = get_noise(self.port[ichan])
+                    self.port[ichan] /= norm
+                    self.norm_values[ichan] = norm
+                    self.noise_stds[0,0,ichan] = get_noise(self.port[ichan])
+            self.flux_prof = self.port.mean(axis=1)
+            #Reduced portrait
+            self.norm_valuesx = np.ones(len(self.portx))
+            for ichanx in range(len(self.portx)):
                 if method == "mean":
-                    norm = self.port[ichan].mean()
+                    norm = self.portx[ichanx].mean()
                 elif method == "max":
-                    norm = self.port[ichan].max()
+                    norm = self.portx[ichanx].max()
                 else:
-                    norm = get_noise(self.port[ichan])
-                self.port[ichan] /= norm
-                self.noise_stds[0,0,ichan] = get_noise(self.port[ichan])
-        self.flux_prof = self.port.mean(axis=1)
-        #Reduced portrait
-        for ichanx in range(len(self.portx)):
-            if method == "mean":
-                norm = self.portx[ichanx].mean()
-            elif method == "max":
-                norm = self.portx[ichanx].max()
-            else:
-                norm = get_noise(self.portx[ichanx])
-            self.portx[ichanx] /= norm
-            self.noise_stdsxs[ichanx] = get_noise(self.portx[ichanx])
-        self.flux_profx = self.portx.mean(axis=1)
+                    norm = get_noise(self.portx[ichanx])
+                self.portx[ichanx] /= norm
+                self.norm_valuesx[ichanx] = norm
+                self.noise_stdsxs[ichanx] = get_noise(self.portx[ichanx])
+            self.flux_profx = self.portx.mean(axis=1)
+
+    def unnormalize_portrait(self):
+        """
+        Undo normalize_portrait
+        """
+        if hasattr(self, 'norm_values'):
+            self.port = (self.norm_values * self.port.transpose()).transpose()
+            self.norm_values = np.ones(len(self.port))
+            self.portx = (self.norm_valuesx * \
+                    self.portx.transpose()).transpose()
+            self.norm_valuesx = np.ones(len(self.portx))
+        else:
+            return 1
 
     def fit_profile(self, profile, tau=0.0, fixscat=True, auto_gauss=0.0,
             profile_fit_flags=None, show=True):
@@ -1069,8 +1087,8 @@ if __name__ == "__main__":
                       default=0.0,
                       help="Automatically fit one Gaussian to initial profile with initial width [rot] given as the argument. Not used with -I. [default=False]")
     parser.add_option("--norm", metavar="normalize",
-                      action="store_true", dest="normalize", default=False,
-                      help="Normalize each channel's profile by the channel mean.")
+                      action="store", dest="normalize", default=None,
+                      help="Normalize each channel's profile by either mean, max, or off-pulse noise ('mean', 'max', 'rms').")
     parser.add_option("--figure", metavar="figurename",
                       action="store", dest="figure", default=False,
                       help="Save PNG figure of final fit to figurename. [default=Not saved]")
@@ -1114,7 +1132,9 @@ if __name__ == "__main__":
     quiet = options.quiet
 
     dp = DataPortrait(datafile=datafile, joinfile=joinfile, quiet=quiet)
-    if normalize: dp.normalize_portrait()
+    if normalize is not None:
+        retval = dp.normalize_portrait(normalize)
+        if retval: sys.exit()
     #if not quiet: dp.show_data_portrait()
     if modelfile is not None:
         dp.make_gaussian_model(modelfile = modelfile, fixalpha=fixalpha,
