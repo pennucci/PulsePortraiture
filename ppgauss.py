@@ -928,9 +928,11 @@ class GaussianSelector:
         plt.plot(self.phases, self.profile, c='black', lw=3, alpha=0.3)
         plt.xlabel('Pulse Phase')
         plt.ylabel('Pulse Amplitude')
-        buff = 0.1
+        prefit_buff = 0.1
+        postfit_buff = 0.1
+        if self.fit_scattering: prefit_buff = 1.0
         ymin,ymax = plt.ylim()
-        ymax = self.profile.max() + buff * \
+        ymax = self.profile.max() + prefit_buff * \
                 (self.profile.max()-self.profile.min())
         plt.ylim(ymin, ymax)
         DC = params[0]
@@ -944,7 +946,8 @@ class GaussianSelector:
             plt.plot(self.phases, DC + amp*gaussian_profile(self.proflen, loc,
                 wid), '%s'%cols[igauss])
             if max_amp > ymax:
-                plt.ylim(ymin, max_amp + buff * (max_amp - self.profile.min()))
+                plt.ylim(ymin, max_amp + postfit_buff * \
+                        (max_amp - self.profile.min()))
 
     def onselect(self):
         """on select event"""

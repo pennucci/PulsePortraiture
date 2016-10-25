@@ -67,7 +67,8 @@ if nfiles > 1:
 #Now we want to "build" our gaussian model from the data
 print "Running ppgauss.py to fit a gaussian model..."
 import ppgauss as pg
-datafile = "example.port"
+if nfiles > 1: datafile = "example.port"
+else: datafile = "example-1.fits"
 #Initiate Class instance
 dp = pg.DataPortrait(datafile)
 #Have a look at the data you're fitting
