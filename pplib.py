@@ -13,6 +13,12 @@
 #imports#
 #########
 
+#Unfortunately, this has to come first in the event nodes = True
+nodes = False  #Used when needing parallelized operation
+if nodes:
+    import matplotlib
+    matplotlib.use('Agg')
+
 import sys
 import time
 import numpy as np
@@ -21,10 +27,6 @@ import scipy.optimize as opt
 import scipy.signal as ss
 import lmfit as lm
 import psrchive as pr
-nodes = False  #Used when needing parallelized operation
-if nodes:
-    import matplotlib
-    matplotlib.use('Agg')
 import matplotlib.gridspec as gs
 import matplotlib.pyplot as plt
 
