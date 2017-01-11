@@ -9,7 +9,7 @@
 #    pptoas within an interactive python environment.
 
 #Written by Timothy T. Pennucci (TTP; pennucci@email.virginia.edu).
-#Contributions by Scott M. Ransom (SMR) and Paul B. Demorest (PBD)
+#Contributions by Scott M. Ransom (SMR) and Paul B. Demorest (PBD).
 
 from pplib import *
 
@@ -93,7 +93,7 @@ class GetTOAs:
             *not*quite*implemented*yet*.
         quiet=True suppresses output.
         """
-        if file_is_ASCII(datafiles):
+        if file_is_type(datafiles, "ASCII"):
             self.datafiles = [datafile[:-1] for datafile in \
                     open(datafiles, "r").readlines()]
         else:
@@ -101,7 +101,7 @@ class GetTOAs:
         if len(self.datafiles) > max_nfile:
             print "Too many archives.  See/change max_nfile(=%d) in pptoas.py."%max_nfile
             sys.exit()
-        self.is_gauss_model = file_is_ASCII(modelfile)
+        self.is_FITS_model = file_is_type(modelfile, "FITS")
         self.modelfile = modelfile
         self.obs = []
         self.nu0s = []
@@ -209,7 +209,7 @@ class GetTOAs:
                 DM0 = self.DM0
             if not fit_DM:
                 bounds[1] = (DM0, DM0)
-            if not self.is_gauss_model:
+            if self.is_FITS_model:
                 print "You are using an experimental functionality of pptoas!"
                 model_data = load_data(self.modelfile, dedisperse=False,
                     dededisperse=False, tscrunch=True, pscrunch=True,
@@ -226,11 +226,17 @@ class GetTOAs:
                 epoch = epochs[isub]
                 MJD = MJDs[isub]
                 P = Ps[isub]
-                if self.is_gauss_model:
+                if not self.is_FITS_model:
                     #Read model
-                    self.model_name, self.ngauss, model = read_model(
-                            self.modelfile, phases, freqs[isub], Ps[isub],
-                            quiet=bool(quiet+(itoa-1)))
+                    try:
+                        self.model_name, self.ngauss, model = read_model(
+                                self.modelfile, phases, freqs[isub], Ps[isub],
+                                quiet=bool(quiet+(itoa-1)))
+                    except:
+                        print "You are using an experimental functionality of pptoas!"
+                        self.model_name, model = read_interp_model(
+                                self.modelfile, freqs[isub],
+                                quiet=True) #bool(quiet+(itoa-1)))
                 #else:
                 ##THESE FREQUENCIES WILL BE OFF IF AVERAGED CHANNELS##
                 #    print model_data.freqs[0, ok_ichans[isub]] - \
@@ -274,7 +280,9 @@ class GetTOAs:
                 #estimate as the next guess, but that could be bad, if one
                 #subint is contaminated or very poorly determined.
                 #Also have to be careful below, since the subints are 
-                #dedispersed at different nu_fit
+                #dedispersed at different nu_fit.
+                #Finally, Ns should be larger than nbin for very low S/N data,
+                #especially in the case of noisy models...
                 rot_port = rotate_data(portx, 0.0,
                         DM_stored, P, freqsx, nu_fit)
                 #PSRCHIVE Dedisperses w.r.t. center of band, which is
@@ -282,7 +290,7 @@ class GetTOAs:
                 #phase offset w.r.t to what would be seen in the PSRCHIVE
                 #dedispersed portrait.
                 phase_guess = fit_phase_shift(rot_port.mean(axis=0),
-                        model.mean(axis=0)).phase
+                        model.mean(axis=0), Ns=100).phase
                 #Currently, fit_phase_shift returns an unbounded phase,
                 #so here we transform to be on the interval [-0.5, 0.5]
                 #This may not be needed, but hasn't proved dangerous yet...
@@ -308,7 +316,8 @@ class GetTOAs:
                         print "...using Fourier phase gradient routine..."
                         if self.nu_ref is not None:
                             print "--nu_ref will be ignored!"
-                    results = fit_phase_shift(portx[0], modelx[0], errs[0])
+                    results = fit_phase_shift(portx[0], modelx[0], errs[0],
+                            Ns=nbin)
                     results.DM = DM_stored
                     results.DM_err = 0.0
                     results.nu_ref = freqsx[0]
@@ -577,7 +586,7 @@ class GetTOAs:
         nu_ref = self.nu_refs[ifile][isub]
         P = data.Ps[isub]
         phases = data.phases
-        if not self.is_gauss_model:
+        if self.is_FITS_model:
             print "You are using an experimental functionality of pptoas!"
             model_data = load_data(self.modelfile, dedisperse=False,
                     dededisperse=False, tscrunch=True, pscrunch=True,
@@ -586,9 +595,14 @@ class GetTOAs:
             model = (model_data.masks * model_data.subints)[0,0]
             model_name = self.modelfile
         else:
-            model_name, ngauss, model = read_model(self.modelfile, phases,
-                    freqs, data.Ps.mean(), quiet=quiet)
-                    #freqs, data.Ps[isub], quiet=quiet)     #Track down
+            try:
+                model_name, ngauss, model = read_model(self.modelfile, phases,
+                        freqs, data.Ps.mean(), quiet=quiet)
+                        #freqs, data.Ps[isub], quiet=quiet)     #Track down
+            except:
+                print "You are using an experimental functionality of pptoas!"
+                model_name, model = read_interp_model(self.modelfile,
+                        freqs[isub], quiet=True) #quiet=bool(quiet+(itoa-1)))
         port = rotate_data(data.subints[isub,0], phi, DM_fitted, P, freqs,
                 nu_ref)
         if rotate:
@@ -721,7 +735,7 @@ if __name__ == "__main__":
                               i.e. vap -c dmc <datafile> should return 0!")
     parser.add_option("-m", "--modelfile",
                       action="store", metavar="model", dest="modelfile",
-                      help="Model file from ppgauss.py, or PSRCHIVE FITS file that has same channel frequencies, nchan, nbin as datafile(s).")
+                      help="Model file from ppgauss.py, ppinterp.py, or PSRCHIVE FITS file that has same channel frequencies, nchan, & nbin as datafile(s).")
     parser.add_option("-o", "--outfile",
                       action="store", metavar="timfile", dest="outfile",
                       default=None,
@@ -767,10 +781,10 @@ if __name__ == "__main__":
     (options, args) = parser.parse_args()
 
     if (options.datafiles is None or options.modelfile is None):
-            print "\npptoas.py - simultaneously measure TOAs and DMs in broadband data\n"
-            parser.print_help()
-            print ""
-            parser.exit()
+        print "\npptoas.py - simultaneously measure TOAs and DMs in broadband data\n"
+        parser.print_help()
+        print ""
+        parser.exit()
 
     datafiles = options.datafiles
     modelfile = options.modelfile

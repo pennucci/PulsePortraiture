@@ -69,7 +69,8 @@ def check_if_Stokes(metafile):
             return False
 
 def align_archives(metafile, initial_guess, tscrunch=False, pscrunch=True,
-        outfile=None, rot_phase=0.0, place=None, niter=1, quiet=False):
+        outfile=None, norm=None, rot_phase=0.0, place=None, niter=1,
+        quiet=False):
     """
     Iteratively align and average archives.
 
@@ -88,6 +89,8 @@ def align_archives(metafile, initial_guess, tscrunch=False, pscrunch=True,
         total intensity portrait.
     outfile is the name of the output archive; defaults to
         <metafile>.algnd.fits.
+    norm is the normalization method (None, 'mean', 'max', or 'rms') applied to
+        the final data.
     rot_phase is an overall rotation to be applied to the final output archive.
     place is a phase value at which to roughly place the peak pulse; it
         overrides rot_phase.
@@ -132,13 +135,14 @@ def align_archives(metafile, initial_guess, tscrunch=False, pscrunch=True,
                 rot_port = rotate_data(port, 0.0, DM_guess, P, freqs,
                         nu_fit)
                 phase_guess = fit_phase_shift(rot_port.mean(axis=0),
-                        model.mean(axis=0)).phase
+                        model.mean(axis=0), Ns=nbin).phase
                 if len(freqs) > 1:
                     results = fit_portrait(port, model,
                             np.array([phase_guess, DM_guess]), P, freqs,
                             nu_fit, None, errs, quiet=quiet)
                 else:  #1-channel hack
-                    results = fit_phase_shift(port[0], model[0], errs[0])
+                    results = fit_phase_shift(port[0], model[0], errs[0],
+                            Ns=nbin)
                     results.DM = data.DM
                     results.DM_err = 0.0
                     results.nu_ref = freqs[0]
@@ -161,12 +165,23 @@ def align_archives(metafile, initial_guess, tscrunch=False, pscrunch=True,
         model_port = aligned_port[0]
         niter -= 1
         count += 1
+    if norm in ("mean", "max", "rms"):
+        for ipol in range(npol):
+            for ichan in range(nchan):
+                if aligned_port[ipol,ichan].any():
+                    if norm == "mean":
+                        norm_val = aligned_port[ipol,ichan].mean()
+                    elif norm == "max":
+                        norm_val = aligned_port[ipol,ichan].max()
+                    else:
+                        norm_val = get_noise(aligned_port[ipol,ichan])
+                    aligned_port[ipol,ichan] /= norm_val
     if rot_phase:
         aligned_port = rotate_data(aligned_port, rot_phase)
     if place is not None:
         prof = aligned_port[0].mean(axis=0)
         delta = prof.max() * gaussian_profile(len(prof), place, 0.0001)
-        phase = fit_phase_shift(prof, delta).phase
+        phase = fit_phase_shift(prof, delta, Ns=nbin).phase
         aligned_port = rotate_data(aligned_port, phase)
     arch = model_data.arch
     arch.tscrunch()
@@ -219,6 +234,10 @@ if __name__ == "__main__":
                       default=False,
                       action="store_true", dest="palign",
                       help="Passes -P to psradd if -I is not used. [default=False]")
+    parser.add_option("-N", "--norm",
+                      action="store", metavar="normalization", dest="norm",
+                      default=None,
+                      help="Normalize the final averaged data by channel ('None' [default], 'mean', 'max' (not recommended), or 'rms').")
     parser.add_option("-s", "--smooth",
                       default=False,
                       action="store_true", dest="smooth",
@@ -252,6 +271,7 @@ if __name__ == "__main__":
     pscrunch = options.pscrunch
     outfile = options.outfile
     palign = options.palign
+    norm = options.norm
     smooth = options.smooth
     rot_phase = np.float64(options.rot_phase)
     if options.place is not None:
@@ -270,7 +290,8 @@ if __name__ == "__main__":
     if check_if_Stokes(metafile) or pscrunch:
         align_archives(metafile, initial_guess=initial_guess,
                 tscrunch=tscrunch, pscrunch=pscrunch, outfile=outfile,
-                rot_phase=rot_phase, place=place, niter=niter, quiet=quiet)
+                norm=norm, rot_phase=rot_phase, place=place, niter=niter,
+                quiet=quiet)
         if smooth:
             if outfile is None:
                 outfile = metafile + ".algnd.fits"

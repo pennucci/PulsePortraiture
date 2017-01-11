@@ -9,7 +9,7 @@
 #    obtained when using ppgauss within an interactive python environment.
 
 #Written by Timothy T. Pennucci (TTP; pennucci@email.virginia.edu).
-#Contributions by Scott M. Ransom (SMR) and Paul B. Demorest (PBD)
+#Contributions by Scott M. Ransom (SMR) and Paul B. Demorest (PBD).
 
 from matplotlib.patches import Rectangle
 from pplib import *
@@ -39,7 +39,7 @@ class DataPortrait:
         """
         self.init_params = []
         self.joinfile = joinfile
-        if file_is_ASCII(datafile):
+        if file_is_type(datafile, "ASCII"):
             self.join_params = []
             self.join_fit_flags = []
             self.join_nchans = [0]
@@ -91,7 +91,7 @@ class DataPortrait:
                     self.join_nchans.append(self.nchan)
                     self.join_nchanxs.append(self.nchanx)
                     prof = data.prof
-                    phi = -fit_phase_shift(prof, refprof).phase
+                    phi = -fit_phase_shift(prof, refprof, Ns=self.nbin).phase
                     self.join_params.append(phi)
                     self.join_fit_flags.append(1)
                     self.join_params.append(data.DM*0.0)
@@ -218,6 +218,18 @@ class DataPortrait:
         #self.modelx = np.compress(self.masks[0,0].mean(axis=1), self.model,
         #        axis=0)
 
+    def smooth_portrait(self, **kwargs):
+        """
+        """
+        self.port = wavelet_smooth(self.port, **kwargs)
+        for ichan in range(len(self.port)):
+            self.noise_stds[0,0,ichan] = get_noise(self.port[ichan])
+        self.flux_prof = self.port.mean(axis=1)
+        self.portx = wavelet_smooth(self.portx, **kwargs)
+        for ichanx in range(len(self.portx)):
+            self.noise_stdsxs[ichanx] = get_noise(self.portx[ichanx])
+        self.flux_profx = self.portx.mean(axis=1)
+
     def normalize_portrait(self, method="mean"):
         """
         Normalize each profile.
@@ -234,6 +246,7 @@ class DataPortrait:
         else:
             #Full portrait
             self.norm_values = np.ones(len(self.port))
+            self.unnorm_noise_stds = np.copy(self.noise_stds)
             for ichan in range(len(self.port)):
                 if self.port[ichan].any():
                     if method == "mean":
@@ -248,6 +261,7 @@ class DataPortrait:
             self.flux_prof = self.port.mean(axis=1)
             #Reduced portrait
             self.norm_valuesx = np.ones(len(self.portx))
+            self.unnorm_noise_stdsxs = np.copy(self.noise_stdsxs)
             for ichanx in range(len(self.portx)):
                 if method == "mean":
                     norm = self.portx[ichanx].mean()
@@ -264,12 +278,16 @@ class DataPortrait:
         """
         Undo normalize_portrait
         """
-        if hasattr(self, 'norm_values'):
+        if hasattr(self, 'unnorm_noise_stds'):
             self.port = (self.norm_values * self.port.transpose()).transpose()
             self.norm_values = np.ones(len(self.port))
+            self.noise_stds = np.copy(self.unnorm_noise_stds)
+            del(self.unnorm_noise_stds)
             self.portx = (self.norm_valuesx * \
                     self.portx.transpose()).transpose()
             self.norm_valuesx = np.ones(len(self.portx))
+            self.noise_stdsxs = np.copy(self.unnorm_noise_stdsxs)
+            del(self.unnorm_noise_stdsxs)
         else:
             return 1
 
@@ -300,12 +318,12 @@ class DataPortrait:
         self.init_param_errs = self.interactor.fit_errs
         self.ngauss = (len(self.init_params) - 2) / 3
 
-    def fit_flux_profile(self, guessA=1.0, guessalpha=0.0, plot=True,
-            quiet=False):
+    def fit_flux_profile(self, channel_errs=None, guessA=1.0, guessalpha=0.0,
+            plot=True, quiet=False):
         """
         Fit a power-law to the phase-averaged flux spectrum of the data.
 
-        Fitted parameters and uncertainties are added to as class attributes.
+        Fitted parameters and uncertainties are added as class attributes.
 
         guessA is the initial amplitude parameter.
         guessalpha is the initial spectral index parameter.
@@ -313,8 +331,9 @@ class DataPortrait:
         quiet=True suppresses output.
         """
         #Noise level below may be off
+        if channel_errs is None: channel_errs = np.ones(len(self.freqsxs[0]))
         fp = fit_powlaw(self.flux_profx, np.array([guessA,guessalpha]),
-            np.ones(len(self.freqsxs[0])), self.freqsxs[0], self.nu0)
+            channel_errs, self.freqsxs[0], self.nu0)
         if not quiet:
             print ""
             print "Flux-density power-law fit"
@@ -328,10 +347,11 @@ class DataPortrait:
         if plot:
             ax1 = plt.subplot(211, position=(0.1,0.1,0.8,0.4))
             ax2 = plt.subplot(212, position=(0.1,0.5,0.8,0.4))
-            ax1.plot(self.freqsxs[0], fp.residuals, 'r+')
+            ax1.errorbar(self.freqsxs[0], fp.residuals, channel_errs, fmt='r+')
             ax2.plot(self.freqs[0], powlaw(self.freqs[0], self.nu0,
                 fp.amp, fp.alpha), 'k-')
-            ax2.plot(self.freqsxs[0], self.flux_profx, 'r+')
+            ax2.errorbar(self.freqsxs[0], self.flux_profx, channel_errs,
+                    fmt='r+')
             ax1.set_xlim(self.freqs[0].min(), self.freqs[0].max())
             ax2.set_xlim(ax1.get_xlim())
             ax2.set_xticklabels([])
@@ -341,10 +361,9 @@ class DataPortrait:
                 fp.amp, fp.amp_err) + "\n" + r"$\alpha$ = %.2f $\pm$ %.2f"%(
                     fp.alpha, fp.alpha_err), ha="left", va="bottom",
                 transform=ax2.transAxes)
-            ax1.text(0.05, 0.1, "Residuals",ha="left", va="bottom",
-                    transform=ax1.transAxes)
             ax1.set_xlabel("Frequency [MHz]")
-            plt.text(0.05, 0.5, "Flux Units")
+            ax1.set_ylabel("Residual")
+            ax2.set_ylabel("Flux")
             ax2.set_title("Average Flux Profile for %s"%self.source)
             plt.show()
         self.spect_A = fp.amp

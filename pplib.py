@@ -3,11 +3,12 @@
 #######
 
 #pplib contains all necessary functions and definitions for the fitting
-#programs ppgauss and pptoas, as well as some additional functions used in our
-#wideband timing analysis.
+#    programs ppgauss and pptoas, as well as some additional functions used in
+#    our #wideband timing analysis.
 
 #Written by Timothy T. Pennucci (TTP; pennucci@email.virginia.edu).
-#Contributions by Scott M. Ransom (SMR) and Paul B. Demorest (PBD) 
+#Contributions by Scott M. Ransom (SMR), Paul B. Demorest (PBD), and Emmanuel
+#    Fonseca (EF).
 
 #########
 #imports#
@@ -21,11 +22,14 @@ if nodes:
 
 import sys
 import time
+import pickle
 import numpy as np
 import numpy.fft as fft
+import scipy.interpolate as si
 import scipy.optimize as opt
 import scipy.signal as ss
 import lmfit as lm
+import pywt as pw
 import psrchive as pr
 import matplotlib.gridspec as gs
 import matplotlib.pyplot as plt
@@ -357,6 +361,20 @@ def gen_gaussian_portrait(model_code, params, scattering_index, phases, freqs,
             gport[join_ichan] = rotate_data(gport[join_ichan], phi,
                     DM, P, freqs[join_ichan], nu_ref)
     return gport
+
+def build_interp_portrait(mean_prof, freqs, eigvec, tck):
+    """
+    Build an interpolated model portrait from make_interp_model(...) results.
+
+    mean_prof is the mean profile.
+    freqs are the frequencies at which to build the model.
+    eigvec are the eigenvectors providing the basis for the B-spline curve.
+    tck is a tuple containing knot locations, B-spline coefficients, and spline
+        degree.
+    """
+    delta_proj_interp = np.array(si.splev(freqs, tck, der=0, ext=0))
+    delta_interp = np.dot(eigvec, delta_proj_interp).T
+    return delta_interp + mean_prof
 
 def power_law_evolution(freqs, nu_ref, parameter, index):
     """
@@ -755,39 +773,6 @@ def fit_portrait_function_2deriv(params, model=None, p_n=None, data=None,
     nu_zero = (W_n.sum() / np.sum(W_n * freqs**-2))**0.5
     return (np.array([d2_phi, d2_DM, d2_cross]), nu_zero)
 
-def estimate_portrait(phase, DM, scales, data, errs, P, freqs, nu_ref=np.inf):
-    #############
-    #MOTH-BALLED#
-    #############
-    #here, all vars have additional epoch-index except nu_ref
-    #i.e. all have to be arrays of at least len 1; errs are precision
-    """
-    Return an average over all data portraits.
-
-    An early attempt to make a '2-D' version of PBD's autotoa.  That is, to
-    iterate over all epochs of data portraits to build a non-Gaussian model
-    that can be smoothed.
-
-    <UNDER CONSTRUCTION>
-
-    References: PBD's autotoa, PhDT
-    """
-    dFFT = fft.rfft(data, axis=2)
-    dFFT[:, :, 0] *= DC_fact
-    #errs = np.real(dFFT[:, :, -len(dFFT[0,0])/4:]).std(axis=2)**-2.0
-    #errs = get_noise(data, chans=True) * np.sqrt(len(data[0])/2.0)
-    D = Dconst * DM / P
-    freqs2 = freqs**-2.0 - nu_ref**-2.0
-    phiD = np.outer(D, freqs2)
-    phiprime = np.outer(phase, np.ones(len(freqs))) + phiD
-    weight = np.sum(pow(scales, 2.0) / errs**2.0, axis=0)**-1
-    phasor = np.array([np.exp(2.0j * np.pi * kk * phiprime) for kk in xrange(
-        len(dFFT[0,0]))]).transpose(1,2,0)
-    p = np.sum(np.transpose(np.transpose(scales / errs**2.0) *
-        np.transpose(phasor * dFFT)), axis=0)
-    wp = np.transpose(weight * np.transpose(p))
-    return wp
-
 def wiener_filter(prof, noise):
     #FIX does not work
     """
@@ -868,9 +853,110 @@ def find_kc(pows):
     other_args = [data]
     results = opt.brute(find_kc_function, [tuple((1, len(data))),
         tuple((0, data.max()-data.min())), tuple((data.min(), data.max()))],
-        args=other_args, Ns=10, full_output=False, finish=None)
+        args=other_args, Ns=len(pows), full_output=False, finish=None)
     a, b, dc = results[0], results[1], results[2]
     return int(np.floor(a))
+
+def pca(port, mean_prof=None, ncomp=10, quiet=False):
+    """
+    Compute the pricinpal components of port and reconstructed port.
+
+    Returns reconstructed port projected into the space of ncomp principle
+    components, all eigenvectors, and all eigenvales. The latter two are sorted
+        by the eigenvalues.
+
+    port is a nchan x nbin array of data values; in the PCA, these dimensions
+        are interpreted as nmeasurements of nvariables, respectively.
+    mean_prof is an nbin array of the mean profile to be subtracted; if None,
+        an unweighted average is used.
+    ncomp is the number of principal components to use in the reconstruction of
+        port.  Default is min(nbin, 10).
+    quiet=True suppresses output.
+
+    Written mostly by EF.
+    """
+
+    nmes,ndim = port.shape #nchan x nbin
+    ncomp = min(ndim, ncomp)
+
+    print "Performing principal component analysis on data with %d dimensions and %d measurements..." %(ndim,nmes)
+
+    #Subtract weighted average from each set of measurements.
+    if mean_prof is None: mean_prof = port.mean(axis=0)
+    delta_port = port - mean_prof
+
+    #Compute covariance matrix.
+    #cov = np.cov(port.T)
+    cov = np.cov(delta_port.T) #Shouldn't matter if using centered data or not?
+
+    #Compute eigenvalues/vectors of cov, and order them.
+    eigval, eigvec = np.linalg.eigh(cov)
+    ind = (np.argsort(eigval))[::-1]
+    eigval, eigvec = eigval[ind], eigvec[:,ind]
+
+    #Reconstruct port projected into space of ncomp principal components.
+    some_eigvec = eigvec[:,:ncomp]
+    reconst_port = np.dot(some_eigvec, np.dot(some_eigvec.T, delta_port.T)).T \
+            + mean_prof
+    return reconst_port, eigvec, eigval
+
+def wavelet_smooth(port, wave='sym8', nlevel=5, ncycle=10, threshtype='hard'):
+    """
+    Compute the wavelet-denoised version of a portrait or profile.
+
+    Returns the smoothed portrait or profile.
+
+    port is a nchan x nbin array, or a single profile array of length nbin.
+    wave is the type of mother wavelet.
+    nlevel is the integer number of decomposition levels.
+    ncycle is the integer number of circulant averages to compute.
+    threshtype is the type of wavelet thresholding ('hard' or 'soft').
+
+    Written mostly by EF.
+    """
+    try:
+        nchan,nbin = port.shape
+        one_prof = False
+    except:
+        port = np.array([port])
+        nchan,nbin = port.shape
+        one_prof = True
+
+    smooth_port = np.zeros(port.shape)
+
+    #Smooth each channel
+    for ichan in xrange(nchan):
+      prof = port[ichan]
+      data = np.zeros(nbin)
+      #Carry out translation-invariant wavelet denoising
+      for icycle in xrange(ncycle):
+        m = icycle - ncycle/2 - 1
+        coeffs = pw.wavedec(np.roll(prof,m), wave, level=nlevel)
+        #Get threshold value
+        lopt = np.median(np.fabs(coeffs[1])) / 0.6745 * np.sqrt(2. * \
+                np.log(nbin))
+        #Do wavelet thresholding
+        for ilevel in xrange(1, nlevel+1):
+          #Hard threshold
+          if threshtype == 'hard':
+            (coeffs[ilevel])[np.where(np.fabs(coeffs[ilevel]) < lopt)] = 0.
+          #Soft threshold
+          else:
+            (coeffs[ilevel])[np.where(np.fabs(coeffs[ilevel]) < lopt)] = 0.
+            (coeffs[ilevel])[np.where(coeffs[ilevel] > lopt)] = \
+                    (coeffs[ilevel])[np.where(coeffs[ilevel] > lopt)]+lopt
+            (coeffs[ilevel])[np.where(coeffs[ilevel] < -lopt)] = \
+                    (coeffs[ilevel])[np.where(coeffs[ilevel] < -lopt)]-lopt
+        #Reconstruct data
+        data += np.roll(pw.waverec(coeffs,wave), -m)
+      #Save averaged profile
+      smooth_port[ichan] = data / ncycle
+
+    #Return smoothed portrait
+    if one_prof:
+        return smooth_port[0]
+    else:
+        return smooth_port
 
 def fit_powlaw(data, init_params, errs, freqs, nu_ref):
     """
@@ -969,7 +1055,7 @@ def fit_gaussian_profile(data, init_params, errs, fit_flags=None,
         fit; defaults to fitting all.
     fit_scattering=True fits a scattering timescale parameter via convolution
         with a one-sided exponential function.
-    quiet=True suppresses output [default].
+    quiet=True suppresses output.
     """
     nparam = len(init_params)
     ngauss = (len(init_params) - 2) / 3
@@ -1061,7 +1147,7 @@ def fit_gaussian_portrait(model_code, data, init_params, scattering_index,
     join_params specifies how to simultaneously fit several portraits; see
         ppgauss.
     P is the pulse period [sec].
-    quiet=True suppresses output [default].
+    quiet=True suppresses output.
     """
     nparam = len(init_params)
     ngauss = (len(init_params) - 2) / 6
@@ -1157,7 +1243,7 @@ def fit_gaussian_portrait(model_code, data, init_params, scattering_index,
             scattering_index_err=scattering_index_err, chi2=chi2, dof=dof)
     return results
 
-def fit_phase_shift(data, model, noise=None, bounds=[-0.5, 0.5]):
+def fit_phase_shift(data, model, noise=None, bounds=[-0.5, 0.5], Ns=100):
     """
     Fit a phase shift between data and model.
 
@@ -1173,6 +1259,7 @@ def fit_phase_shift(data, model, noise=None, bounds=[-0.5, 0.5]):
     model is the array of model profile values.
     noise is time-domain noise-level; it is measured if None.
     bounds is the list containing the bounds on the phase.
+    Ns is the number of grid points passed to opt.brute; *linear* slow-down!
     """
     dFFT = fft.rfft(data)
     dFFT[0] *= DC_fact
@@ -1188,7 +1275,7 @@ def fit_phase_shift(data, model, noise=None, bounds=[-0.5, 0.5]):
     other_args = (mFFT, dFFT, err)
     start = time.time()
     results = opt.brute(fit_phase_shift_function, [tuple(bounds)],
-            args=other_args, Ns=100, full_output=True)
+            args=other_args, Ns=Ns, full_output=True)
     duration = time.time() - start
     phase = results[0][0]
     fmin = results[1]
@@ -1927,7 +2014,7 @@ def read_model(modelfile, phases=None, freqs=None, P=None, quiet=False):
         info = line.split()
         try:
             if info[0] == "MODEL":
-                name = info[1]
+                modelname = info[1]
             elif info[0] == "CODE":
                 model_code = info[1]
             elif info[0] == "FREQ":
@@ -1971,7 +2058,7 @@ def read_model(modelfile, phases=None, freqs=None, P=None, quiet=False):
         model = gen_gaussian_portrait(model_code, params, alpha, phases, freqs,
                 nu_ref)
     if not quiet and not read_only:
-        print "Model Name: %s"%name
+        print "Model Name: %s"%modelname
         print "Made %d component model with %d profile bins,"%(ngauss, nbin)
         if len(freqs) != 1:
             bw = (freqs[-1] - freqs[0]) + ((freqs[-1] - freqs[-2]))
@@ -1981,28 +2068,96 @@ def read_model(modelfile, phases=None, freqs=None, P=None, quiet=False):
         print "with model parameters referenced at %.3f MHz."%nu_ref
     #This could be changed to a DataBunch
     if read_only:
-        return (name, model_code, nu_ref, ngauss, params, fit_flags, alpha,
-                fit_alpha)
+        return (modelname, model_code, nu_ref, ngauss, params, fit_flags,
+                alpha, fit_alpha)
     else:
-        return (name, ngauss, model)
+        return (modelname, ngauss, model)
 
-def file_is_ASCII(filename):
+def read_interp_model(modelfile, freqs=None, quiet=False):
     """
-    Checks if a file is ASCII.
+    Read-in a model created by make_interp_model(...).
+
+    If only modelfile is specified, returns the contents of the pickled model:
+        (model name, source name, datafile name from which the model was
+        created, mean profile vector used in the PCA, the eigenvectors, and the
+        'tck' tuple containing knot locations, B-spline coefficients, and
+        spline degree)
+    Otherwise, builds a model based on the input frequencies using the function
+        build_interp_portrait(...).
+
+    modelfile is the name of the make_interp_model(...)-type of model file.
+    freqs in an array of frequencies at which to build the model; these should
+        be in the same units as the datafile frequencies (cf. the knot vector),
+        and they should be within the same bandwidth range.
+    quiet=True suppresses output.
+    """
+    if freqs is None:
+        read_only = True
+    else:
+        read_only = False
+    if not quiet:
+        print "Reading model from %s..."%modelfile
+    modelname, source, datafile, mean_prof, eigvec, tck = \
+            pickle.load(open(modelfile, 'rb'))
+    if read_only:
+        return (modelname, source, datafile, mean_prof, eigvec, tck)
+    else:
+        return (modelname,
+                build_interp_portrait(mean_prof, freqs, eigvec, tck))
+
+def file_is_type(filename, filetype="ASCII"):
+    """
+    Checks if a file is a certain type.
+
+    filename is the name of file to be checked by parsing the output from a
+        call to the command 'file -L <filename>'.
+    filetype is the string that is searched for in the output.
     """
     from os import popen4
     cmd = "file -L %s"%filename
     i,o = popen4(cmd)
     line = o.readline().split()
     try:
-        line.index("ASCII")
+        line.index(filetype)
         return True
     except ValueError:
-        try:
-            line.index("FITS")
-            return False
-        except ValueError:
-            pass
+        return False
+
+def unload_new_archive(data, arch, outfile, DM=None, dmc=0, weights=None,
+        quiet=False):
+    """
+    Unload a PSRFITS archive containing new data values.
+
+    data is the nsub x npol x nchan x nbin array of amplitudes to be stored,
+        which has the same shape as arch.get_data().shape.
+    arch is the PSRCHIVE archive to be otherwise copied.
+    outfile is the name of the new written archive.
+    DM is the DM value [cm**-3 pc] to be stored in the archive; if None,
+        nothing is changed.
+    dmc=0 means the archive is stored dededispersed (not "DM corrected"); the
+        data provided should be in the same state as dmc implies.
+    weights is an nsub x nchan array of channel weights; if None, nothing is
+        changed.
+    quiet=True suppresses output.
+    """
+    if dmc:
+        if arch.get_dedispersed(): pass
+        else: arch.dedisperse()
+    else:
+        if arch.get_dedispersed(): arch.dededisperse()
+        else: pass
+    if DM is not None: arch.set_dispersion_measure(DM)
+    nsub,npol,nchan,nbin = arch.get_data().shape
+    for isub in xrange(nsub):
+        sub = arch.get_Integration(isub)
+        for ipol in xrange(npol):
+            for ichan in xrange(nchan):
+                prof = sub.get_Profile(ipol,ichan)
+                prof.get_amps()[:] = data[isub,ipol,ichan]
+                if weights is not None:
+                    sub.set_weight(ichan, weights[isub,ichan])
+    arch.unload(outfile)
+    if not quiet: print "\nUnloaded %s.\n"%outfile
 
 def write_archive(data, ephemeris, freqs, nu0=None, bw=None,
         outfile="pparchive.fits", tsub=1.0, start_MJD=None, weights=None,
@@ -2010,7 +2165,7 @@ def write_archive(data, ephemeris, freqs, nu0=None, bw=None,
     """
     Write data to a PSRCHIVE psrfits file (using a hack).
 
-    Not guaranteed to work perfectly.
+    Not guaranteed to work perfectly.  See also unload_new_archive(...).
 
     Takes dedispersed data, please.
 
