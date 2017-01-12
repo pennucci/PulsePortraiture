@@ -39,7 +39,7 @@ def make_interp_model(dp, norm="mean", smooth=False, ncomp=10, k=3,
     modelfile is the name of the written pickle file that will contain the
         model.
     modelname is the name of the model; defaults to dp.datafile + '.interp'
-    outfile is the name of a written PSRCHIVE fits file to be constructed from 
+    outfile is the name of a written PSRCHIVE fits file to be constructed from
         the model at the same (non-zero weighted channel) frequencies.
     quiet=True suppresses output.
     """
@@ -70,11 +70,11 @@ def make_interp_model(dp, norm="mean", smooth=False, ncomp=10, k=3,
     if ier > 0:
         print "Something went wrong in si.splprep:\n%s"%msg
     model_port = build_interp_portrait(mean_prof, freqs, eigvec[:,:ncomp], tck)
-    
+
     if modelfile is not None:
         of = open(modelfile, "wb")
         if modelname is None: modelname = dp.datafile + '.interp'
-        pickle.dump([modelname, dp.source, datafile, mean_prof,
+        pickle.dump([modelname, dp.source, dp.datafile, mean_prof,
             eigvec[:,:ncomp], tck], of)
         of.close()
 
@@ -87,14 +87,14 @@ def make_interp_model(dp, norm="mean", smooth=False, ncomp=10, k=3,
                 ichanx += 1
         unload_new_archive(new_data, dp.arch, outfile, DM=0.0, dmc=0,
                 weights=None, quiet=quiet)
-    
-    dp.modelname = modelname 
+
+    dp.modelname = modelname
     dp.eigvec = eigvec
     dp.eigval = eigval
     dp.mean_prof = mean_prof
     dp.tck, dp.u, dp.fp, dp.ier, dp.msg = tck, u, fp, ier, msg
     dp.model_port = model_port
-        
+
 
 if __name__ == "__main__":
 
@@ -114,7 +114,7 @@ if __name__ == "__main__":
     parser.add_option("-s", "--modelname",
                       action="store", metavar="modelname", dest="modelname",
                       default=None,
-                      help="Optional name for model [default=datafile_interp].")    
+                      help="Optional name for model [default=datafile_interp].")
     parser.add_option("-o", "--outfile",
                       action="store", metavar="outfile", dest="outfile",
                       default=None,
@@ -155,7 +155,7 @@ if __name__ == "__main__":
     ncomp = int(options.ncomp)
     k = int(options.k)
     quiet = options.quiet
-    
+
     dp = DataPortrait(datafile)
     make_interp_model(dp, norm=norm, smooth=smooth, ncomp=ncomp, k=k,
             modelfile=modelfile, modelname=modelname, outfile=outfile,

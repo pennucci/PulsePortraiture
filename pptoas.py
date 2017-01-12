@@ -216,6 +216,10 @@ class GetTOAs:
                     fscrunch=False, rm_baseline=True, flux_prof=False,
                     refresh_arch=False, return_arch=False, quiet=True)
                 model = (model_data.masks * model_data.subints)[0,0]
+                if model_data.nchan == 1:
+                    model = np.tile(model[0], len(freqs[isub])).reshape(
+                            len(freqs[isub]), nbin)
+                    print model.shape
             if not quiet:
                 print "\nEach of the %d TOAs is approximately %.2f s"%(
                         len(ok_isubs), arch.integration_length() / nsub)
@@ -290,7 +294,7 @@ class GetTOAs:
                 #phase offset w.r.t to what would be seen in the PSRCHIVE
                 #dedispersed portrait.
                 phase_guess = fit_phase_shift(rot_port.mean(axis=0),
-                        model.mean(axis=0), Ns=100).phase
+                        modelx.mean(axis=0), Ns=100).phase
                 #Currently, fit_phase_shift returns an unbounded phase,
                 #so here we transform to be on the interval [-0.5, 0.5]
                 #This may not be needed, but hasn't proved dangerous yet...
@@ -439,6 +443,7 @@ class GetTOAs:
                 stop = time.time()
                 tot_duration += stop - start
                 self.show_results(datafile)
+                #self.show_fit(datafile)
                 start = time.time()
         if not show_plot:
             tot_duration = time.time() - start
@@ -593,6 +598,9 @@ class GetTOAs:
                     fscrunch=False, rm_baseline=True, flux_prof=False,
                     refresh_arch=False, return_arch=False, quiet=True)
             model = (model_data.masks * model_data.subints)[0,0]
+            if model_data.nchan == 1:
+                model = np.tile(model[0], len(freqs)).reshape(len(freqs),
+                        model_data.nbin)
             model_name = self.modelfile
         else:
             try:
@@ -735,7 +743,7 @@ if __name__ == "__main__":
                               i.e. vap -c dmc <datafile> should return 0!")
     parser.add_option("-m", "--modelfile",
                       action="store", metavar="model", dest="modelfile",
-                      help="Model file from ppgauss.py, ppinterp.py, or PSRCHIVE FITS file that has same channel frequencies, nchan, & nbin as datafile(s).")
+                      help="Model file from ppgauss.py, ppinterp.py, or PSRCHIVE FITS file that either has same channel frequencies, nchan, & nbin as datafile(s), or is a single profile (nchan = 1, with the same nbin) to be interpreted as a constant template.")
     parser.add_option("-o", "--outfile",
                       action="store", metavar="timfile", dest="outfile",
                       default=None,
