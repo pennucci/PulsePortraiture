@@ -602,7 +602,7 @@ class GetTOAs:
             except:
                 print "You are using an experimental functionality of pptoas!"
                 model_name, model = read_interp_model(self.modelfile,
-                        freqs[isub], quiet=True) #quiet=bool(quiet+(itoa-1)))
+                        freqs, quiet=True) #quiet=bool(quiet+(itoa-1)))
         port = rotate_data(data.subints[isub,0], phi, DM_fitted, P, freqs,
                 nu_ref)
         if rotate:
