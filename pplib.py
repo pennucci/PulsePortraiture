@@ -900,7 +900,7 @@ def pca(port, mean_prof=None, ncomp=10, quiet=False):
             + mean_prof
     return reconst_port, eigvec, eigval
 
-def wavelet_smooth(port, wave='db8', nlevel=6, ncycle=16, threshtype='hard'):
+def wavelet_smooth(port, wave='db8', nlevel=5, threshtype='hard', fact=0.4):
     """
     Compute the wavelet-denoised version of a portrait or profile.
 
@@ -909,8 +909,6 @@ def wavelet_smooth(port, wave='db8', nlevel=6, ncycle=16, threshtype='hard'):
     port is a nchan x nbin array, or a single profile array of length nbin.
     wave is the type of mother wavelet [default=Daubechies 8].
     nlevel is the integer number of decomposition levels (5-6 typical).
-    ncycle is the integer number of shifted reconstructions to average
-        together, sampling one full cycle.
     threshtype is the type of wavelet thresholding ('hard' or 'soft').
 
     Written mostly by EF.
@@ -927,32 +925,18 @@ def wavelet_smooth(port, wave='db8', nlevel=6, ncycle=16, threshtype='hard'):
 
     #Smooth each channel
     for ichan in xrange(nchan):
-      prof = port[ichan]
-      data = np.zeros(nbin)
-      #Carry out translation-invariant wavelet denoising
-      for icycle in xrange(-ncycle/2, ncycle/2 + 1):
-        binshift = icycle * nbin/ncycle
-        coeffs = pw.wavedec(np.roll(prof, binshift), wave, level=nlevel)
+        prof = port[ichan]
+        #Translation-invariant (stationary) wavelet transform/denoising
+        coeffs = np.array(pw.swt(prof, wave, level=nlevel, start_level=0,
+            axis=-1))
         #Get threshold value
-        lopt = np.median(np.fabs(coeffs[1])) / 0.6745 * np.sqrt(2. * \
+        lopt = fact * (np.median(np.abs(coeffs[0])) / 0.6745) * np.sqrt(2 * \
                 np.log(nbin))
         #Do wavelet thresholding
-        for ilevel in xrange(1, nlevel+1):
-          #Hard threshold
-          if threshtype == 'hard':
-            (coeffs[ilevel])[np.where(np.fabs(coeffs[ilevel]) < lopt)] = 0.
-          #Soft threshold
-          else:
-            (coeffs[ilevel])[np.where(np.fabs(coeffs[ilevel]) < lopt)] = 0.
-            (coeffs[ilevel])[np.where(coeffs[ilevel] > lopt)] = \
-                    (coeffs[ilevel])[np.where(coeffs[ilevel] > lopt)]+lopt
-            (coeffs[ilevel])[np.where(coeffs[ilevel] < -lopt)] = \
-                    (coeffs[ilevel])[np.where(coeffs[ilevel] < -lopt)]-lopt
+        coeffs = pw.threshold(coeffs, lopt, mode=threshtype, substitute=0.0)
         #Reconstruct data
-        data += np.roll(pw.waverec(coeffs,wave), -binshift)
-      #Save averaged profile
-      smooth_port[ichan] = data / ncycle
-
+        smooth_port[ichan] = pw.iswt(map(tuple, coeffs), wave)
+    
     #Return smoothed portrait
     if one_prof:
         return smooth_port[0]
