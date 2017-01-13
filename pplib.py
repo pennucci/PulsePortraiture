@@ -900,16 +900,17 @@ def pca(port, mean_prof=None, ncomp=10, quiet=False):
             + mean_prof
     return reconst_port, eigvec, eigval
 
-def wavelet_smooth(port, wave='sym8', nlevel=5, ncycle=10, threshtype='hard'):
+def wavelet_smooth(port, wave='db8', nlevel=6, ncycle=16, threshtype='hard'):
     """
     Compute the wavelet-denoised version of a portrait or profile.
 
     Returns the smoothed portrait or profile.
 
     port is a nchan x nbin array, or a single profile array of length nbin.
-    wave is the type of mother wavelet.
-    nlevel is the integer number of decomposition levels.
-    ncycle is the integer number of circulant averages to compute.
+    wave is the type of mother wavelet [default=Daubechies 8].
+    nlevel is the integer number of decomposition levels (5-6 typical).
+    ncycle is the integer number of shifted reconstructions to average
+        together, sampling one full cycle.
     threshtype is the type of wavelet thresholding ('hard' or 'soft').
 
     Written mostly by EF.
@@ -929,9 +930,9 @@ def wavelet_smooth(port, wave='sym8', nlevel=5, ncycle=10, threshtype='hard'):
       prof = port[ichan]
       data = np.zeros(nbin)
       #Carry out translation-invariant wavelet denoising
-      for icycle in xrange(ncycle):
-        m = icycle - ncycle/2 - 1
-        coeffs = pw.wavedec(np.roll(prof,m), wave, level=nlevel)
+      for icycle in xrange(-ncycle/2, ncycle/2 + 1):
+        binshift = icycle * nbin/ncycle
+        coeffs = pw.wavedec(np.roll(prof, binshift), wave, level=nlevel)
         #Get threshold value
         lopt = np.median(np.fabs(coeffs[1])) / 0.6745 * np.sqrt(2. * \
                 np.log(nbin))
@@ -948,7 +949,7 @@ def wavelet_smooth(port, wave='sym8', nlevel=5, ncycle=10, threshtype='hard'):
             (coeffs[ilevel])[np.where(coeffs[ilevel] < -lopt)] = \
                     (coeffs[ilevel])[np.where(coeffs[ilevel] < -lopt)]-lopt
         #Reconstruct data
-        data += np.roll(pw.waverec(coeffs,wave), -m)
+        data += np.roll(pw.waverec(coeffs,wave), -binshift)
       #Save averaged profile
       smooth_port[ichan] = data / ncycle
 
