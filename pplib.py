@@ -1416,14 +1416,14 @@ def get_noise_PS(data, frac=4, chans=False):
             prof = data[ichan]
             FFT = fft.rfft(prof)
             pows = np.real(FFT * np.conj(FFT)) / len(prof)
-            kc = (1 - frac**-1)*len(pows)
+            kc = int((1 - frac**-1)*len(pows))
             noise[ichan] = np.sqrt(np.mean(pows[kc:]))
         return noise
     else:
         raveld = data.ravel()
         FFT = fft.rfft(raveld)
         pows = np.real(FFT * np.conj(FFT)) / len(raveld)
-        kc = (1 - frac**-1)*len(pows)
+        kc = int((1 - frac**-1)*len(pows))
         return np.sqrt(np.mean(pows[kc:]))
 
 def get_noise_fit(data, fact=1.1, chans=False):
