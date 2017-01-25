@@ -237,7 +237,8 @@ class GetTOAs:
                                 self.modelfile, phases, freqs[isub], Ps[isub],
                                 quiet=bool(quiet+(itoa-1)))
                     except:
-                        print "You are using an experimental functionality of pptoas!"
+                        if list(ok_isubs).index(isub) == 0:
+                            print "You are using an experimental functionality of pptoas!"
                         self.model_name, model = read_interp_model(
                                 self.modelfile, freqs[isub],
                                 quiet=True) #bool(quiet+(itoa-1)))
