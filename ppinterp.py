@@ -111,7 +111,7 @@ if __name__ == "__main__":
     parser.add_option("-m", "--modelfile",
                       action="store", metavar="modelfile", dest="modelfile",
                       help="Name for output model (pickle) file.")
-    parser.add_option("-s", "--modelname",
+    parser.add_option("-l", "--modelname",
                       action="store", metavar="modelname", dest="modelname",
                       default=None,
                       help="Optional name for model [default=datafile_interp].")
@@ -123,7 +123,7 @@ if __name__ == "__main__":
                       action="store", metavar="normalization", dest="norm",
                       default="mean",
                       help="Normalize the input data by channel ('None', 'mean' [default], 'max' (not recommended), or 'rms').")
-    parser.add_option("-S", "--smooth",
+    parser.add_option("-s", "--smooth",
                       action="store_true", metavar="smooth", dest="smooth",
                       default=False,
                       help="Pre-smooth the data using default wavelet_smooth options.")
