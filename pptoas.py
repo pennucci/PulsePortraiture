@@ -240,7 +240,7 @@ class GetTOAs:
                         if list(ok_isubs).index(isub) == 0:
                             print "You are using an experimental functionality of pptoas!"
                         self.model_name, model = read_interp_model(
-                                self.modelfile, freqs[isub],
+                                self.modelfile, freqs[isub], nbin,
                                 quiet=True) #bool(quiet+(itoa-1)))
                 #else:
                 ##THESE FREQUENCIES WILL BE OFF IF AVERAGED CHANNELS##
@@ -611,7 +611,7 @@ class GetTOAs:
             except:
                 print "You are using an experimental functionality of pptoas!"
                 model_name, model = read_interp_model(self.modelfile,
-                        freqs, quiet=True) #quiet=bool(quiet+(itoa-1)))
+                        freqs, data.nbin, quiet=True) #quiet=bool(quiet+(itoa-1)))
         port = rotate_data(data.subints[isub,0], phi, DM_fitted, P, freqs,
                 nu_ref)
         if rotate:

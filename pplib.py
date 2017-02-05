@@ -362,7 +362,7 @@ def gen_gaussian_portrait(model_code, params, scattering_index, phases, freqs,
                     DM, P, freqs[join_ichan], nu_ref)
     return gport
 
-def build_interp_portrait(mean_prof, freqs, eigvec, tck):
+def build_interp_portrait(mean_prof, freqs, eigvec, tck, nbin=None):
     """
     Build an interpolated model portrait from make_interp_model(...) results.
 
@@ -371,10 +371,16 @@ def build_interp_portrait(mean_prof, freqs, eigvec, tck):
     eigvec are the eigenvectors providing the basis for the B-spline curve.
     tck is a tuple containing knot locations, B-spline coefficients, and spline
         degree.
+    nbin is the number of phase bins to use in the model; if different from
+        len(mean_prof), a resampling function is used.
     """
     delta_proj_interp = np.array(si.splev(freqs, tck, der=0, ext=0))
     delta_interp = np.dot(eigvec, delta_proj_interp).T
-    return delta_interp + mean_prof
+    port = delta_interp + mean_prof
+    if nbin is not None:
+        if len(mean_prof) != nbin:
+            port = ss.resample(port, nbin, axis=1)
+    return port
 
 def power_law_evolution(freqs, nu_ref, parameter, index):
     """
@@ -2058,7 +2064,7 @@ def read_model(modelfile, phases=None, freqs=None, P=None, quiet=False):
     else:
         return (modelname, ngauss, model)
 
-def read_interp_model(modelfile, freqs=None, quiet=False):
+def read_interp_model(modelfile, freqs=None, nbin=None, quiet=False):
     """
     Read-in a model created by make_interp_model(...).
 
@@ -2074,6 +2080,7 @@ def read_interp_model(modelfile, freqs=None, quiet=False):
     freqs in an array of frequencies at which to build the model; these should
         be in the same units as the datafile frequencies (cf. the knot vector),
         and they should be within the same bandwidth range.
+    nbin is the number of phase bins to use in the model.
     quiet=True suppresses output.
     """
     if freqs is None:
@@ -2088,7 +2095,7 @@ def read_interp_model(modelfile, freqs=None, quiet=False):
         return (modelname, source, datafile, mean_prof, eigvec, tck)
     else:
         return (modelname,
-                build_interp_portrait(mean_prof, freqs, eigvec, tck))
+                build_interp_portrait(mean_prof, freqs, eigvec, tck, nbin))
 
 def file_is_type(filename, filetype="ASCII"):
     """
