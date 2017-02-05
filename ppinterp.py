@@ -23,8 +23,9 @@ from ppgauss import DataPortrait
 from pplib import *
 
 
-def make_interp_model(dp, norm="mean", smooth=False, ncomp=10, k=3,
-        modelfile=None, modelname=None, outfile=None, quiet=False):
+def make_interp_model(dp, norm="mean", smooth=False, filtre=False,
+        ncomp=10, k=3, modelfile=None, modelname=None, outfile=None,
+        quiet=False):
     """
     Make a model based on PCA and B-spline parameterization of a ncomp curve.
 
@@ -33,6 +34,7 @@ def make_interp_model(dp, norm="mean", smooth=False, ncomp=10, k=3,
     dp is an object from the class DataPortrait.
     norm is the portrait normalization method (None, 'mean', 'max', or 'rms').
     smooth=True will use the default settings from wavelet_smooth to smooth.
+    filtre=True will use default settings to low-pass filter the portrait.
     ncomp is the number of PCA components to use in the B-spline
         parameterization; ncomp <= 10 (recommended).
     k is the degree of the spline; cubic splines (k=3) recommended; 1 <= k <=5.
@@ -45,6 +47,7 @@ def make_interp_model(dp, norm="mean", smooth=False, ncomp=10, k=3,
     """
     if norm in ("mean", "max", "rms"): dp.normalize_portrait(norm)
     if smooth: dp.smooth_portrait()
+    if filtre: dp.filter_portrait()
 
     port = dp.portx
     #mean_prof = dp.prof #bad choice
@@ -127,6 +130,10 @@ if __name__ == "__main__":
                       action="store_true", metavar="smooth", dest="smooth",
                       default=False,
                       help="Pre-smooth the data using default wavelet_smooth options.")
+    parser.add_option("-f", "--filter",
+                      action="store_true", metavar="filter", dest="filtre",
+                      default=False,
+                      help="Pre-filter the data using default low-pass filter function.")
     parser.add_option("-n", "--ncomp",
                       action="store", metavar="ncomp", dest="ncomp",
                       default=10,
@@ -152,11 +159,12 @@ if __name__ == "__main__":
     outfile = options.outfile
     norm = options.norm
     smooth = options.smooth
+    filtre = options.filtre
     ncomp = int(options.ncomp)
     k = int(options.k)
     quiet = options.quiet
 
     dp = DataPortrait(datafile)
-    make_interp_model(dp, norm=norm, smooth=smooth, ncomp=ncomp, k=k,
-            modelfile=modelfile, modelname=modelname, outfile=outfile,
+    make_interp_model(dp, norm=norm, smooth=smooth, filtre=filtre, ncomp=ncomp,
+            k=k, modelfile=modelfile, modelname=modelname, outfile=outfile,
             quiet=quiet)

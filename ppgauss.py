@@ -220,6 +220,9 @@ class DataPortrait:
 
     def smooth_portrait(self, **kwargs):
         """
+        Smooth portrait data using default settings from wavelet_smooth.
+
+        Optional keyword arguments can be passed.
         """
         self.port = wavelet_smooth(self.port, **kwargs)
         for ichan in range(len(self.port)):
@@ -229,6 +232,22 @@ class DataPortrait:
         for ichanx in range(len(self.portx)):
             self.noise_stdsxs[ichanx] = get_noise(self.portx[ichanx])
         self.flux_profx = self.portx.mean(axis=1)
+
+    def filter_portrait(self, **kwargs):
+        """
+        Filter portrait using default settings from find_kc.
+
+        Optional keyword arguments can be passed.
+        """
+        portx_fft = np.fft.rfft(self.portx, axis=1)
+        pows = np.real(portx_fft * np.conj(portx_fft))
+        for ichanx,ichan in enumerate(self.ok_ichans[0]):
+            kc = find_kc(pows[ichanx])
+            portx_fft[ichanx,kc:] = 0.0
+            self.portx[ichanx] = np.fft.irfft(portx_fft[ichanx])
+            self.port[ichan] = np.fft.irfft(portx_fft[ichanx])
+            self.noise_stdsxs *= 0.0
+            self.noise_stds[0,0,ichan] *= 0.0
 
     def normalize_portrait(self, method="mean"):
         """

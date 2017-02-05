@@ -828,34 +828,54 @@ def half_triangle_function(a, b, dc, N):
     fn[:a] += -(np.float64(b)/a)*np.arange(a) + b
     return fn
 
-def find_kc_function(params, data, errs=1.0):
+def find_kc_function(params, data, errs=1.0, fn='exp_dc'):
     """
-    Return the (weighted) chi-squared statistic for a half-triangle model.
+    Return the (weighted) chi-squared statistic for find_kc.
 
-    params are the input parameters for half_triangle_function: (a, b, dc).
+    params are the input parameters for either a decaying exponential or
+        half-triangle function, (a, b, dc), with a as the width parameter, b as
+        the height parameter, and dc as the offset parameter.
     data is the array of data values.
     errs is the array of uncertainties on the data.
+    fn is either 'half_tri' (half-triangle) or 'exp_dc' (decaying exponential).
     """
     a, b, dc = params[0], params[1], params[2]
-    return np.sum((data - half_triangle_function(a, b, dc, len(data)) /
-        errs)**2.0)
+    if fn == 'exp_dc': model = b * np.exp(-a * np.arange(len(data))) + dc
+    elif fn == 'half_tri': model = half_triangle_function(a, b, dc, len(data))
+    else: return 0.0
+    return np.sum(((data - model) / errs)**2.0)
 
-def find_kc(pows):
+def find_kc(pows, errs=1.0, fn='exp_dc'):
     """
     Return the critical cutoff index kc based on a half-triangle function fit.
 
     The function attempts to find where the noise-floor in a power-spectrum
     begins.
 
-    pows is the input power-spectrum values.
+    pows is a 1-D array of input power-spectrum amplitudes.
     """
     data = np.log10(pows)
-    other_args = [data]
-    results = opt.brute(find_kc_function, [tuple((1, len(data))),
-        tuple((0, data.max()-data.min())), tuple((data.min(), data.max()))],
-        args=other_args, Ns=len(pows), full_output=False, finish=None)
+    other_args = [data, errs, fn]
+    if fn == 'exp_dc':
+        ranges = [tuple((len(data)**-1, 1.0)),
+                tuple((0, data.max()-data.min())),
+                tuple((data.min(), data.max()))]
+    elif fn == 'half_tri':
+        ranges = [tuple((1, len(data))), tuple((0, data.max()-data.min())),
+                tuple((data.min(), data.max()))]
+    else: return 0
+    results = opt.brute(find_kc_function, ranges, args=other_args, Ns=20,
+            full_output=False, finish=None)
     a, b, dc = results[0], results[1], results[2]
-    return int(np.floor(a))
+    if fn == 'exp_dc':
+        try:
+            return np.where(np.exp(-a*np.arange(len(data))) < 0.005)[0].min()
+        except ValueError:
+            return len(data)-1
+    elif fn == 'half_tri':
+        return int(np.floor(a))
+    else:
+        return len(data)-1
 
 def pca(port, mean_prof=None, ncomp=10, quiet=False):
     """
