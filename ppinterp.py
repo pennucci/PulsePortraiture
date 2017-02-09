@@ -53,12 +53,12 @@ def make_interp_model(dp, norm="mean", smooth=False, filtre=False,
     #mean_prof = dp.prof #bad choice
     mean_prof = np.average(port, axis=0) #works, simple
     #mean_prof = np.average(port, axis=0, weights=dp.noise_stdsxs**-2) #obvious
-    #mean_prof = np.average(port, axis=0, weights=dp.SNRsxs) #not sure
+    #mean_prof = np.average(port, axis=0, weights=dp.SNRsxs)#**2) #not sure
     freqs = dp.freqsxs[0]
     nu_lo = freqs.min()
     nu_hi = freqs.max()
-    #weights = dp.noise_stdsxs**-2
-    weights = dp.SNRsxs
+    weights = dp.noise_stdsxs**-1
+    #weights = dp.SNRsxs
     reconst_port, eigvec, eigval = pca(port, mean_prof, ncomp=ncomp,
             quiet=quiet)
     delta_port = port - mean_prof
@@ -67,7 +67,7 @@ def make_interp_model(dp, norm="mean", smooth=False, filtre=False,
     else: flip = 1
 
     (tck,u), fp, ier, msg = si.splprep(proj_port[::flip].T,
-            w=weights[::flip]**0.5, u=freqs[::flip], ub=nu_lo, ue=nu_hi, k=k,
+            w=weights[::flip], u=freqs[::flip], ub=nu_lo, ue=nu_hi, k=k,
             task=0, s=None, t=None, full_output=1, nest=None, per=0,
             quiet=int(quiet))
     if ier > 0:
