@@ -57,8 +57,8 @@ def make_interp_model(dp, norm="mean", smooth=False, filtre=False,
     freqs = dp.freqsxs[0]
     nu_lo = freqs.min()
     nu_hi = freqs.max()
-    weights = dp.noise_stdsxs**-1
-    #weights = dp.SNRsxs
+    #weights = dp.noise_stdsxs**-1 #Not robust to normalization/scintillation
+    weights = dp.SNRsxs #"Agrees" with splprep documentation if norm'd by mean
     reconst_port, eigvec, eigval = pca(port, mean_prof, ncomp=ncomp,
             quiet=quiet)
     delta_port = port - mean_prof
