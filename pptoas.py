@@ -214,6 +214,7 @@ class GetTOAs:
                 model_data = load_data(self.modelfile, dedisperse=False,
                     dededisperse=False, tscrunch=True, pscrunch=True,
                     fscrunch=False, rm_baseline=True, flux_prof=False,
+                    #fscrunch=False, rm_baseline=False, flux_prof=False,
                     refresh_arch=False, return_arch=False, quiet=True)
                 model = (model_data.masks * model_data.subints)[0,0]
                 if model_data.nchan == 1:

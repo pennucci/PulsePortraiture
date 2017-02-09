@@ -697,7 +697,7 @@ def fit_portrait_function(params, model=None, p_n=None, data=None, errs=None,
     """
     phase = params[0]
     m = 0.0
-    if P == None or freqs == None:
+    if P is None or freqs is None:
         D = 0.0
         freqs = np.inf * np.ones(len(model))
     else: D = Dconst * params[1] / P
@@ -1938,11 +1938,12 @@ def load_data(filename, dedisperse=False, dededisperse=False, tscrunch=False,
     data = DataBunch(arch=arch, backend=backend, backend_delay=backend_delay,
             bw=bw, DM=DM, epochs=epochs, filename=filename,
             flux_prof=flux_prof, freqs=freqs, frontend=frontend, masks=masks,
-            nbin=nbin, nchan=nchan, noise_stds=noise_stds, nsub=nsub, nu0=nu0,
-            ok_ichans=ok_ichans, ok_isubs=ok_isubs, phases=phases, prof=prof,
-            prof_noise=prof_noise, prof_SNR=prof_SNR, Ps=Ps, SNRs=SNRs,
-            source=source, state=state, subints=subints, subtimes=subtimes,
-            telescope=telescope, tempo_code=tempo_code, weights=weights)
+            nbin=nbin, nchan=nchan, noise_stds=noise_stds, npol=npol,
+            nsub=nsub, nu0=nu0, ok_ichans=ok_ichans, ok_isubs=ok_isubs,
+            phases=phases, prof=prof, prof_noise=prof_noise, prof_SNR=prof_SNR,
+            Ps=Ps, SNRs=SNRs, source=source, state=state, subints=subints,
+            subtimes=subtimes, telescope=telescope, tempo_code=tempo_code,
+            weights=weights)
     return data
 
 def unpack_dict(data):
