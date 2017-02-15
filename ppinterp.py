@@ -23,7 +23,7 @@ from ppgauss import DataPortrait
 from pplib import *
 
 
-def make_interp_model(dp, norm="mean", filtre=False, smoothe=False
+def make_interp_model(dp, norm="mean", filtre=False, smooth=False,
         ncomp=10, k=3, modelfile=None, modelname=None, outfile=None,
         quiet=False):
     """
