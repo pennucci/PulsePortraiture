@@ -251,13 +251,13 @@ def gaussian_profile(nbin, loc, wid, norm=False, abs_wid=False, zeroout=True):
             np.pi)))
         if norm:
             return retval
-        #else:
-        #    return retval / np.max(retval)
         else:
             if np.max(abs(retval)) == 0.0:
-                return retval   #TTP hack
+                return retval
             else:
-                return retval / np.max(abs(retval))  #TTP hack
+                z = (locval[retval.argmax()] - loc) / sigma
+                fact = np.exp(-0.5 * z**2.0) / retval[retval.argmax()]
+                return fact * retval
     except OverflowError:
         print "Problem in gaussian_profile:  mean = %f  sigma = %f" %(mean,
                 sigma)
