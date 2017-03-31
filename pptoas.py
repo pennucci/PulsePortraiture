@@ -237,7 +237,7 @@ class GetTOAs:
                         self.model_name, self.ngauss, model = read_model(
                                 self.modelfile, phases, freqs[isub], Ps[isub],
                                 quiet=bool(quiet+(itoa-1)))
-                    except:
+                    except UnboundLocalError:
                         if list(ok_isubs).index(isub) == 0:
                             print "You are using an experimental functionality of pptoas!"
                         self.model_name, model = read_interp_model(
@@ -314,7 +314,7 @@ class GetTOAs:
                 if len(freqsx) > 1:
                     results = fit_portrait(portx, modelx,
                             np.array([phase_guess, DM_guess]), P, freqsx,
-                            nu_fit, self.nu_ref, errs, bounds=bounds, id = id,
+                            nu_fit, self.nu_ref, errs, bounds=bounds, id=id,
                             quiet=quiet)
                 else:  #1-channel hack
                     if not quiet:

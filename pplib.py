@@ -685,8 +685,8 @@ def fit_portrait_function(params, model=None, p_n=None, data=None, errs=None,
         [cm**-3 pc].
     model is the nchan x nbin phase-frequency model portrait that has been
         DFT'd along the phase axis.
-    p_n is an nchan array containing a weighted, quadratic sum of the model
-        (see 'p_n' in fit_portrait).
+    p_n is an nchan array containing a quadratic sum of the model (see 'p_n' in
+        fit_portrait).
     data is the nchan x nbin phase-frequency data portrait that has been DFT'd
         along the phase axis.
     err is the nchan array of noise level estimates (in the Fourier domain).
@@ -757,7 +757,7 @@ def fit_portrait_function_2deriv(params, model=None, p_n=None, data=None,
     phase = params[0]
     D = Dconst * params[1] / P
     d2_phi, d2_DM, d2_cross = 0.0, 0.0, 0.0
-    W_n = np.empty(len(freqs))
+    W_n = np.zeros(len(freqs))
     for nn in xrange(len(freqs)):
         freq = freqs[nn]
         p = p_n[nn]
@@ -1370,7 +1370,7 @@ def fit_portrait(data, model, init_params, P, freqs, nu_fit=None, nu_out=None,
             sys.stderr.write(
                     "Fit failed with return code %d -- %s"%(results.status,
                         rcstring))
-    if not quiet and results.success is True and 0:
+    if not quiet and results.success is True and 0:  #For debugging
         sys.stderr.write("Fit succeeded with return code %d -- %s\n"
                 %(results.status, rcstring))
     #Curvature matrix = 1/2 2deriv of chi2 (cf. Gregory sect 11.5)
@@ -1396,7 +1396,7 @@ def fit_portrait(data, model, init_params, P, freqs, nu_fit=None, nu_out=None,
     #Errors on scales, if ever needed (these may be wrong b/c of covariances)
     scale_errs = pow(p_n / errs**2.0, -0.5)
     #SNR of the fit, based on PDB's notes
-    snr = pow(np.sum(scales**2 * p_n / errs**2), 0.5)
+    snr = pow(np.sum(scales**2.0 * p_n / errs**2.0), 0.5)
     results = DataBunch(phase=phi_out, phase_err=param_errs[0], DM=DM,
             DM_err=param_errs[1], scales=scales, scale_errs=scale_errs,
             nu_ref=nu_out, covariance=covariance, red_chi2=red_chi2, snr=snr,
@@ -2566,7 +2566,7 @@ def write_TOAs(TOAs, format="tempo2", SNR_cutoff=0.0, outfile=None,
                     exec("toa_string += ' -%s %s'"%(flag, value))
                 elif hasattr(value, "bit_length"):
                     exec("toa_string += ' -%s %d'"%(flag, value))
-                elif flag == "pp_cov":
+                elif flag.find("_cov") >= 0:
                     exec("toa_string += ' -%s %.1e'"%(flag, toa.flags[flag]))
                 else:
                     exec("toa_string += ' -%s %.3f'"%(flag, toa.flags[flag]))
