@@ -2568,7 +2568,7 @@ def write_TOAs(TOAs, format="tempo2", SNR_cutoff=0.0, outfile=None,
                     exec("toa_string += ' -%s %d'"%(flag, value))
                 elif flag.find("_cov") >= 0:
                     exec("toa_string += ' -%s %.1e'"%(flag, toa.flags[flag]))
-                elif flag.find("_phs"):
+                elif flag.find("_phs") >= 0:
                     exec("toa_string += ' -%s %.8f'"%(flag, toa.flags[flag]))
                 else:
                     exec("toa_string += ' -%s %.3f'"%(flag, toa.flags[flag]))
