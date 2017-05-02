@@ -2553,7 +2553,7 @@ def write_TOAs(TOAs, format="tempo2", SNR_cutoff=0.0, outfile=None,
         of = open(outfile, mode)
     for toa in toas:
         if format == "tempo2":
-            toa_string = "%s %.3f %d"%(toa.archive, toa.frequency,
+            toa_string = "%s %.8f %d"%(toa.archive, toa.frequency,
                     toa.MJD.intday()) + ("%.15f   %.3f  %s"%(toa.MJD.fracday(),
                             toa.TOA_error,
                             tempo_codes[toa.telescope.lower()]))[1:]
@@ -2568,6 +2568,8 @@ def write_TOAs(TOAs, format="tempo2", SNR_cutoff=0.0, outfile=None,
                     exec("toa_string += ' -%s %d'"%(flag, value))
                 elif flag.find("_cov") >= 0:
                     exec("toa_string += ' -%s %.1e'"%(flag, toa.flags[flag]))
+                elif flag.find("_phs"):
+                    exec("toa_string += ' -%s %.8f'"%(flag, toa.flags[flag]))
                 else:
                     exec("toa_string += ' -%s %.3f'"%(flag, toa.flags[flag]))
             if outfile is not None:
