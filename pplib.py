@@ -157,6 +157,17 @@ def set_colormap(colormap):
         exec("im.set_cmap(plt.cm.%s)"%colormap)
     plt.draw_if_interactive()
 
+def get_bin_centers(nbin, lo=0.0, hi=1.0):
+    """
+    Return nbin bin centers with extremities at lo and hi.
+    """
+    lo = np.double(lo)
+    hi = np.double(hi)
+    diff = hi-lo
+    bin_centers = np.linspace(lo + diff/(nbin*2), hi - diff/(nbin*2), nbin)
+    bin_centers = np.double(bin_centers)
+    return bin_centers
+
 def weighted_mean(data, errs=1.0):
     """
     Return the weighted mean and its standard error.
@@ -237,7 +248,7 @@ def gaussian_profile(nbin, loc, wid, norm=False, abs_wid=False, zeroout=True):
         return 0
     sigma = wid / (2 * np.sqrt(2 * np.log(2)))
     mean = loc % 1.0
-    locval = np.arange(nbin, dtype='d') / np.float64(nbin)
+    locval = get_bin_centers(nbin, lo=0.0, hi=1.0)
     if (mean < 0.5):
         locval = np.where(np.greater(locval, mean + 0.5), locval - 1.0, locval)
     else:
@@ -1872,7 +1883,8 @@ def load_data(filename, dedisperse=False, dededisperse=False, tscrunch=False,
             xrange(nchan)] for sub in arch])
     nbin = arch.get_nbin()
     #Centers of phase bins
-    phases = np.linspace(0.0 + (nbin*2)**-1, 1.0 - (nbin*2)**-1, nbin)
+    phases = get_bin_centers(nbin, lo=0.0, hi=1.0)
+    #phases = np.linspace(0.0 + (nbin*2)**-1, 1.0 - (nbin*2)**-1, nbin)
     #These are NOT the bin centers...
     #phases = np.arange(nbin, dtype='d') / nbin
     #Get data
@@ -2208,7 +2220,8 @@ def write_archive(data, ephemeris, freqs, nu0=None, bw=None,
         #This is off by a tiny bit...
         bw = (freqs.max() - freqs.min()) + abs(freqs[1] - freqs[0])
     #Phase bin centers
-    phases = np.linspace(0.0 + (nbin*2)**-1, 1.0 - (nbin*2)**-1, nbin)
+    phases = get_bin_centers(nbin, lo=0.0, hi=1.0)
+    #phases = np.linspace(0.0 + (nbin*2)**-1, 1.0 - (nbin*2)**-1, nbin)
     #Create the Archive instance.
     #This is kind of a weird hack, if we create a PSRFITS
     #Archive directly, some header info does not get filled
@@ -2342,7 +2355,8 @@ def make_fake_pulsar(modelfile, ephemeris, outfile="fake_pulsar.fits", nsub=1,
     freqs = np.linspace(lofreq + (chanwidth/2.0), lofreq + bw -
             (chanwidth/2.0), nchan)
     #Phase bin centers
-    phases = np.linspace(0.0 + (nbin*2)**-1, 1.0 - (nbin*2)**-1, nbin)
+    phases = get_bin_centers(nbin, lo=0.0, hi=1.0)
+    #phases = np.linspace(0.0 + (nbin*2)**-1, 1.0 - (nbin*2)**-1, nbin)
     #Channel noise
     try:
         if len(noise_stds) != nchan:
