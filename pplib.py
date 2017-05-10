@@ -952,7 +952,7 @@ def wavelet_smooth(port, wave='db8', nlevel=5, threshtype='hard', fact=0.4):
     """
     try: import pywt as pw
     except ImportError:
-        print "You need the pywt package to use this function."
+        print "You need the pywt (PyWavelets) package to use this function."
         return 0
     try:
         nchan,nbin = port.shape
