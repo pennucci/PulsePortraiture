@@ -29,7 +29,7 @@ import scipy.interpolate as si
 import scipy.optimize as opt
 import scipy.signal as ss
 import lmfit as lm
-import pywt as pw
+#import pywt as pw
 import psrchive as pr
 import matplotlib.gridspec as gs
 import matplotlib.pyplot as plt
@@ -950,6 +950,10 @@ def wavelet_smooth(port, wave='db8', nlevel=5, threshtype='hard', fact=0.4):
 
     Written mostly by EF.
     """
+    try: import pywt as pw
+    except ImportError:
+        print "You need the pywt package to use this function."
+        return 0
     try:
         nchan,nbin = port.shape
         one_prof = False
