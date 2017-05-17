@@ -390,7 +390,9 @@ def build_interp_portrait(mean_prof, freqs, eigvec, tck, nbin=None):
     port = delta_interp + mean_prof
     if nbin is not None:
         if len(mean_prof) != nbin:
+            shift = 0.5 * (nbin**-1 - len(mean_prof)**-1)
             port = ss.resample(port, nbin, axis=1)
+            port = rotate_portrait(port, shift) #ss.resample introduces shift!
     return port
 
 def power_law_evolution(freqs, nu_ref, parameter, index):
