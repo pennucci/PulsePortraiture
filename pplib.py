@@ -898,13 +898,13 @@ def find_kc(pows, errs=1.0, fn='exp_dc'):
 
 def pca(port, mean_prof=None, ncomp=10, quiet=False):
     """
-    Compute the pricinpal components of port and reconstructed port.
+    Compute the pricinpal components of port and reconstruct port.
 
     Returns reconstructed port projected into the space of ncomp principle
     components, all eigenvectors, and all eigenvales. The latter two are sorted
         by the eigenvalues.
 
-    port is a nchan x nbin array of data values; in the PCA, these dimensions
+    port is an nchan x nbin array of data values; in the PCA, these dimensions
         are interpreted as nmeasurements of nvariables, respectively.
     mean_prof is an nbin array of the mean profile to be subtracted; if None,
         an unweighted average is used.
@@ -920,7 +920,7 @@ def pca(port, mean_prof=None, ncomp=10, quiet=False):
 
     print "Performing principal component analysis on data with %d dimensions and %d measurements..." %(ndim,nmes)
 
-    #Subtract weighted average from each set of measurements.
+    #Subtract average from each set of measurements.
     if mean_prof is None: mean_prof = port.mean(axis=0)
     delta_port = port - mean_prof
 
