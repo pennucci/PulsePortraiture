@@ -324,8 +324,8 @@ class GetTOAs:
                             print "--nu_ref will be ignored!"
                     results = fit_phase_shift(portx[0], modelx[0], errs[0],
                             Ns=nbin)
-                    results.DM = DM_stored
-                    results.DM_err = 0.0
+                    results.DM = None #DM_stored
+                    results.DM_err = None #0.0
                     results.nu_ref = freqsx[0]
                     results.nfeval = 0
                     results.return_code = -2
@@ -351,7 +351,8 @@ class GetTOAs:
                     #NB: the 'doppler factor' retrieved from PSRCHIVE seems to
                     #be the inverse of the convention nu_source/nu_observed
                     df = arch.get_Integration(int(isub)).get_doppler_factor()
-                    results.DM *= df    #NB: No longer the *fitted* value!
+                    if len(freqsx) > 1:
+                        results.DM *= df  #NB: No longer the *fitted* value!
                     doppler_fs[isub] = df
                 else:
                     doppler_fs[isub] = 1.0
