@@ -32,7 +32,8 @@ def make_interp_model(dp, norm="mean", filtre=False, smooth=False,
     Important quantities are added as attributes of dp.
 
     dp is an object from the class DataPortrait.
-    norm is the portrait normalization method (None, 'mean', 'max', or 'rms').
+    norm is the portrait normalization method (None, 'mean', 'max', 'rms', or
+        'abs').
     filtre=True will use default settings to low-pass filter the portrait.
     smooth=True will use the default settings from wavelet_smooth to smooth.
     ncomp is the number of PCA components to use in the B-spline
@@ -45,7 +46,7 @@ def make_interp_model(dp, norm="mean", filtre=False, smooth=False,
         the model at the same (non-zero weighted channel) frequencies.
     quiet=True suppresses output.
     """
-    if norm in ("mean", "max", "rms"): dp.normalize_portrait(norm)
+    if norm in ("mean", "max", "rms", "abs"): dp.normalize_portrait(norm)
     if filtre: dp.filter_portrait()
     if smooth: dp.smooth_portrait()
 
@@ -125,7 +126,7 @@ if __name__ == "__main__":
     parser.add_option("-N", "--norm",
                       action="store", metavar="normalization", dest="norm",
                       default="mean",
-                      help="Normalize the input data by channel ('None', 'mean' [default], 'max' (not recommended), or 'rms').")
+                      help="Normalize the input data by channel ('None', 'mean' [default], 'max' (not recommended), 'rms' (off-pulse noise), or 'abs' (sqrt{vector modulus})).")
     parser.add_option("-f", "--filter",
                       action="store_true", metavar="filter", dest="filtre",
                       default=False,

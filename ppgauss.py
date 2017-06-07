@@ -253,13 +253,15 @@ class DataPortrait:
         """
         Normalize each profile.
 
-        method is either "mean", "max", or "rms"
+        method is either "mean", "max", "rms", or "abs".
             if "mean", then normalize by the profile mean (flux).
             if "max", then normalize by the profile maximum.
             if "rms", then normalize by the noise level, such that
                 get_noise(profile) = 1.
+            if "abs", then normalize such that each profile would have the same
+                'length' in an nbin vector space.
         """
-        if method not in ("mean", "max", "rms"):
+        if method not in ("mean", "max", "rms", "abs"):
             print "Unknown method for normalize_portrait, '%s'"%method
             return 1
         else:
@@ -272,8 +274,10 @@ class DataPortrait:
                         norm = self.port[ichan].mean()
                     elif method == "max":
                         norm = self.port[ichan].max()
-                    else:
+                    elif method == "rms":
                         norm = get_noise(self.port[ichan])
+                    else:
+                        norm = (pow(self.port[ichan], 2.0).sum())**0.5
                     self.port[ichan] /= norm
                     self.norm_values[ichan] = norm
                     self.noise_stds[0,0,ichan] = get_noise(self.port[ichan])
@@ -286,8 +290,10 @@ class DataPortrait:
                     norm = self.portx[ichanx].mean()
                 elif method == "max":
                     norm = self.portx[ichanx].max()
-                else:
+                elif method == "rms":
                     norm = get_noise(self.portx[ichanx])
+                else:
+                    norm = (pow(self.portx[ichanx], 2.0).sum())**0.5
                 self.portx[ichanx] /= norm
                 self.norm_valuesx[ichanx] = norm
                 self.noise_stdsxs[ichanx] = get_noise(self.portx[ichanx])
@@ -1129,7 +1135,7 @@ if __name__ == "__main__":
                       help="Automatically fit one Gaussian to initial profile with initial width [rot] given as the argument. Not used with -I. [default=False]")
     parser.add_option("--norm", metavar="normalize",
                       action="store", dest="normalize", default=None,
-                      help="Normalize each channel's profile by either mean, max, or off-pulse noise ('mean', 'max', 'rms').")
+                      help="Normalize each channel's profile by either mean, max, off-pulse noise, or sqrt{vector modulus} ('mean', 'max', 'rms', 'abs').")
     parser.add_option("--figure", metavar="figurename",
                       action="store", dest="figure", default=False,
                       help="Save PNG figure of final fit to figurename. [default=Not saved]")

@@ -53,7 +53,7 @@ def psrsmooth_archive(archive, options="-W"):
 
 def check_if_Stokes(metafile):
     """
-    Checks that archives are either have state 'Stokes'.
+    Checks that archives all have state 'Stokes'.
 
     metafile is a file containing PSRFITS archive names to be averaged.
     """
@@ -82,15 +82,15 @@ def align_archives(metafile, initial_guess, tscrunch=False, pscrunch=True,
 
     metafile is a file containing PSRFITS archive names to be averaged.
     initial_guess is the PSRFITS archive providing the initial alignment guess.
-    tscrunch=True will average the subintegrations; recommended unless there is
-        a reason to fit each subint individually.
+    tscrunch=True will pre-average the subintegrations; recommended unless
+        there is a reason to keep the invidual subints for looping over.
     pscrunch=False will average the available polarizations as well as average
         intensity.  Alignment and weighting is still performed only via the
         total intensity portrait.
     outfile is the name of the output archive; defaults to
         <metafile>.algnd.fits.
-    norm is the normalization method (None, 'mean', 'max', or 'rms') applied to
-        the final data.
+    norm is the normalization method (None, 'mean', 'max', 'rms', or 'abs')
+        applied to the final data.
     rot_phase is an overall rotation to be applied to the final output archive.
     place is a phase value at which to roughly place the peak pulse; it
         overrides rot_phase.
@@ -165,7 +165,7 @@ def align_archives(metafile, initial_guess, tscrunch=False, pscrunch=True,
         model_port = aligned_port[0]
         niter -= 1
         count += 1
-    if norm in ("mean", "max", "rms"):
+    if norm in ("mean", "max", "rms", "abs"):
         for ipol in range(npol):
             for ichan in range(nchan):
                 if aligned_port[ipol,ichan].any():
@@ -173,8 +173,11 @@ def align_archives(metafile, initial_guess, tscrunch=False, pscrunch=True,
                         norm_val = aligned_port[ipol,ichan].mean()
                     elif norm == "max":
                         norm_val = aligned_port[ipol,ichan].max()
-                    else:
+                    elif norm == "rms":
                         norm_val = get_noise(aligned_port[ipol,ichan])
+                    else:
+                        norm_val = (pow(aligned_port[ipol,ichan],
+                            2.0).sum)**0.5
                     aligned_port[ipol,ichan] /= norm_val
     if rot_phase:
         aligned_port = rotate_data(aligned_port, rot_phase)
@@ -237,7 +240,7 @@ if __name__ == "__main__":
     parser.add_option("-N", "--norm",
                       action="store", metavar="normalization", dest="norm",
                       default=None,
-                      help="Normalize the final averaged data by channel ('None' [default], 'mean', 'max' (not recommended), or 'rms').")
+                      help="Normalize the final averaged data by channel ('None' [default], 'mean', 'max' (not recommended), 'rms', or 'abs').")
     parser.add_option("-s", "--smooth",
                       default=False,
                       action="store_true", dest="smooth",
