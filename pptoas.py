@@ -178,7 +178,7 @@ class GetTOAs:
             data = load_data(datafile, dedisperse=False,
                     dededisperse=False, tscrunch=False, pscrunch=True,
                     fscrunch=False, rm_baseline=rm_baseline, flux_prof=False,
-                    refresh_arch=True, return_arch=True, quiet=quiet)
+                    refresh_arch=False, return_arch=False, quiet=quiet)
             #Unpack the data dictionary into the local namespace; see load_data
             #for dictionary keys.
             for key in data.keys():
@@ -195,7 +195,7 @@ class GetTOAs:
             TOA_errs = np.zeros(nsub, dtype="object")
             DMs = np.zeros(nsub, dtype=np.float64)
             DM_errs = np.zeros(nsub, dtype=np.float64)
-            doppler_fs = np.zeros(nsub, dtype=np.float64)
+            doppler_fs = np.ones(nsub, dtype=np.float64)
             nfevals = np.zeros(nsub, dtype="int")
             rcs = np.zeros(nsub, dtype="int")
             scales = np.zeros([nsub, nchan], dtype=np.float64)
@@ -205,7 +205,7 @@ class GetTOAs:
             #PSRCHIVE epochs are *midpoint* of the integration
             MJDs = np.array([epochs[isub].in_days()
                 for isub in xrange(nsub)], dtype=np.double)
-            DM_stored = arch.get_dispersion_measure()
+            DM_stored = DM # = arch.get_dispersion_measure()
             if self.DM0 is None:
                 DM0 = DM_stored
             else:
@@ -228,7 +228,7 @@ class GetTOAs:
                     print model.shape
             if not quiet:
                 print "\nEach of the %d TOAs is approximately %.2f s"%(
-                        len(ok_isubs), arch.integration_length() / nsub)
+                        len(ok_isubs), integration_length / nsub)
                 print "Doing Fourier-domain least-squares fit..."
             itoa = 1
             for isub in ok_isubs:
@@ -356,7 +356,7 @@ class GetTOAs:
                 if self.bary_DM: #Default is True
                     #NB: the 'doppler factor' retrieved from PSRCHIVE seems to
                     #be the inverse of the convention nu_source/nu_observed
-                    df = arch.get_Integration(int(isub)).get_doppler_factor()
+                    df = doppler_factors[isub]
                     if len(freqsx) > 1:
                         results.DM *= df  #NB: No longer the *fitted* value!
                     doppler_fs[isub] = df

@@ -1872,6 +1872,11 @@ def load_data(filename, dedisperse=False, dededisperse=False, tscrunch=False,
     #tscrunch?
     if tscrunch: arch.tscrunch()
     nsub = arch.get_nsubint()
+    #Integration length
+    integration_length = arch.integration_length()
+    #Doppler factors
+    doppler_factors = np.array([arch.get_Integration( \
+            int(isub)).get_doppler_factor() for isub in range(nsub)])
     #pscrunch?
     if pscrunch: arch.pscrunch()
     state = arch.get_state()
@@ -1954,14 +1959,15 @@ def load_data(filename, dedisperse=False, dededisperse=False, tscrunch=False,
     if not return_arch: arch = None
     #Return getitem/attribute-accessible class!
     data = DataBunch(arch=arch, backend=backend, backend_delay=backend_delay,
-            bw=bw, DM=DM, epochs=epochs, filename=filename,
-            flux_prof=flux_prof, freqs=freqs, frontend=frontend, masks=masks,
-            nbin=nbin, nchan=nchan, noise_stds=noise_stds, npol=npol,
-            nsub=nsub, nu0=nu0, ok_ichans=ok_ichans, ok_isubs=ok_isubs,
-            phases=phases, prof=prof, prof_noise=prof_noise, prof_SNR=prof_SNR,
-            Ps=Ps, SNRs=SNRs, source=source, state=state, subints=subints,
-            subtimes=subtimes, telescope=telescope, tempo_code=tempo_code,
-            weights=weights)
+            bw=bw, doppler_factors=doppler_factors, DM=DM, epochs=epochs,
+            filename=filename, flux_prof=flux_prof, freqs=freqs,
+            frontend=frontend, integration_length=integration_length,
+            masks=masks, nbin=nbin, nchan=nchan, noise_stds=noise_stds,
+            npol=npol, nsub=nsub, nu0=nu0, ok_ichans=ok_ichans,
+            ok_isubs=ok_isubs, phases=phases, prof=prof, prof_noise=prof_noise,
+            prof_SNR=prof_SNR, Ps=Ps, SNRs=SNRs, source=source, state=state,
+            subints=subints, subtimes=subtimes, telescope=telescope,
+            tempo_code=tempo_code, weights=weights)
     return data
 
 def unpack_dict(data):
