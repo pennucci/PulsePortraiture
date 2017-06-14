@@ -159,6 +159,9 @@ class GetTOAs:
             to all tempo2-formatted TOAs. e.g. ('pta','NANOGrav','version',0.1)
         quiet=True suppresses output.
         """
+        already_warned = False
+        warning_message = \
+                "You are using an experimental functionality of pptoas!"
         self.nu_ref = nu_ref
         self.DM0 = DM0
         self.bary_DM = bary_DM
@@ -210,7 +213,9 @@ class GetTOAs:
             if not fit_DM:
                 bounds[1] = (DM0, DM0)
             if self.is_FITS_model:
-                print "You are using an experimental functionality of pptoas!"
+                if not already_warned:
+                    print warning_message
+                    already_warned = True
                 model_data = load_data(self.modelfile, dedisperse=False,
                     dededisperse=False, tscrunch=True, pscrunch=True,
                     fscrunch=False, rm_baseline=True, flux_prof=False,
@@ -238,8 +243,9 @@ class GetTOAs:
                                 self.modelfile, phases, freqs[isub], Ps[isub],
                                 quiet=bool(quiet+(itoa-1)))
                     except UnboundLocalError:
-                        if list(ok_isubs).index(isub) == 0:
-                            print "You are using an experimental functionality of pptoas!"
+                        if not already_warned:
+                            print warning_message
+                            already_warned = True
                         self.model_name, model = read_interp_model(
                                 self.modelfile, freqs[isub], nbin,
                                 quiet=True) #bool(quiet+(itoa-1)))
@@ -595,7 +601,6 @@ class GetTOAs:
         P = data.Ps[isub]
         phases = data.phases
         if self.is_FITS_model:
-            print "You are using an experimental functionality of pptoas!"
             model_data = load_data(self.modelfile, dedisperse=False,
                     dededisperse=False, tscrunch=True, pscrunch=True,
                     fscrunch=False, rm_baseline=True, flux_prof=False,
@@ -611,7 +616,6 @@ class GetTOAs:
                         freqs, data.Ps.mean(), quiet=quiet)
                         #freqs, data.Ps[isub], quiet=quiet)     #Track down
             except:
-                print "You are using an experimental functionality of pptoas!"
                 model_name, model = read_interp_model(self.modelfile,
                         freqs, data.nbin, quiet=True) #quiet=bool(quiet+(itoa-1)))
         port = rotate_data(data.subints[isub,0], phi, DM_fitted, P, freqs,

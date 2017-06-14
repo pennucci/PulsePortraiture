@@ -119,7 +119,8 @@ def align_archives(metafile, initial_guess, tscrunch=False, pscrunch=True,
         for ifile in xrange(len(datafiles)):
             data = load_data(datafiles[ifile], dedisperse=False,
                     tscrunch=tscrunch, pscrunch=pscrunch, fscrunch=False,
-                    rm_baseline=True, quiet=load_quiet)
+                    rm_baseline=True, flux_prof=False, refresh_arch=False,
+                    return_arch=False, quiet=load_quiet)
             DM_guess = data.DM
             for isub in data.ok_isubs:
                 ichans = np.intersect1d(data.ok_ichans[isub],

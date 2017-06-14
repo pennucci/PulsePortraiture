@@ -1491,7 +1491,7 @@ def get_noise_fit(data, fact=1.1, chans=False):
             if k_crit >= len(pows):
                 #Will only matter in unresolved or super narrow, high SNR cases
                 k_crit = min(int(0.99*len(pows)), k_crit)
-            noise[ichan] = np.sqrt(np.mean(pows[k_crit:]))
+            noise[ichan] = np.sqrt(np.mean(pows[int(k_crit):]))
         return noise
     else:
         raveld = data.ravel()
@@ -1501,7 +1501,7 @@ def get_noise_fit(data, fact=1.1, chans=False):
         if k_crit >= len(pows):
             #Will only matter in unresolved or super narrow, high SNR cases
             k_crit = min(int(0.99*len(pows)), k_crit)
-        return np.sqrt(np.mean(pows[k_crit:]))
+        return np.sqrt(np.mean(pows[int(k_crit):]))
 
 def get_SNR(prof, fudge=3.25):
     """
@@ -2186,7 +2186,7 @@ def unload_new_archive(data, arch, outfile, DM=None, dmc=0, weights=None,
                 prof = sub.get_Profile(ipol,ichan)
                 prof.get_amps()[:] = data[isub,ipol,ichan]
                 if weights is not None:
-                    sub.set_weight(ichan, weights[isub,ichan])
+                    sub.set_weight(ichan, float(weights[isub,ichan]))
     arch.unload(outfile)
     if not quiet: print "\nUnloaded %s.\n"%outfile
 
@@ -2495,7 +2495,8 @@ def make_fake_pulsar(modelfile, ephemeris, outfile="fake_pulsar.fits", nsub=1,
     arch.unload(outfile)
     if not quiet: print "\nUnloaded %s.\n"%outfile
 
-def filter_TOAs(TOAs, flag, cutoff, criterion=">=", pass_unflagged=False):
+def filter_TOAs(TOAs, flag, cutoff, criterion=">=", pass_unflagged=False,
+        return_culled=False):
     """
     Filter TOAs based on a flag and cutoff value.
 
@@ -2504,14 +2505,24 @@ def filter_TOAs(TOAs, flag, cutoff, criterion=">=", pass_unflagged=False):
     cutoff is the cutoff value for the flag.
     criterion is a string specifying the condition e.g. '>', '<=', etc.
     pass_unflagged=True will pass TOAs if they do not have the flag.
+    return_culled=True will return a second list of the filtered out TOAs.
     """
     new_toas = []
+    culled_toas = []
     for toa in TOAs:
         if hasattr(toa, flag):
             exec("if toa.%s %s cutoff: new_toas.append(toa)"%(flag, criterion))
+            exec("if not(toa.%s %s cutoff): culled_toas.append(toa)"%(flag,
+                criterion))
         else:
-            if pass_unflagged: new_toas.append(toa)
-    return new_toas
+            if pass_unflagged:
+                new_toas.append(toa)
+            else:
+                culled_toas.append(toa)
+    if return_culled:
+        return new_toas, return_culled
+    else:
+        return new_toas
 
 def write_princeton_TOA(TOA_MJDi, TOA_MJDf, TOA_err, nu_ref, dDM, obs='@',
         name=' ' * 13):
