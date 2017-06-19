@@ -122,14 +122,31 @@ def align_archives(metafile, initial_guess, tscrunch=False, pscrunch=True,
                     rm_baseline=True, flux_prof=False, refresh_arch=False,
                     return_arch=False, quiet=load_quiet)
             if data.nbin != model_data.nbin: continue
+            try:
+                freq_diffs = data.freqs - model_data.freqs
+                if freq_diffs.min() == freq_diffs.max() == 0.0:
+                    same_freqs = True
+                else: same_freqs = False
+            except:
+                same_freqs = False
             DM_guess = data.DM
             for isub in data.ok_isubs:
-                ichans = np.intersect1d(data.ok_ichans[isub],
-                        model_data.ok_ichans[0])
+                if same_freqs:
+                    ichans = np.intersect1d(data.ok_ichans[isub],
+                            model_data.ok_ichans[0])
+                    model_ichans = ichans
+                else:  #Find 'close' frequency indices
+                    ichans = data.ok_ichans[isub]
+                    model_ichans = []
+                    for ichan in ichans:
+                        data_freq = data.freqs[isub,ichan]
+                        imin = np.argmin(abs(model_data.freqs[isub]-data_freq))
+                        model_ichans.append(imin)
+                    model_ichans = np.array(model_ichans)
                 port = data.subints[isub,0,ichans]
-                freqs = data.freqs[isub,ichans]
-                model = model_port[ichans]
-                #print freqs-model_data.freqs[0,ichans]
+                freqs = data.freqs[isub,ichans]  #Use data freqs
+                #freqs = model_data.freqs[isub,model_ichans]  #Use model freqs
+                model = model_port[model_ichans]
                 P = data.Ps[isub]
                 SNRs = data.SNRs[isub,0,ichans]
                 errs = data.noise_stds[isub,0,ichans]
@@ -146,20 +163,15 @@ def align_archives(metafile, initial_guess, tscrunch=False, pscrunch=True,
                     results = fit_phase_shift(port[0], model[0], errs[0],
                             Ns=nbin)
                     results.DM = data.DM
-                    results.DM_err = 0.0
                     results.nu_ref = freqs[0]
-                    results.nfeval = 0
-                    results.return_code = -2
                     results.scales = np.array([results.scale])
-                    results.scale_errs = np.array([results.scale_error])
-                    results.covariance = 0.0
                 weights = np.outer(results.scales / errs**2, np.ones(nbin))
                 for ipol in range(npol):
-                    aligned_port[ipol, ichans] += weights * \
+                    aligned_port[ipol, model_ichans] += weights * \
                             rotate_data(data.subints[isub,ipol,ichans],
                                     results.phase, results.DM, P,freqs,
                                     results.nu_ref)
-                total_weights[ichans] +=  weights
+                total_weights[model_ichans] +=  weights
             load_quiet = True
         for ipol in range(npol):
             aligned_port[ipol, np.where(total_weights > 0)[0]] /= \
