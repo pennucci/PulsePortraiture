@@ -752,7 +752,7 @@ class DataPortrait:
             jf.write(line)
         jf.close()
 
-    def show_data_portrait(self):
+    def show_data_portrait(self, **kwargs):
         """
         Show the data portrait.
 
@@ -760,9 +760,9 @@ class DataPortrait:
         """
         title = "%s Portrait"%self.source
         show_portrait(self.port * self.masks[0,0], self.phases, self.freqs[0],
-                title, True, True, bool(self.bw < 0))
+                title, True, True, bool(self.bw < 0), **kwargs)
 
-    def show_model_fit(self):
+    def show_model_fit(self, **kwargs):
         """
         Show the model, data, and residuals.
 
@@ -771,7 +771,7 @@ class DataPortrait:
         resids = self.port - self.model_masked
         titles = ("%s"%self.datafile, "%s"%self.model_name, "Residuals")
         show_residual_plot(self.port, self.model, resids, self.phases,
-                self.freqs[0], titles, bool(self.bw < 0))
+                self.freqs[0], titles, bool(self.bw < 0), **kwargs)
 
 class GaussianSelector:
     """
