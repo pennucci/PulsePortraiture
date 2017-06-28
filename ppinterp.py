@@ -24,8 +24,8 @@ from pplib import *
 
 
 def make_interp_model(dp, norm="mean", filtre=False, smooth=False,
-        ncomp=10, k=3, modelfile=None, modelname=None, outfile=None,
-        quiet=False):
+        ncomp=None, eigfac=0.99, k=3, sfac=1.5, modelfile=None, modelname=None,
+        outfile=None, quiet=False):
     """
     Make a model based on PCA and B-spline parameterization of a ncomp curve.
 
@@ -37,8 +37,13 @@ def make_interp_model(dp, norm="mean", filtre=False, smooth=False,
     filtre=True will use default settings to low-pass filter the portrait.
     smooth=True will use the default settings from wavelet_smooth to smooth.
     ncomp is the number of PCA components to use in the B-spline
-        parameterization; ncomp <= 10 (recommended).
+        parameterization; ncomp <= 10.  If None, ncomp is the smallest number
+        of eigenvectors whose eigenvalues sum to > eigfac*sum(eigenvalues), or
+        10, whichever is smaller.
+    eigfac determines ncomp if ncomp is None.
     k is the degree of the spline; cubic splines (k=3) recommended; 1 <= k <=5.
+    sfac is a multiplicative smoothing factor; greater values = more smoothing.
+        sfac=0 will make an interpolating model anchored on the input data.
     modelfile is the name of the written pickle file that will contain the
         model.
     modelname is the name of the model; defaults to dp.datafile + '.interp'
@@ -47,33 +52,37 @@ def make_interp_model(dp, norm="mean", filtre=False, smooth=False,
     quiet=True suppresses output.
     """
     if norm in ("mean", "max", "rms", "abs"): dp.normalize_portrait(norm)
-    if filtre: dp.filter_portrait()
+    if filtre: dp.filter_portrait() #Can take a while
     if smooth: dp.smooth_portrait()
 
     port = dp.portx
-    #mean_prof = dp.prof #bad choice
-    mean_prof = np.average(port, axis=0) #works, simple
-    #mean_prof = np.average(port, axis=0, weights=dp.noise_stdsxs**-2) #obvious
-    #mean_prof = np.average(port, axis=0, weights=dp.SNRsxs)#**2) #not sure
+    mean_prof = np.average(port, axis=0) #Seems to work best
     freqs = dp.freqsxs[0]
     nu_lo = freqs.min()
     nu_hi = freqs.max()
-    #weights = dp.noise_stdsxs**-1 #Not robust to normalization/scintillation
-    weights = dp.SNRsxs #"Agrees" with splprep documentation if norm'd by mean
-    reconst_port, eigvec, eigval = pca(port, mean_prof, ncomp=ncomp,
-            quiet=quiet)
+    ncomp, reconst_port, eigvec, eigval = pca(port, mean_prof, ncomp=ncomp,
+            eigfac=eigfac, quiet=quiet)
     delta_port = port - mean_prof
+    if ncomp > 10:
+        ncomp = 10
+        reconst_port = np.dot(eigvec[:,:ncomp], np.dot(eigvec[:,:ncomp].T,
+            delta_port.T)).T + mean_prof
     proj_port = np.dot(eigvec[:,:ncomp].T, delta_port.T).T
+    weights = get_noise(proj_port, chans=True)**-1 #See si.splprep docs
+    s = len(proj_port) * sfac #Seems to work OK
     if dp.bw < 0: flip = -1
     else: flip = 1
 
     (tck,u), fp, ier, msg = si.splprep(proj_port[::flip].T,
             w=weights[::flip], u=freqs[::flip], ub=nu_lo, ue=nu_hi, k=k,
-            task=0, s=None, t=None, full_output=1, nest=None, per=0,
+            task=0, s=s, t=None, full_output=1, nest=None, per=0,
             quiet=int(quiet))
     if ier > 0:
         print "Something went wrong in si.splprep:\n%s"%msg
     model_port = build_interp_portrait(mean_prof, freqs, eigvec[:,:ncomp], tck)
+    if not quiet:
+        print "B-spline interpolation model uses %d basis profile components."\
+                %ncomp
 
     if modelfile is not None:
         of = open(modelfile, "wb")
@@ -92,6 +101,7 @@ def make_interp_model(dp, norm="mean", filtre=False, smooth=False,
         unload_new_archive(new_data, dp.arch, outfile, DM=0.0, dmc=0,
                 weights=None, quiet=quiet)
 
+    dp.ncomp = ncomp
     dp.modelname = modelname
     dp.eigvec = eigvec
     dp.eigval = eigval

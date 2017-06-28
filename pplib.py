@@ -381,7 +381,7 @@ def build_interp_portrait(mean_prof, freqs, eigvec, tck, nbin=None):
     freqs are the frequencies at which to build the model.
     eigvec are the eigenvectors providing the basis for the B-spline curve.
     tck is a tuple containing knot locations, B-spline coefficients, and spline
-        degree.
+        degree (output of si.splprep(...)).
     nbin is the number of phase bins to use in the model; if different from
         len(mean_prof), a resampling function is used.
     """
@@ -896,27 +896,29 @@ def find_kc(pows, errs=1.0, fn='exp_dc'):
     else:
         return len(data)-1
 
-def pca(port, mean_prof=None, ncomp=10, quiet=False):
+def pca(port, mean_prof=None, ncomp=None, eigfac=1.0, quiet=False):
     """
     Compute the pricinpal components of port and reconstruct port.
 
-    Returns reconstructed port projected into the space of ncomp principle
-    components, all eigenvectors, and all eigenvales. The latter two are sorted
-        by the eigenvalues.
+    Returns the number ncomp, the reconstructed port projected into the space
+    of ncomp principle components, all eigenvectors, and all eigenvales.
+    The latter two are sorted by the eigenvalues.
 
     port is an nchan x nbin array of data values; in the PCA, these dimensions
         are interpreted as nmeasurements of nvariables, respectively.
     mean_prof is an nbin array of the mean profile to be subtracted; if None,
         an unweighted average is used.
     ncomp is the number of principal components to use in the reconstruction of
-        port.  Default is min(nbin, 10).
+        port.  If None, then ncomp is the smallest number of eigenvectors whose
+        eigenvalues sum to > eigfac*sum(eigenvalues).  For eigfac=1.0, this
+        uses all eigenvectors; i.e., it returns an identical reconstruction.
+    eigfac determines ncomp if ncomp is None.
     quiet=True suppresses output.
 
     Written mostly by EF.
     """
 
     nmes,ndim = port.shape #nchan x nbin
-    ncomp = min(ndim, ncomp)
 
     print "Performing principal component analysis on data with %d dimensions and %d measurements..." %(ndim,nmes)
 
@@ -934,10 +936,13 @@ def pca(port, mean_prof=None, ncomp=10, quiet=False):
     eigval, eigvec = eigval[ind], eigvec[:,ind]
 
     #Reconstruct port projected into space of ncomp principal components.
+    if ncomp is None:
+        ncomp = 1
+        while (eigval[:ncomp].sum() < eigfac * eigval[:].sum()): ncomp += 1
     some_eigvec = eigvec[:,:ncomp]
     reconst_port = np.dot(some_eigvec, np.dot(some_eigvec.T, delta_port.T)).T \
             + mean_prof
-    return reconst_port, eigvec, eigval
+    return ncomp, reconst_port, eigvec, eigval
 
 def wavelet_smooth(port, wave='db8', nlevel=5, threshtype='hard', fact=0.4):
     """

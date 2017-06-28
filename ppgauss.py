@@ -313,6 +313,8 @@ class DataPortrait:
             self.norm_valuesx = np.ones(len(self.portx))
             self.noise_stdsxs = np.copy(self.unnorm_noise_stdsxs)
             del(self.unnorm_noise_stdsxs)
+            self.flux_prof = self.port.mean(axis=1)
+            self.flux_profx = self.portx.mean(axis=1)
         else:
             return 1
 
