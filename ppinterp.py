@@ -19,102 +19,102 @@
 
 #Written by Timothy T. Pennucci (TTP; pennucci@email.virginia.edu).
 
-from ppgauss import DataPortrait
 from pplib import *
 
-
-def make_interp_model(dp, norm="mean", filtre=False, smooth=False,
-        ncomp=None, eigfac=0.99, k=3, sfac=1.5, modelfile=None, modelname=None,
-        outfile=None, quiet=False):
+class DataPortrait(DataPortrait):
     """
-    Make a model based on PCA and B-spline parameterization of a ncomp curve.
+    DataPortrait is a class that contains the data to which a model is fit.
 
-    Important quantities are added as attributes of dp.
-
-    dp is an object from the class DataPortrait.
-    norm is the portrait normalization method (None, 'mean', 'max', 'rms', or
-        'abs').
-    filtre=True will use default settings to low-pass filter the portrait.
-    smooth=True will use the default settings from wavelet_smooth to smooth.
-    ncomp is the number of PCA components to use in the B-spline
-        parameterization; ncomp <= 10.  If None, ncomp is the smallest number
-        of eigenvectors whose eigenvalues sum to > eigfac*sum(eigenvalues), or
-        10, whichever is smaller.
-    eigfac determines ncomp if ncomp is None.
-    k is the degree of the spline; cubic splines (k=3) recommended; 1 <= k <=5.
-    sfac is a multiplicative smoothing factor; greater values = more smoothing.
-        sfac=0 will make an interpolating model anchored on the input data.
-    modelfile is the name of the written pickle file that will contain the
-        model.
-    modelname is the name of the model; defaults to dp.datafile + '.interp'
-    outfile is the name of a written PSRCHIVE fits file to be constructed from
-        the model at the same (non-zero weighted channel) frequencies.
-    quiet=True suppresses output.
+    This class adds methods and attributes to the parent class specific to
+        modeling profile evolution with a B-spline curve.
     """
-    if norm in ("mean", "max", "rms", "abs"): dp.normalize_portrait(norm)
-    if filtre: dp.filter_portrait() #Can take a while
-    if smooth: dp.smooth_portrait()
 
-    port = dp.portx
-    mean_prof = np.average(port, axis=0) #Seems to work best
-    freqs = dp.freqsxs[0]
-    nu_lo = freqs.min()
-    nu_hi = freqs.max()
-    ncomp, reconst_port, eigvec, eigval = pca(port, mean_prof, ncomp=ncomp,
-            eigfac=eigfac, quiet=quiet)
-    delta_port = port - mean_prof
-    if ncomp > 10:
-        ncomp = 10
-        reconst_port = np.dot(eigvec[:,:ncomp], np.dot(eigvec[:,:ncomp].T,
-            delta_port.T)).T + mean_prof
-    proj_port = np.dot(eigvec[:,:ncomp].T, delta_port.T).T
-    weights = get_noise(proj_port, chans=True)**-1 #See si.splprep docs
-    s = len(proj_port) * sfac #Seems to work OK
-    if dp.bw < 0: flip = -1
-    else: flip = 1
+    def make_interp_model(self, ncomp=None, eigfac=0.99, k=3, sfac=1.5,
+            model_name=None, quiet=False):
+        """
+        Make a model based on PCA and B-spline interpolation.
 
-    (tck,u), fp, ier, msg = si.splprep(proj_port[::flip].T,
-            w=weights[::flip], u=freqs[::flip], ub=nu_lo, ue=nu_hi, k=k,
-            task=0, s=s, t=None, full_output=1, nest=None, per=0,
-            quiet=int(quiet))
-    if ier > 0:
-        print "Something went wrong in si.splprep:\n%s"%msg
-    model_port = build_interp_portrait(mean_prof, freqs, eigvec[:,:ncomp], tck)
-    if not quiet:
-        print "B-spline interpolation model uses %d basis profile components."\
-                %ncomp
+        ncomp is the number of PCA components to use in the B-spline
+            parameterization; ncomp <= 10.  If None, ncomp is the smallest
+            number of eigenvectors whose eigenvalues sum to greater than
+            eigfac*sum(eigenvalues), or 10, whichever is smaller.
+        eigfac determines ncomp if ncomp is None.
+        k is the degree of the spline; cubic splines (k=3) recommended;
+            1 <= k <= 5.
+        sfac is a multiplicative smoothing factor; greater values result in
+            more smoothing.  sfac=0 will make an interpolating model anchored
+            on the input data profiles.
+        model_name is the name of the model; defaults to
+            self.datafile + '.interp'
+        quiet=True suppresses output.
+        """
 
-    if modelfile is not None:
-        of = open(modelfile, "wb")
-        if modelname is None: modelname = dp.datafile + '.interp'
-        pickle.dump([modelname, dp.source, dp.datafile, mean_prof,
-            eigvec[:,:ncomp], tck], of)
+        #Definitions
+        port = self.portx
+        mean_prof = np.average(port, axis=0) #Seems to work best
+        freqs = self.freqsxs[0]
+        nu_lo = freqs.min()
+        nu_hi = freqs.max()
+        #Do principal component analysis
+        ncomp, reconst_port, eigvec, eigval = pca(port, mean_prof, ncomp=ncomp,
+                eigfac=eigfac, quiet=quiet)
+        delta_port = port - mean_prof
+        if ncomp > 10:
+            ncomp = 10
+            reconst_port = np.dot(eigvec[:,:ncomp], np.dot(eigvec[:,:ncomp].T,
+                delta_port.T)).T + mean_prof
+        #Find the projections of the profiles onto the basis components
+        proj_port = np.dot(eigvec[:,:ncomp].T, delta_port.T).T
+        weights = get_noise(proj_port, chans=True)**-1 #See si.splprep docs
+        s = len(proj_port) * sfac #Seems to work OK
+        if self.bw < 0: flip = -1
+        else: flip = 1
+        #Find the B-spline curve traced by the projected vectors, parameterized
+        #by frequency
+        (tck,u), fp, ier, msg = si.splprep(proj_port[::flip].T,
+                w=weights[::flip], u=freqs[::flip], ub=nu_lo, ue=nu_hi, k=k,
+                task=0, s=s, t=None, full_output=1, nest=None, per=0,
+                quiet=int(quiet))
+        if ier > 0:
+            print "Something went wrong in si.splprep:\n%s"%msg
+        if not quiet:
+            print "B-spline interpolation model uses %d basis profile components."%ncomp
+
+        #Build model
+        modelx = gen_interp_portrait(mean_prof, freqs, eigvec[:,:ncomp], tck)
+        model = gen_interp_portrait(mean_prof, self.freqs[0], eigvec[:,:ncomp],
+                tck)
+
+        #Assign new attributes
+        self.ncomp = ncomp
+        self.model_name = model_name
+        self.eigvec = eigvec
+        self.eigval = eigval
+        self.mean_prof = mean_prof
+        self.tck, self.u, self.fp, self.ier, self.msg = tck, u, fp, ier, msg
+        if model_name is None: self.model_name = self.datafile + '.interp'
+        else: self.model_name = model_name
+        self.model = model
+        self.modelx = modelx
+        self.model_masked = self.model * self.masks[0,0]
+
+    def write_model(self, outfile, quiet=False):
+        """
+        Write the output (pickle file) model to outfile.
+        """
+        of = open(outfile, "wb")
+        pickle.dump([self.model_name, self.source, self.datafile,
+            self.mean_prof, self.eigvec[:,:ncomp], self.tck], of)
         of.close()
-
-    if outfile is not None:
-        new_data = np.zeros(dp.arch.get_data().shape)
-        ichanx = 0
-        for ichan,weight in enumerate(dp.weights[0]):
-            if weight > 0:
-                new_data[0,0,ichan] = model_port[ichanx]
-                ichanx += 1
-        unload_new_archive(new_data, dp.arch, outfile, DM=0.0, dmc=0,
-                weights=None, quiet=quiet)
-
-    dp.ncomp = ncomp
-    dp.modelname = modelname
-    dp.eigvec = eigvec
-    dp.eigval = eigval
-    dp.mean_prof = mean_prof
-    dp.tck, dp.u, dp.fp, dp.ier, dp.msg = tck, u, fp, ier, msg
-    dp.model_port = model_port
+        if not quiet:
+            print "Wrote modelfile %s."%outfile
 
 
 if __name__ == "__main__":
 
     from optparse import OptionParser
 
-    usage = "Usage: %prog -d <datafile> -o <outfile> [options]"
+    usage = "Usage: %prog -d <datafile> [options]"
     parser = OptionParser(usage)
     #parser.add_option("-h", "--help",
     #                  action="store_true", dest="help", default=False,
@@ -122,15 +122,15 @@ if __name__ == "__main__":
     parser.add_option("-d", "--datafile",
                       action="store", metavar="archive", dest="datafile",
                       help="PSRCHIVE archive from which to make model.")
-    parser.add_option("-m", "--modelfile",
+    parser.add_option("-o", "--modelfile",
                       action="store", metavar="modelfile", dest="modelfile",
-                      help="Name for output model (pickle) file.")
-    parser.add_option("-l", "--modelname",
-                      action="store", metavar="modelname", dest="modelname",
+                      help="Name for output model (pickle) file. [default=datafile.spl].")
+    parser.add_option("-l", "--model_name",
+                      action="store", metavar="model_name", dest="model_name",
                       default=None,
                       help="Optional name for model [default=datafile_interp].")
-    parser.add_option("-o", "--outfile",
-                      action="store", metavar="outfile", dest="outfile",
+    parser.add_option("-a", "--archive",
+                      action="store", metavar="archive", dest="archive",
                       default=None,
                       help="Name for optional output PSRCHIVE archive.")
     parser.add_option("-N", "--norm",
@@ -158,7 +158,7 @@ if __name__ == "__main__":
 
     (options, args) = parser.parse_args()
 
-    if (options.datafile is None or options.modelfile is None):
+    if (options.datafile is None):
         print "\nppinterp.py - make a pulse portrait model using PCA & B-splines\n"
         parser.print_help()
         print ""
@@ -166,8 +166,8 @@ if __name__ == "__main__":
 
     datafile = options.datafile
     modelfile = options.modelfile
-    modelname = options.modelname
-    outfile = options.outfile
+    model_name = options.model_name
+    archive = options.archive
     norm = options.norm
     filtre = options.filtre
     smooth = options.smooth
@@ -176,6 +176,15 @@ if __name__ == "__main__":
     quiet = options.quiet
 
     dp = DataPortrait(datafile)
-    make_interp_model(dp, norm=norm, filtre=filtre, smooth=smooth, ncomp=ncomp,
-            k=k, modelfile=modelfile, modelname=modelname, outfile=outfile,
-            quiet=quiet)
+
+    if norm in ("mean", "max", "rms", "abs"): dp.normalize_portrait(norm)
+    if filtre: dp.filter_portrait() #Can take a while
+    if smooth: dp.smooth_portrait()
+
+    dp.make_interp_model(ncomp=ncomp, k=k, modelfile=modelfile,
+            model_name=model_name, archive=archive, quiet=quiet)
+
+    if modelfile is None: modelfile = datafile + ".spl"
+    dp.write_model(modelfile, quiet=quiet)
+
+    if archive is not None: dp.write_archive(archive, quiet=quiet)

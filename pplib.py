@@ -138,6 +138,476 @@ class DataBunch(dict):
         dict.__init__(self, kwds)
         self.__dict__ = self
 
+class DataPortrait(object):
+
+    """
+    DataPortrait is a class that contains the data to which a model is fit.
+
+    This class is also useful for the quick examining of PSRCHIVE archives in
+    an interactive python environment.
+    """
+
+    def __init__(self, datafile=None, joinfile=None, quiet=False):
+        """
+        Unpack all of the data and set initial attributes.
+
+        If datafile is a metafile of PSRCHIVE archives, "join" attributes are
+            set, which are used to align the archives.  A large (>3) number of
+            archives signficiantly slows the fitting process, and it has only
+            been tested for the case that each archive originates from a
+            unique receiver.
+        joinfile is a file like that which is output by write_join_parameters,
+            containing optional parameters to align the multiple archives.
+        quiet=True suppresses output.
+        """
+        self.init_params = []
+        self.joinfile = joinfile
+        if file_is_type(datafile, "ASCII"):
+            self.join_params = []
+            self.join_fit_flags = []
+            self.join_nchans = [0]
+            self.join_nchanxs = [0]
+            self.join_ichans = []
+            self.join_ichanxs = []
+            self.nchans = []
+            self.metafile = self.datafile = datafile
+            self.datafiles = open(datafile, "r").readlines()
+            self.datafiles = [self.datafiles[ifile][:-1] for ifile in
+                    xrange(len(self.datafiles))]
+            self.njoin = len(self.datafiles)
+            self.Ps = 0.0
+            self.nchan = 0
+            self.nchanx = 0
+            #self.nu0s = []
+            self.lofreq = np.inf
+            self.hifreq = 0.0
+            self.freqs = []
+            self.freqsxs = []
+            self.port = []
+            self.portx = []
+            self.flux_prof = []
+            self.flux_profx = []
+            self.noise_stds = []
+            self.noise_stdsxs = []
+            self.SNRs = []
+            self.SNRsxs = []
+            self.masks = []
+            for ifile in range(len(self.datafiles)):
+                datafile = self.datafiles[ifile]
+                data = load_data(datafile, dedisperse=True, tscrunch=True,
+                        pscrunch=True, fscrunch=False, rm_baseline=True,
+                        flux_prof=True, return_arch=True, quiet=quiet)
+                self.nchan += data.nchan
+                self.nchanx += len(data.ok_ichans[0])
+                if ifile == 0:
+                    self.join_nchans.append(self.nchan)
+                    self.join_nchanxs.append(self.nchanx)
+                    self.join_params.append(0.0)
+                    self.join_fit_flags.append(0)
+                    self.join_params.append(data.DM*0.0)
+                    self.join_fit_flags.append(1)
+                    self.nbin = data.nbin
+                    self.phases = data.phases
+                    refprof = data.prof
+                    self.source = data.source
+                else:
+                    self.join_nchans.append(self.nchan)
+                    self.join_nchanxs.append(self.nchanx)
+                    prof = data.prof
+                    phi = -fit_phase_shift(prof, refprof, Ns=self.nbin).phase
+                    self.join_params.append(phi)
+                    self.join_fit_flags.append(1)
+                    self.join_params.append(data.DM*0.0)
+                    self.join_fit_flags.append(1)
+                self.Ps += data.Ps.mean()
+                lf = data.freqs.min() - (abs(data.bw) / (2*data.nchan))
+                if lf < self.lofreq:
+                    self.lofreq = lf
+                hf = data.freqs.max() + (abs(data.bw) / (2*data.nchan))
+                if hf > self.hifreq:
+                    self.hifreq = hf
+                self.freqs.extend(data.freqs[0])
+                self.freqsxs.extend(data.freqs[0, data.ok_ichans[0]])
+                self.masks.extend(data.masks[0,0])
+                self.port.extend(data.subints[0,0] * data.masks[0,0])
+                self.portx.extend(data.subints[0,0, data.ok_ichans[0]])
+                self.flux_prof.extend(data.flux_prof)
+                self.flux_profx.extend(data.flux_prof[data.ok_ichans[0]])
+                self.noise_stds.extend(data.noise_stds[0,0])
+                self.noise_stdsxs.extend(
+                        data.noise_stds[0,0][data.ok_ichans[0]])
+                self.SNRs.extend(data.SNRs[0,0])
+                self.SNRsxs.extend(data.SNRs[0,0][data.ok_ichans[0]])
+            self.Ps /= len(self.datafiles)
+            self.Ps = [self.Ps] #This line is a toy
+            self.bw = self.hifreq - self.lofreq
+            self.freqs = np.array(self.freqs)
+            self.freqsxs = np.array(self.freqsxs)
+            self.nu0 = self.freqs.mean()
+            self.isort = np.argsort(self.freqs)
+            self.isortx = np.argsort(self.freqsxs)
+            for ijoin in range(self.njoin):
+                join_ichans = np.intersect1d(np.where(self.isort >=
+                    self.join_nchans[ijoin])[0], np.where(self.isort <
+                        self.join_nchans[ijoin+1])[0])
+                self.join_ichans.append(join_ichans)
+                join_ichanxs = np.intersect1d(np.where(self.isortx >=
+                    self.join_nchanxs[ijoin])[0], np.where(self.isortx <
+                        self.join_nchanxs[ijoin+1])[0])
+                self.join_ichanxs.append(join_ichanxs)
+            self.masks = np.array(self.masks)[self.isort]
+            self.masks = np.array([[self.masks]])
+            self.port = np.array(self.port)[self.isort]
+            self.portx = np.array(self.portx)[self.isortx]
+            self.flux_prof = np.array(self.flux_prof)[self.isort]
+            self.flux_profx = np.array(self.flux_profx)[self.isortx]
+            self.noise_stds = np.array(self.noise_stds)[self.isort]
+            self.noise_stds = np.array([[self.noise_stds]]) #For consistency
+            self.noise_stdsxs = np.array(self.noise_stdsxs)[self.isortx]
+            self.SNRs = np.array(self.SNRs)[self.isort]
+            self.SNRsxs = np.array(self.SNRsxs)[self.isortx]
+            self.freqs.sort()
+            self.freqsxs.sort()
+            self.freqs = np.array([self.freqs])
+            self.freqsxs = [self.freqsxs]
+            self.join_params = np.array(self.join_params)
+            self.join_fit_flags = np.array(self.join_fit_flags)
+            if self.joinfile:  #Read joinfile
+                joinfile_lines = open(self.joinfile, "r").readlines()[-len(
+                    self.datafiles):]
+                joinfile_lines = [line.split() for line in joinfile_lines]
+                try:
+                    for ifile in range(len(joinfile_lines)):
+                        ijoin = self.datafiles.index(joinfile_lines[ifile][0])
+                        phi = np.double(joinfile_lines[ifile][1])
+                        if len(joinfile_lines[ifile]) > 3:  #New joinfiles...
+                            DM = np.float(joinfile_lines[ifile][3])
+                        else:  #Old joinfiles...
+                            DM = np.float(joinfile_lines[ifile][2])
+                        self.join_params[ijoin*2] = phi
+                        self.join_params[ijoin*2+1] = DM
+                except:
+                    print "Bad join file."
+                    sys.exit()
+            self.all_join_params = [self.join_ichanxs, self.join_params,
+                    self.join_fit_flags]
+        else:
+            self.njoin = 0
+            self.join_params = []
+            self.join_ichans = []
+            self.all_join_params = []
+            self.datafile = datafile
+            self.data = load_data(datafile, dedisperse=True,
+                    dededisperse=False, tscrunch=True, pscrunch=True,
+                    fscrunch=False, rm_baseline=True, flux_prof=True,
+                    refresh_arch=True, return_arch=True, quiet=quiet)
+            #Unpack the data dictionary into the local namespace;
+            #see load_data for dictionary keys.
+            for key in self.data.keys():
+                exec("self." + key + " = self.data['" + key + "']")
+            if self.source is None: self.source = "noname"
+            self.port = (self.masks * self.subints)[0,0]
+            self.portx = self.port[self.ok_ichans[0]]
+            self.flux_profx = self.flux_prof[self.ok_ichans[0]]
+            self.freqsxs = [self.freqs[0,self.ok_ichans[0]]]
+            self.noise_stdsxs = self.noise_stds[0,0,self.ok_ichans[0]]
+            self.SNRsxs = self.SNRs[0,0,self.ok_ichans[0]]
+
+    def apply_joinfile(self, nu_ref, undo=False):
+        """
+        Apply parameters in joinfile.
+
+        nu_ref is the reference frequency [MHz], which should be the fitted
+            model's reference frequency.
+        undo=True rotates the data the other way.
+        """
+        undo = (-1)**(int(undo))
+        for ii in range(self.njoin):
+            jic = self.join_ichans[ii]
+            self.port[jic] = rotate_data(self.port[jic],
+                    -self.join_params[0::2][ii]*undo,
+                    -self.join_params[1::2][ii]*undo, self.Ps[0],
+                    self.freqs[0,jic], nu_ref)
+            jicx = self.join_ichanxs[ii]
+            self.portx[jicx] = rotate_data(self.portx[jicx],
+                    -self.join_params[0::2][ii]*undo,
+                    -self.join_params[1::2][ii]*undo, self.Ps[0],
+                    self.freqsxs[0][jicx], nu_ref)
+        #    self.model[jic] = rotate_data(self.model[jic],
+        #            -self.join_params[0::2][ii]*undo,
+        #            -self.join_params[1::2][ii]*undo, self.Ps[0],
+        #            self.freqs[0,jic], nu_ref)
+        #self.model_masked = self.model * self.masks[0,0]
+        #self.modelx = np.compress(self.masks[0,0].mean(axis=1), self.model,
+        #        axis=0)
+
+    def smooth_portrait(self, **kwargs):
+        """
+        Smooth portrait data using default settings from wavelet_smooth.
+
+        Optional keyword arguments can be passed.
+        """
+        self.port = wavelet_smooth(self.port, **kwargs)
+        for ichan in range(len(self.port)):
+            self.noise_stds[0,0,ichan] = get_noise(self.port[ichan])
+        self.flux_prof = self.port.mean(axis=1)
+        self.portx = wavelet_smooth(self.portx, **kwargs)
+        for ichanx in range(len(self.portx)):
+            self.noise_stdsxs[ichanx] = get_noise(self.portx[ichanx])
+        self.flux_profx = self.portx.mean(axis=1)
+
+    def filter_portrait(self, **kwargs):
+        """
+        Filter portrait using default settings from find_kc.
+
+        Optional keyword arguments can be passed.
+        """
+        portx_fft = np.fft.rfft(self.portx, axis=1)
+        pows = np.real(portx_fft * np.conj(portx_fft))
+        for ichanx,ichan in enumerate(self.ok_ichans[0]):
+            kc = find_kc(pows[ichanx])
+            portx_fft[ichanx,kc:] = 0.0
+            self.portx[ichanx] = np.fft.irfft(portx_fft[ichanx])
+            self.port[ichan] = np.fft.irfft(portx_fft[ichanx])
+            self.noise_stdsxs *= 0.0
+            self.noise_stds[0,0,ichan] *= 0.0
+
+    def normalize_portrait(self, method="mean"):
+        """
+        Normalize each profile.
+
+        method is either "mean", "max", "rms", or "abs".
+            if "mean", then normalize by the profile mean (flux).
+            if "max", then normalize by the profile maximum.
+            if "rms", then normalize by the noise level, such that
+                get_noise(profile) = 1.
+            if "abs", then normalize such that each profile would have the same
+                'length' in an nbin vector space.
+        """
+        if method not in ("mean", "max", "rms", "abs"):
+            print "Unknown method for normalize_portrait, '%s'"%method
+            return 1
+        else:
+            #Full portrait
+            self.norm_values = np.ones(len(self.port))
+            self.unnorm_noise_stds = np.copy(self.noise_stds)
+            for ichan in range(len(self.port)):
+                if self.port[ichan].any():
+                    if method == "mean":
+                        norm = self.port[ichan].mean()
+                    elif method == "max":
+                        norm = self.port[ichan].max()
+                    elif method == "rms":
+                        norm = get_noise(self.port[ichan])
+                    else:
+                        norm = (pow(self.port[ichan], 2.0).sum())**0.5
+                    self.port[ichan] /= norm
+                    self.norm_values[ichan] = norm
+                    self.noise_stds[0,0,ichan] = get_noise(self.port[ichan])
+            self.flux_prof = self.port.mean(axis=1)
+            #Reduced portrait
+            self.norm_valuesx = np.ones(len(self.portx))
+            self.unnorm_noise_stdsxs = np.copy(self.noise_stdsxs)
+            for ichanx in range(len(self.portx)):
+                if method == "mean":
+                    norm = self.portx[ichanx].mean()
+                elif method == "max":
+                    norm = self.portx[ichanx].max()
+                elif method == "rms":
+                    norm = get_noise(self.portx[ichanx])
+                else:
+                    norm = (pow(self.portx[ichanx], 2.0).sum())**0.5
+                self.portx[ichanx] /= norm
+                self.norm_valuesx[ichanx] = norm
+                self.noise_stdsxs[ichanx] = get_noise(self.portx[ichanx])
+            self.flux_profx = self.portx.mean(axis=1)
+
+    def unnormalize_portrait(self):
+        """
+        Undo normalize_portrait
+        """
+        if hasattr(self, 'unnorm_noise_stds'):
+            self.port = (self.norm_values * self.port.transpose()).transpose()
+            self.norm_values = np.ones(len(self.port))
+            self.noise_stds = np.copy(self.unnorm_noise_stds)
+            del(self.unnorm_noise_stds)
+            self.portx = (self.norm_valuesx * \
+                    self.portx.transpose()).transpose()
+            self.norm_valuesx = np.ones(len(self.portx))
+            self.noise_stdsxs = np.copy(self.unnorm_noise_stdsxs)
+            del(self.unnorm_noise_stdsxs)
+            self.flux_prof = self.port.mean(axis=1)
+            self.flux_profx = self.portx.mean(axis=1)
+        else:
+            return 1
+
+    def fit_flux_profile(self, channel_errs=None, guessA=1.0, guessalpha=0.0,
+            plot=True, quiet=False):
+        """
+        Fit a power-law to the phase-averaged flux spectrum of the data.
+
+        Fitted parameters and uncertainties are added as class attributes.
+
+        guessA is the initial amplitude parameter.
+        guessalpha is the initial spectral index parameter.
+        plot=True shows the fit results.
+        quiet=True suppresses output.
+        """
+        #Noise level below may be off
+        if channel_errs is None: channel_errs = np.ones(len(self.freqsxs[0]))
+        fp = fit_powlaw(self.flux_profx, np.array([guessA,guessalpha]),
+            channel_errs, self.freqsxs[0], self.nu0)
+        if not quiet:
+            print ""
+            print "Flux-density power-law fit"
+            print "----------------------------------"
+            print "residual mean = %.2f"%fp.residuals.mean()
+            print "residual std. = %.2f"%fp.residuals.std()
+            print "reduced chi-squared = %.2f"%(fp.chi2 / fp.dof)
+            print "A = %.3f +/- %.3f (flux at %.2f MHz)"%(fp.amp,
+                    fp.amp_err, self.nu0)
+            print "alpha = %.3f +/- %.3f"%(fp.alpha, fp.alpha_err)
+        if plot:
+            ax1 = plt.subplot(211, position=(0.1,0.1,0.8,0.4))
+            ax2 = plt.subplot(212, position=(0.1,0.5,0.8,0.4))
+            ax1.errorbar(self.freqsxs[0], fp.residuals, channel_errs, fmt='r+')
+            ax2.plot(self.freqs[0], powlaw(self.freqs[0], self.nu0,
+                fp.amp, fp.alpha), 'k-')
+            ax2.errorbar(self.freqsxs[0], self.flux_profx, channel_errs,
+                    fmt='r+')
+            ax1.set_xlim(self.freqs[0].min(), self.freqs[0].max())
+            ax2.set_xlim(ax1.get_xlim())
+            ax2.set_xticklabels([])
+            ax1.set_yticks(ax1.get_yticks()[1:-1])
+            ax2.set_yticks(ax2.get_yticks()[1:-1])
+            ax2.text(0.05, 0.1, r"A$_{\nu_0}$ = %.2f $\pm$ %.2f"%(
+                fp.amp, fp.amp_err) + "\n" + r"$\alpha$ = %.2f $\pm$ %.2f"%(
+                    fp.alpha, fp.alpha_err), ha="left", va="bottom",
+                transform=ax2.transAxes)
+            ax1.set_xlabel("Frequency [MHz]")
+            ax1.set_ylabel("Residual")
+            ax2.set_ylabel("Flux")
+            ax2.set_title("Average Flux Profile for %s"%self.source)
+            plt.show()
+        self.spect_A = fp.amp
+        self.spect_A_err = fp.amp_err
+        self.spect_index = fp.alpha
+        self.spect_index_err = fp.alpha_err
+
+    def write_join_parameters(self):
+        """
+        Write the JOIN parameters to file.
+
+        This function is a hack until something better is developed for how to
+        deal with these alignment parameters.
+
+        NB: The join parameters are "opposite" of how they are used to rotate
+            the data with e.g. rotate_data; use a negative!
+        ALSO NB: In order to get "proper barycentic DMs" from these delta-DMs,
+                 one must do something like DM = (DM0 + delta-DM)*df, where df
+                 is the doppler factor and DM0 is the nominal dispersion
+                 measure, both obtained from the archive via PSRCHIVE:
+                 e.g.  df = archive.get_Integration(0).get_doppler_factor and
+                      DM0 = archive.get_dispersion_measure().
+        """
+        #print "Beware: JOIN Parameters should be negated!"
+        #print "Beware: JOIN DMs are offsets and not doppler corrected!"
+        if self.joinfile is not None:
+            joinfile = self.joinfile
+        else:
+            joinfile = self.model_name + ".join"
+        jf = open(joinfile, "a")
+        header = "# archive name" + " "*32 + "-phase offset & err [rot]" + \
+                " "*2 + "-delta-DM & err [cm**-3 pc]\n"
+        jf.write(header)
+        for ifile in xrange(len(self.datafiles)):
+            datafile = self.datafiles[ifile]
+            phase = self.join_params[ifile*2]
+            dm = self.join_params[ifile*2 + 1]
+            line = datafile + " "*abs(45-len(datafile)) + "% .10f"%phase + \
+                    " "*1 + "%.10f"%self.join_param_errs[::2][ifile] + \
+                    " "*2 + "% .6f"%dm + " "*1 + \
+                    "%.6f"%self.join_param_errs[1::2][ifile] + "\n"
+            jf.write(line)
+        jf.close()
+
+    def rotate_stuff(self, phase=0.0, DM=0.0, nu_ref=None):
+        """
+        Rotates the data and model portraits according to rotate_portrait(...).
+
+        phase is a value specifying the amount of achromatic rotation [rot].
+        DM is a value specifying the amount of rotation based on the
+        cold-plasma dispersion law [cm**-3 pc].
+        nu_ref is the reference frequency [MHz] that has zero dispersive delay.
+            If nu_ref=None, defaults to self.nu0.
+        """
+        if nu_ref is None: nu_ref = self.nu0
+        P = self.Ps[0]
+        freqs = self.freqs[0]
+        freqsxs = self.freqsxs[0]
+
+        self.port = rotate_portrait(self.port, phase, DM, P, freqs, nu_ref)
+        self.portx = rotate_portrait(self.portx, phase, DM, P, freqsxs, nu_ref)
+
+        if hasattr(self, 'model'):
+            self.model = rotate_portrait(self.model, phase, DM, P, freqs,
+                    nu_ref)
+            self.modelx = rotate_portrait(self.modelx, phase, DM, P, freqsxs,
+                    nu_ref)
+            self.model_masked = rotate_portrait(self.model_masked, phase, DM,
+                    P, freqs, nu_ref)
+
+    def write_archive(self, outfile, quiet=False):
+        """
+        Write a PSRCHIVE archive to outfile containing the model.
+
+        This archive will have the same zero-weighted channels as the input
+            datafile.
+        """
+        if not hasattr(self, 'model'): return None
+        shape = self.arch.get_data().shape
+        nsub,npol,nchan,nbin = shape
+        model_data = np.zeros(shape)
+        for isub in range(nsub):
+            for ipol in range(npol):
+                model_data[isub,ipol] = self.model
+        unload_new_archive(model_data, self.arch, outfile, DM=0.0, dmc=0,
+                weights=self.weights, quiet=quiet)
+
+    def show_data_portrait(self, **kwargs):
+        """
+        Show the data portrait.
+
+        See show_portrait(...)
+        """
+        title = "%s Data Portrait"%self.source
+        show_portrait(self.port * self.masks[0,0], self.phases, self.freqs[0],
+                title, True, True, bool(self.bw < 0), **kwargs)
+
+    def show_model_portrait(self, **kwargs):
+        """
+        Show the masked model portrait.
+
+        See show_portrait(...)
+        """
+        if not hasattr(self, 'model'): return None
+        title = "%s Model Portrait"%self.source
+        show_portrait(self.model * self.masks[0,0], self.phases, self.freqs[0],
+                title, True, True, bool(self.bw < 0), **kwargs)
+
+    def show_model_fit(self, **kwargs):
+        """
+        Show the model, data, and residuals.
+
+        See show_residual_plot(...)
+        """
+        if not hasattr(self, 'model'): return None
+        resids = self.port - self.model_masked
+        titles = ("%s"%self.datafile, "%s"%self.model_name, "Residuals")
+        show_residual_plot(self.port, self.model, resids, self.phases,
+                self.freqs[0], titles, bool(self.bw < 0), **kwargs)
+
+
 ###########
 #functions#
 ###########
@@ -373,9 +843,9 @@ def gen_gaussian_portrait(model_code, params, scattering_index, phases, freqs,
                     DM, P, freqs[join_ichan], nu_ref)
     return gport
 
-def build_interp_portrait(mean_prof, freqs, eigvec, tck, nbin=None):
+def gen_interp_portrait(mean_prof, freqs, eigvec, tck, nbin=None):
     """
-    Build an interpolated model portrait from make_interp_model(...) results.
+    Generate an interpolated model portrait from make_interp_model(...) output.
 
     mean_prof is the mean profile.
     freqs are the frequencies at which to build the model.
@@ -2124,7 +2594,7 @@ def read_interp_model(modelfile, freqs=None, nbin=None, quiet=False):
         'tck' tuple containing knot locations, B-spline coefficients, and
         spline degree)
     Otherwise, builds a model based on the input frequencies using the function
-        build_interp_portrait(...).
+        gen_interp_portrait(...).
 
     modelfile is the name of the make_interp_model(...)-type of model file.
     freqs in an array of frequencies at which to build the model; these should
@@ -2145,7 +2615,7 @@ def read_interp_model(modelfile, freqs=None, nbin=None, quiet=False):
         return (modelname, source, datafile, mean_prof, eigvec, tck)
     else:
         return (modelname,
-                build_interp_portrait(mean_prof, freqs, eigvec, tck, nbin))
+                gen_interp_portrait(mean_prof, freqs, eigvec, tck, nbin))
 
 def file_is_type(filename, filetype="ASCII"):
     """
