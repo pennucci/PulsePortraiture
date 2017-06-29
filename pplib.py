@@ -3198,6 +3198,70 @@ def show_portrait(port, phases=None, freqs=None, title=None, prof=True,
     else:
         plt.show()
 
+def show_profiles(data_profiles, model_profiles=None, phases=None, freqs=None,
+        rvrsd=False, fit=False, title=None, fact=0.25, savefig=False):
+    """
+    Show stacked, offset data profiles, with optional overlaid model profiles.
+
+    data_profiles is the nprof(nchan) x nbin array of data profiles.
+    model_profiles is the nprof(nchan) x nbin array of model profiles.
+    phases is the nbin array with phase-bin centers [rot].  Defaults to
+        phase-bin indices.
+    freqs is the nchan array with frequency-channel centers [MHz]. Defaults to
+        frequency-channel indices.
+    rvrsd=True flips the frequency axis.
+    fit=True will fit the model profile to the data profile on a per-profile
+        basis using fit_phase_shift(...).
+    title is a string to be displayed.
+    fact is a scaling factor to increase the separation between profiles.
+    savefig specifies a string for a saved figure; will not show the plot.
+    """
+    if model_profiles is None:
+        model_profiles = np.copy(data_profiles)
+    else: pass
+    if phases is None:
+        phases = np.arange(len(data_profiles[0]))
+        xlabel = "Bin Number"
+    else:
+        xlabel = "Phase [rot]"
+    if freqs is None:
+        freqs = np.arange(len(data_profiles))
+        ylabel = "Approx. Channel Number"
+    else:
+        ylabel = "Approx. Frequency [MHz]"
+    if rvrsd:
+        freqs = freqs[::-1]
+        data_profiles = data_profiles[::-1]
+        model_profiles = model_profiles[::-1]
+
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    off = (data_profiles.max() - data_profiles.min()) * fact
+    for iprof,dprof in enumerate(data_profiles):
+        freq = freqs[iprof]
+        mprof = model_profiles[iprof]
+        if fit and np.any(dprof-mprof):
+            r = fit_phase_shift(dprof, mprof, Ns=100)
+            mprof = r.scale * rotate_profile(mprof, -r.phase)
+        m, = ax.plot(phases, mprof+iprof*off, lw=2, ls='dashed')
+        d, = ax.plot(phases, dprof+iprof*off, lw=2, ls='solid', color=m.get_color())
+    ax.set_xlabel(xlabel)
+    ax.set_yticks(np.arange(len(data_profiles))[::10]*off)
+    ytick_labels = ax.get_yticklabels()
+    ytick_labels = freqs[::10]
+    #ytick_labels = np.linspace(freqs[0], freqs[-1], len(ytick_labels))
+    ytick_labels = map(round, ytick_labels)
+    ytick_labels = map(int, ytick_labels)
+    ytick_labels = map(str, ytick_labels)
+    ax.set_yticklabels(ytick_labels)
+    ax.set_ylabel(ylabel)
+    if title is not None: ax.set_title(title)
+    if savefig:
+        plt.savefig(savefig, format='png')
+        plt.close()
+    else:
+        plt.show()
+
 def show_residual_plot(port, model, resids=None, phases=None, freqs=None,
         titles=(None,None,None), rvrsd=False, colorbar=True, savefig=False,
         aspect="auto", interpolation="none", origin="lower", extent=None,
@@ -3256,7 +3320,8 @@ def show_residual_plot(port, model, resids=None, phases=None, freqs=None,
         ax1.set_title(titles[0])
     ax2 = plt.subplot(grid[:mm, -mm:])
     im = ax2.imshow(model, aspect=aspect, origin=origin, extent=extent,
-            interpolation=interpolation, vmin=im.properties()['clim'], **kwargs)
+            interpolation=interpolation, vmin=im.properties()['clim'],
+            **kwargs)
     if colorbar: plt.colorbar(im, ax=ax2, use_gridspec=False)
     ax2.set_xlabel(xlabel)
     ax2.set_ylabel(ylabel)
@@ -3265,7 +3330,10 @@ def show_residual_plot(port, model, resids=None, phases=None, freqs=None,
     else:
         ax2.set_title(titles[1])
     ax3 = plt.subplot(grid[-mm:, :mm])
-    if resids is None: resids = port - model
+    if resids is None:
+        resids = port - model
+    else:
+        if rvrsd: resids = resids[::-1]
     im = ax3.imshow(resids, aspect=aspect, origin=origin, extent=extent,
             interpolation=interpolation, **kwargs)
     if colorbar: plt.colorbar(im, ax=ax3, use_gridspec=False)
@@ -3288,6 +3356,98 @@ def show_residual_plot(port, model, resids=None, phases=None, freqs=None,
     ax4.set_yticklabels(())
     ax4.set_yticks(())
     #plt.tight_layout(pad=1.0, h_pad=-10.0, w_pad=-10.0)
+    if savefig:
+        plt.savefig(savefig, format='png')
+        plt.close()
+    else:
+        plt.show()
+
+def show_spline_curve_projections(projected_port, tck, freqs, ncoord=None,
+        icoord=None, title=None, savefig=False):
+    """
+    Show projections of the fitted B-spline curve for profile evolution.
+
+    projected_port is the projected portrait of data into the subspace of basis
+        vectors; this is an attribute of a DataPortrait instance once
+        make_interp_model is called.
+    tck is output from si.splprep that parameterizes the B-spline curve; this
+        is an attribute of a DataPortrait instance once make_interp_model is
+        called.
+    freqs is the array of frequencies corresponding to the profile vectors in
+        projected_port.
+    ncoord is the number of coordinates to examine in one plot.  Defaults to
+        all coordinates! 1 <= ncoord <= projected_port.shape[1]
+    icoord is a specific coordinate index to plot as a function of profile
+        index; overrides ncoord. 0 <= icoord <= projected_port.shape[1]
+    title is a string to be displayed.
+    savefig specifies a string for a saved figure; will not show the plot.
+    """
+    nprof,nbin = projected_port.shape
+    if icoord is not None:
+        ncoord = 1
+        if icoord < 0 or icoord > nbin-1:
+            print "0 <= icoord <= projected_port.shape[1] - 1 = %d"%(nbin-1)
+            return 0
+        else:
+            plot_this_coord = icoord
+    elif ncoord == 1: plot_this_coord = 0
+    else: plot_this_coord = None
+    if ncoord < 1 or ncoord > nbin:
+        print "1 <= ncoord <= projected_port.shape[1] = %d"%nbin
+        return 0
+    if ncoord is None: ncoord = nbin
+    if freqs[0] > freqs[-1]: flip = -1 #has negative bandwidth
+    else: flip = 1
+    freqs = np.linspace(freqs.min(), freqs.max(), nprof*10)
+    proj_port_interp = np.array(si.splev(freqs, tck, der=0, ext=0)).T
+
+    size = 3 #inches per plot
+    buff = 1 #inches
+    fig = plt.figure(figsize=((ncoord-1)*size + buff, (ncoord-1)*size + buff))
+    fmt = 'bo'
+    weights = get_noise(projected_port, chans=True)**-1
+    ms = (weights - weights.min())
+    ms /= (ms.max() / 9.0)
+    ms += 1.0 + 3.0
+    alpha = np.linspace(0.25,1.0,nprof)
+    for icoord in range(ncoord):
+        nplot = (ncoord - icoord - 1) #number of plots in the column for icoord
+        if nplot:
+            for iplot in range(ncoord-1)[-nplot:]:
+                ocoord = iplot + 1
+                plot_number = ((ncoord-1) * iplot) + (icoord + 1)
+                ax = fig.add_subplot(ncoord-1, ncoord-1, plot_number)
+                for iprof,prof in enumerate(projected_port):
+                    ax.plot(prof[icoord], prof[ocoord], fmt, ms=ms[iprof],
+                            alpha=alpha[iprof], mew=0.0)
+                ax.plot(projected_port[:,icoord], projected_port[:,ocoord],
+                        color='k', ls='solid', lw=1)
+                ax.plot(proj_port_interp[:,icoord], proj_port_interp[:,ocoord],
+                        color='r', ls='solid', lw=2)
+                if ocoord == ncoord-1: ax.set_xlabel(icoord)
+                else: ax.tick_params(labelbottom=False)
+                if icoord == 0: ax.set_ylabel(ocoord)
+                else: ax.tick_params(labelleft=False)
+        elif plot_this_coord is not None:
+            icoord = plot_this_coord
+            plt.close('all')
+            fig = plt.figure(figsize=(size + 2*buff, size + 2*buff))
+            ax = fig.add_subplot(111)
+            for iprof,prof in enumerate(projected_port):
+                ax.plot(iprof, prof[icoord], fmt, ms=ms[iprof],
+                        alpha=alpha[iprof], mew=0.0)
+            ax.plot(projected_port[:,icoord], color='k', ls='solid', lw=1)
+            ax.plot(np.linspace(0, nprof-1, len(freqs)),
+                    proj_port_interp[:,icoord][::flip], color='r', ls='solid',
+                    lw=2)
+    if ncoord > 1:
+        fig.text(0.025, 0.5, "Coordinate Index", rotation='vertical',
+                ha='center', va='center')
+        fig.text(0.5, 0.025, "Coordinate Index", ha='center', va='center')
+    else:
+        ax.set_xlabel("Profile index")
+        ax.set_ylabel("Coordinate %d"%plot_this_coord)
+    if title is not None: plt.suptitle(title+'\n')
     if savefig:
         plt.savefig(savefig, format='png')
         plt.close()

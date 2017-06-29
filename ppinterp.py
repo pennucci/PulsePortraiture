@@ -67,7 +67,7 @@ class DataPortrait(DataPortrait):
         proj_port = np.dot(eigvec[:,:ncomp].T, delta_port.T).T
         weights = get_noise(proj_port, chans=True)**-1 #See si.splprep docs
         s = len(proj_port) * sfac #Seems to work OK
-        if self.bw < 0: flip = -1
+        if self.bw < 0: flip = -1   #u in si.splprep has to be increasing...
         else: flip = 1
         #Find the B-spline curve traced by the projected vectors, parameterized
         #by frequency
@@ -91,6 +91,7 @@ class DataPortrait(DataPortrait):
         self.eigvec = eigvec
         self.eigval = eigval
         self.mean_prof = mean_prof
+        self.proj_port = proj_port
         self.tck, self.u, self.fp, self.ier, self.msg = tck, u, fp, ier, msg
         if model_name is None: self.model_name = self.datafile + '.interp'
         else: self.model_name = model_name
