@@ -2784,7 +2784,7 @@ def write_archive(data, ephemeris, freqs, nu0=None, bw=None,
     if not quiet: print "\nUnloaded %s.\n"%outfile
 
 def make_fake_pulsar(modelfile, ephemeris, outfile="fake_pulsar.fits", nsub=1,
-        npol=1, nchan=512, nbin=1048, nu0=1500.0, bw=800.0, tsub=300.0,
+        npol=1, nchan=512, nbin=2048, nu0=1500.0, bw=800.0, tsub=300.0,
         phase=0.0, dDM=0.0, start_MJD=None, weights=None, noise_stds=1.0,
         scales=1.0, dedispersed=False, t_scat=0.0, alpha=scattering_alpha,
         scint=False, xs=None, Cs=None, nu_DM=np.inf, state="Stokes", obs="GBT",
@@ -3390,12 +3390,15 @@ def show_spline_curve_projections(projected_port, tck, freqs, ncoord=None,
             return 0
         else:
             plot_this_coord = icoord
-    elif ncoord == 1: plot_this_coord = 0
-    else: plot_this_coord = None
-    if ncoord < 1 or ncoord > nbin:
-        print "1 <= ncoord <= projected_port.shape[1] = %d"%nbin
-        return 0
-    if ncoord is None: ncoord = nbin
+    else:
+        if ncoord is None:
+            ncoord = nbin
+        elif ncoord < 1 or ncoord > nbin:
+            print "1 <= ncoord <= projected_port.shape[1] = %d"%nbin
+            return 0
+        else: pass
+        if ncoord == 1: plot_this_coord = 0
+        else: plot_this_coord = None
     if freqs[0] > freqs[-1]: flip = -1 #has negative bandwidth
     else: flip = 1
     freqs = np.linspace(freqs.min(), freqs.max(), nprof*10)
