@@ -2428,8 +2428,8 @@ def load_data(filename, dedisperse=False, dededisperse=False, tscrunch=False,
         # chan (mean)      = %d\n\
         # subints          = %d\n\
         # unzapped subint  = %d\n\
-        pol'n state        = %s\n"%(P, DM, nu0, abs(bw), nbin, nchan, nchanx,
-                nsub, nsubx, state)
+        pol'n state        = %s\n"%(P, DM, nu0, bw, nbin, nchan, nchanx, nsub,
+                nsubx, state)
     if refresh_arch: arch.refresh()
     if not return_arch: arch = None
     #Return getitem/attribute-accessible class!
