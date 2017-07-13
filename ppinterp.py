@@ -105,7 +105,7 @@ class DataPortrait(DataPortrait):
         """
         of = open(outfile, "wb")
         pickle.dump([self.model_name, self.source, self.datafile,
-            self.mean_prof, self.eigvec[:,:ncomp], self.tck], of)
+            self.mean_prof, self.eigvec[:,:self.ncomp], self.tck], of)
         of.close()
         if not quiet:
             print "Wrote modelfile %s."%outfile
