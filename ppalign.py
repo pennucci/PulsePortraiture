@@ -69,8 +69,8 @@ def check_if_Stokes(metafile):
             return False
 
 def align_archives(metafile, initial_guess, tscrunch=False, pscrunch=True,
-        outfile=None, norm=None, rot_phase=0.0, place=None, niter=1,
-        quiet=False):
+        SNR_cutoff=0.0, outfile=None, norm=None, rot_phase=0.0, place=None,
+        niter=1, quiet=False):
     """
     Iteratively align and average archives.
 
@@ -87,6 +87,7 @@ def align_archives(metafile, initial_guess, tscrunch=False, pscrunch=True,
     pscrunch=False will average the available polarizations as well as average
         intensity.  Alignment and weighting is still performed only via the
         total intensity portrait.
+    SNR_cutoff is used to filter out low S/N archives from the average.
     outfile is the name of the output archive; defaults to
         <metafile>.algnd.fits.
     norm is the normalization method (None, 'mean', 'max', 'rms', or 'abs')
@@ -122,6 +123,7 @@ def align_archives(metafile, initial_guess, tscrunch=False, pscrunch=True,
                     rm_baseline=True, flux_prof=False, refresh_arch=False,
                     return_arch=False, quiet=load_quiet)
             if data.nbin != model_data.nbin: continue
+            if data.prof_SNR < SNR_cutoff: continue
             try:
                 freq_diffs = data.freqs - model_data.freqs
                 if freq_diffs.min() == freq_diffs.max() == 0.0:
@@ -243,6 +245,10 @@ if __name__ == "__main__":
                       default=True,
                       action="store_false", dest="pscrunch",
                       help="Output averaged polarizations, not just total intensity.")
+    parser.add_option("-C", "--cutoff",
+                      default=0.0,
+                      action="store", metavar="SNR_cutoff", dest="SNR_cutoff",
+                      help="S/N ratio cutoff to apply to input archives. [default=0.0]")
     parser.add_option("-o", "--outfile",
                       default=None,
                       action="store", metavar="outfile", dest="outfile",
@@ -306,9 +312,9 @@ if __name__ == "__main__":
         rm = True
     if check_if_Stokes(metafile) or pscrunch:
         align_archives(metafile, initial_guess=initial_guess,
-                tscrunch=tscrunch, pscrunch=pscrunch, outfile=outfile,
-                norm=norm, rot_phase=rot_phase, place=place, niter=niter,
-                quiet=quiet)
+                tscrunch=tscrunch, pscrunch=pscrunch, SNR_cutoff=SNR_cutoff,
+                outfile=outfile, norm=norm, rot_phase=rot_phase, place=place,
+                niter=niter, quiet=quiet)
         if smooth:
             if outfile is None:
                 outfile = metafile + ".algnd.fits"
