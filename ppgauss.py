@@ -572,6 +572,7 @@ class GaussianSelector:
         postfit_buff = 0.1
         if self.fit_scattering: prefit_buff = 1.0
         ymin,ymax = plt.ylim()
+        ymin = params[0] - prefit_buff*(self.profile.max()-self.profile.min())
         ymax = self.profile.max() + prefit_buff * \
                 (self.profile.max()-self.profile.min())
         plt.ylim(ymin, ymax)

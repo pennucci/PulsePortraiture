@@ -292,6 +292,7 @@ if __name__ == "__main__":
     initial_guess = options.initial_guess
     tscrunch = options.tscrunch
     pscrunch = options.pscrunch
+    SNR_cutoff = float(options.SNR_cutoff)
     outfile = options.outfile
     palign = options.palign
     norm = options.norm
