@@ -186,8 +186,8 @@ class GetTOAs:
             if source is None: source = "noname"
             if not len(ok_isubs):
                 if not quiet:
-                    print "No subints to fit for %s.  Exiting!"%datafile
-                sys.exit()
+                    print "No subints to fit for %s."%datafile
+                continue
             #Observation info
             obs = DataBunch(telescope=telescope, backend=backend,
                     frontend=frontend, tempo_code=tempo_code)
