@@ -732,7 +732,7 @@ if __name__ == "__main__":
                       help="Automatically fit one Gaussian to initial profile with initial width [rot] given as the argument. Not used with -I. [default=False]")
     parser.add_option("--norm", metavar="normalize",
                       action="store", dest="normalize", default=None,
-                      help="Normalize each channel's profile by either mean, max, off-pulse noise, or sqrt{vector modulus} ('mean', 'max', 'rms', 'abs').")
+                      help="Normalize each channel's profile by either mean, max, mean profile, off-pulse noise, or sqrt{vector modulus} ('mean', 'max', 'prof', 'rms', 'abs').")
     parser.add_option("--figure", metavar="figurename",
                       action="store", dest="figure", default=False,
                       help="Save PNG figure of final fit to figurename. [default=Not saved]")

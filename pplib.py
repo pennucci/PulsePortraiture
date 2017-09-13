@@ -147,7 +147,8 @@ class DataPortrait(object):
     an interactive python environment.
     """
 
-    def __init__(self, datafile=None, joinfile=None, quiet=False):
+    def __init__(self, datafile=None, joinfile=None, quiet=False,
+            **load_data_kwargs):
         """
         Unpack all of the data and set initial attributes.
 
@@ -195,8 +196,8 @@ class DataPortrait(object):
             for ifile in range(len(self.datafiles)):
                 datafile = self.datafiles[ifile]
                 data = load_data(datafile, dedisperse=True, tscrunch=True,
-                        pscrunch=True, fscrunch=False, rm_baseline=True,
-                        flux_prof=True, return_arch=True, quiet=quiet)
+                        pscrunch=True, fscrunch=False, flux_prof=True,
+                        return_arch=True, quiet=quiet, **load_data_kwargs)
                 self.nchan += data.nchan
                 self.nchanx += len(data.ok_ichans[0])
                 if ifile == 0:
@@ -299,8 +300,8 @@ class DataPortrait(object):
             self.datafile = datafile
             self.data = load_data(datafile, dedisperse=True,
                     dededisperse=False, tscrunch=True, pscrunch=True,
-                    fscrunch=False, rm_baseline=True, flux_prof=True,
-                    refresh_arch=True, return_arch=True, quiet=quiet)
+                    fscrunch=False, flux_prof=True, refresh_arch=True,
+                    return_arch=True, quiet=quiet, **load_data_kwargs)
             #Unpack the data dictionary into the local namespace;
             #see load_data for dictionary keys.
             for key in self.data.keys():
@@ -372,31 +373,36 @@ class DataPortrait(object):
             self.noise_stdsxs *= 0.0
             self.noise_stds[0,0,ichan] *= 0.0
 
-    def normalize_portrait(self, method="mean"):
+    def normalize_portrait(self, method="rms"):
         """
         Normalize each profile.
 
-        method is either "mean", "max", "rms", or "abs".
+        method is either "mean", "max", "prof", "rms", or "abs".
             if "mean", then normalize by the profile mean (flux).
             if "max", then normalize by the profile maximum.
+            if "prof", then normalize by the mean profile.
             if "rms", then normalize by the noise level, such that
                 get_noise(profile) = 1.
             if "abs", then normalize such that each profile would have the same
                 'length' in an nbin vector space.
         """
-        if method not in ("mean", "max", "rms", "abs"):
+        if method not in ("mean", "max", "prof", "rms", "abs"):
             print "Unknown method for normalize_portrait, '%s'"%method
             return 1
         else:
             #Full portrait
             self.norm_values = np.ones(len(self.port))
             self.unnorm_noise_stds = np.copy(self.noise_stds)
+            if method == "prof": mean_prof = self.portx.mean(axis=0)
             for ichan in range(len(self.port)):
                 if self.port[ichan].any():
                     if method == "mean":
                         norm = self.port[ichan].mean()
                     elif method == "max":
                         norm = self.port[ichan].max()
+                    elif method == "prof":
+                        norm = fit_phase_shift(self.port[ichan],
+                                mean_prof).scale
                     elif method == "rms":
                         norm = get_noise(self.port[ichan])
                     else:
@@ -413,6 +419,8 @@ class DataPortrait(object):
                     norm = self.portx[ichanx].mean()
                 elif method == "max":
                     norm = self.portx[ichanx].max()
+                elif method == "prof":
+                    norm = fit_phase_shift(self.portx[ichanx], mean_prof).scale
                 elif method == "rms":
                     norm = get_noise(self.portx[ichanx])
                 else:
@@ -1366,7 +1374,8 @@ def find_kc(pows, errs=1.0, fn='exp_dc'):
     else:
         return len(data)-1
 
-def pca(port, mean_prof=None, ncomp=None, eigfac=1.0, quiet=False):
+def pca(port, mean_prof=None, weights=None, ncomp=None, eigfac=1.0,
+        quiet=False):
     """
     Compute the pricinpal components of port and reconstruct port.
 
@@ -1378,6 +1387,8 @@ def pca(port, mean_prof=None, ncomp=None, eigfac=1.0, quiet=False):
         are interpreted as nmeasurements of nvariables, respectively.
     mean_prof is an nbin array of the mean profile to be subtracted; if None,
         an unweighted average is used.
+    weights are the nchan weights passed to np.cov as 'aweights' for the
+        construction of the covariance matrix.
     ncomp is the number of principal components to use in the reconstruction of
         port.  If None, then ncomp is the smallest number of eigenvectors whose
         eigenvalues sum to > eigfac*sum(eigenvalues).  For eigfac=1.0, this
@@ -1397,8 +1408,9 @@ def pca(port, mean_prof=None, ncomp=None, eigfac=1.0, quiet=False):
     delta_port = port - mean_prof
 
     #Compute covariance matrix.
-    #cov = np.cov(port.T)
-    cov = np.cov(delta_port.T) #Shouldn't matter if using centered data or not?
+    #cov = np.cov(port.T, aweights=weights)
+    #Shouldn't matter if using centered data or not?
+    cov = np.cov(delta_port.T, aweights=weights)
 
     #Compute eigenvalues/vectors of cov, and order them.
     eigval, eigvec = np.linalg.eigh(cov)
@@ -1424,6 +1436,7 @@ def wavelet_smooth(port, wave='db8', nlevel=5, threshtype='hard', fact=0.4):
     wave is the type of mother wavelet [default=Daubechies 8].
     nlevel is the integer number of decomposition levels (5-6 typical).
     threshtype is the type of wavelet thresholding ('hard' or 'soft').
+    fact is a fudge factor that scales the threshold value.
 
     Written mostly by EF.
     """
@@ -3362,8 +3375,8 @@ def show_residual_plot(port, model, resids=None, phases=None, freqs=None,
     else:
         plt.show()
 
-def show_spline_curve_projections(projected_port, tck, freqs, ncoord=None,
-        icoord=None, title=None, savefig=False):
+def show_spline_curve_projections(projected_port, tck, freqs, weights=None,
+        ncoord=None, icoord=None, title=None, savefig=False):
     """
     Show projections of the fitted B-spline curve for profile evolution.
 
@@ -3375,6 +3388,7 @@ def show_spline_curve_projections(projected_port, tck, freqs, ncoord=None,
         called.
     freqs is the array of frequencies corresponding to the profile vectors in
         projected_port.
+    weights is the nchan weights used in the spline fit; defaults to ones.
     ncoord is the number of coordinates to examine in one plot.  Defaults to
         all coordinates! 1 <= ncoord <= projected_port.shape[1]
     icoord is a specific coordinate index to plot as a function of profile
@@ -3408,7 +3422,7 @@ def show_spline_curve_projections(projected_port, tck, freqs, ncoord=None,
     buff = 1 #inches
     fig = plt.figure(figsize=((ncoord-1)*size + buff, (ncoord-1)*size + buff))
     fmt = 'bo'
-    weights = get_noise(projected_port, chans=True)**-1
+    if weights is None: weights = np.ones(len(projected_port))
     ms = (weights - weights.min())
     ms /= (ms.max() / 9.0)
     ms += 1.0 + 3.0
