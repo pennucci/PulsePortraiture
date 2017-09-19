@@ -677,6 +677,31 @@ def get_WRMS(data, errs=1.0):
     w_sum = (errs[iis]**-2.0).sum()
     return (d_sum / w_sum)**0.5
 
+def get_red_chi2(data, model, errs=None, dof=None):
+    """
+    Return reduced chi-squared given input data and model.
+
+    data is a 1- or 2-D array of data values.
+    model is a 1- or 2-D array of model values.
+    errs is a value or 1-D array of '1-sigma' uncertainties on the data.  If
+        None, errs is estimated using get_noise(data).
+    dof is an integer number of degrees of freedom.  If None, dof =
+            sum(data.shape).
+    """
+    resids = data - model
+    if errs is None:
+        if len(data.shape) == 1: errs = get_noise(data)
+        elif len(data.shape) == 2: errs = get_noise(data, chans=True)
+        else:
+            print "Can only handle 1- or 2-D input."
+    if dof is None: dof = sum(data.shape)
+    if len(data.shape) == 1:
+        red_chi2 = np.sum((resids/errs)**2.0) / dof
+    else:
+        red_chi2 = np.array([(resids[ii]/errs[ii])**2.0 for ii in
+            range(len(resids))]).sum() / dof
+    return red_chi2
+
 def gaussian_function(xs, loc, wid, norm=False):
     """
     Evaluates a Gaussian function with parameters loc and wid at values xs.
@@ -1374,7 +1399,7 @@ def find_kc(pows, errs=1.0, fn='exp_dc'):
     else:
         return len(data)-1
 
-def pca(port, mean_prof=None, weights=None, ncomp=None, eigfac=1.0,
+def pca(port, mean_prof=None, weights=None, ncomp=None, awid=0.0025,
         quiet=False):
     """
     Compute the pricinpal components of port and reconstruct port.
@@ -1390,10 +1415,14 @@ def pca(port, mean_prof=None, weights=None, ncomp=None, eigfac=1.0,
     weights are the nchan weights passed to np.cov as 'aweights' for the
         construction of the covariance matrix.
     ncomp is the number of principal components to use in the reconstruction of
-        port.  If None, then ncomp is the smallest number of eigenvectors whose
-        eigenvalues sum to > eigfac*sum(eigenvalues).  For eigfac=1.0, this
-        uses all eigenvectors; i.e., it returns an identical reconstruction.
-    eigfac determines ncomp if ncomp is None.
+        port.  If None, ncomp is the largest number of consecutive eigenvectors
+        that have an autocorrelation displaying a main peak that has a width
+        at 10% maximum greater than awid [rot].  ncomp = 0 will return a
+        portrait with just the mean profile.
+    awid [rot] determines ncomp if ncomp is None.  Default is 0.25% of a
+        rotation, or about 5 phase bins for a 2048 phase bin profile.  For
+        awid=0.0, this uses all eigenvectors; i.e., it returns an identical
+        reconstruction.
     quiet=True suppresses output.
 
     Written mostly by EF.
@@ -1401,7 +1430,11 @@ def pca(port, mean_prof=None, weights=None, ncomp=None, eigfac=1.0,
 
     nmes,ndim = port.shape #nchan x nbin
 
-    print "Performing principal component analysis on data with %d dimensions and %d measurements..." %(ndim,nmes)
+    if ncomp is not None and (ncomp < 0 or ncomp > ndim):
+        print "Bad ncomp for pca."
+        return 0
+
+    if not quiet: print "Performing principal component analysis on data with %d dimensions and %d measurements..." %(ndim,nmes)
 
     #Subtract average from each set of measurements.
     if mean_prof is None: mean_prof = port.mean(axis=0)
@@ -1419,14 +1452,21 @@ def pca(port, mean_prof=None, weights=None, ncomp=None, eigfac=1.0,
 
     #Reconstruct port projected into space of ncomp principal components.
     if ncomp is None:
-        ncomp = 1
-        while (eigval[:ncomp].sum() < eigfac * eigval[:].sum()): ncomp += 1
+        ncomp = 0
+        while(1):
+            ev = eigvec.T[ncomp]
+            acorr = np.correlate(ev, ev, mode="full")
+            bins = np.where(acorr > 0.1*acorr.max())[0]
+            wid = bins.max() - bins.min()
+            if wid > int(awid*ndim): ncomp += 1
+            else: break
+            if ncomp == ndim - 1: break
     some_eigvec = eigvec[:,:ncomp]
     reconst_port = np.dot(some_eigvec, np.dot(some_eigvec.T, delta_port.T)).T \
             + mean_prof
     return ncomp, reconst_port, eigvec, eigval
 
-def wavelet_smooth(port, wave='db8', nlevel=5, threshtype='hard', fact=0.4):
+def wavelet_smooth(port, wave='db8', nlevel=5, threshtype='hard', fact=1.0):
     """
     Compute the wavelet-denoised version of a portrait or profile.
 
@@ -1469,6 +1509,54 @@ def wavelet_smooth(port, wave='db8', nlevel=5, threshtype='hard', fact=0.4):
         smooth_port[ichan] = pw.iswt(map(tuple, coeffs), wave)
     
     #Return smoothed portrait
+    if one_prof:
+        return smooth_port[0]
+    else:
+        return smooth_port
+
+def smart_smooth(port, try_nlevels=8, errs=None, **kwargs):
+    """
+    Attempt to use wavelet_smooth(...) in a smart, iterative but automated way.
+
+    For each profile in port, and for each of try_nlevels, a smooth profile is
+        generated with wavelet_smooth(...) and a reduced chi-squared value is
+        calculated using get_red_chi2(...).  The returned profile is the one
+        with the smallest reduced chi-squared value >= 1.0.
+
+    port is a nchan x nbin array, or a single profile array of length nbin.
+    try_nlevels is the number of levels to try in wavelet_smooth.  A value of
+        0 returns the port as is.  nlevels cannot be higher than 11 so
+        try_nlevels <= 11.
+    errs is a value or a 1-D array of '1-sigma' uncertainties on the data,
+        which is passed to get_red_chi2(...).  If None, errs is estimated using
+        get_noise(data).
+    **kwargs are passed to wavelet_smooth(...)
+    """
+    if try_nlevels == 0: return port
+    try:
+        nchan,nbin = port.shape
+        one_prof = False
+    except:
+        port = np.array([port])
+        nchan,nbin = port.shape
+        one_prof = True
+    smooth_port = np.zeros(port.shape)
+    for iprof, prof in enumerate(port):
+        nlevel = 1
+        smooth_prof = wavelet_smooth(prof, nlevel=nlevel, **kwargs)
+        old_red_chi2 = get_red_chi2(prof, smooth_prof, errs)
+        nlevel += 1
+        while (nlevel <= try_nlevels):
+            smooth_prof = wavelet_smooth(prof, nlevel=nlevel, **kwargs)
+            red_chi2 = get_red_chi2(prof, smooth_prof, errs)
+            if red_chi2 < 1.0:
+                old_red_chi2 = red_chi2
+                nlevel += 1
+            elif red_chi2 < old_red_chi2:
+                old_red_chi2 = red_chi2
+                nlevel += 1
+            else: break
+        smooth_port[iprof] = wavelet_smooth(prof, nlevel=nlevel-1, **kwargs)
     if one_prof:
         return smooth_port[0]
     else:

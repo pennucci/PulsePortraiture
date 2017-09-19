@@ -90,8 +90,8 @@ def align_archives(metafile, initial_guess, tscrunch=False, pscrunch=True,
     SNR_cutoff is used to filter out low S/N archives from the average.
     outfile is the name of the output archive; defaults to
         <metafile>.algnd.fits.
-    norm is the normalization method (None, 'mean', 'max', 'rms', or 'abs')
-        applied to the final data.
+    norm is the normalization method (None, 'mean', 'max', 'prof', 'rms', or
+        'abs') applied to the final data.
     rot_phase is an overall rotation to be applied to the final output archive.
     place is a phase value at which to roughly place the peak pulse; it
         overrides rot_phase.
@@ -181,7 +181,10 @@ def align_archives(metafile, initial_guess, tscrunch=False, pscrunch=True,
         model_port = aligned_port[0]
         niter -= 1
         count += 1
-    if norm in ("mean", "max", "rms", "abs"):
+    if norm in ("mean", "max", "prof", "rms", "abs"):
+        if norm == "prof":
+            ok_ichans = np.where(aligned_port.sum(axis=1) != 0.0)[0]
+            mean_prof = aligned_port[ok_ichans].mean(axis=0)
         for ipol in range(npol):
             for ichan in range(nchan):
                 if aligned_port[ipol,ichan].any():
@@ -189,6 +192,9 @@ def align_archives(metafile, initial_guess, tscrunch=False, pscrunch=True,
                         norm_val = aligned_port[ipol,ichan].mean()
                     elif norm == "max":
                         norm_val = aligned_port[ipol,ichan].max()
+                    elif norm == "prof":
+                        norm_val = fit_phase_shift(aligned_port[ipol,ichan],
+                                mean_prof).scale
                     elif norm == "rms":
                         norm_val = get_noise(aligned_port[ipol,ichan])
                     else:
