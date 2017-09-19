@@ -143,7 +143,7 @@ class DataPortrait(DataPortrait):
         Write the output (pickle file) model to outfile.
         """
         of = open(outfile, "wb")
-        if hasattr(self, smooth_eigvec):
+        if hasattr(self, "smooth_eigvec"):
             pickle.dump([self.model_name, self.source, self.datafile,
                 self.smooth_mean_prof, self.smooth_eigvec[:,:self.ncomp],
                 self.tck], of)
