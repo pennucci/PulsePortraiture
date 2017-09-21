@@ -136,7 +136,7 @@ class DataPortrait(DataPortrait):
             if proj_port.sum():
                 print "B-spline interpolation model %s uses %d basis profile components."%(self.model_name, ncomp)
             else:
-                print "There are zero significant eigenvectors.  B-spline interpolation model %s returns average profile."%self.model_name
+                print "B-spline interpolation model %s uses %d basis profile components; it returns the average profile."%(self.model_name, ncomp)
 
     def write_model(self, outfile, quiet=False):
         """
