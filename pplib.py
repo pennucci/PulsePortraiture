@@ -3299,8 +3299,9 @@ def show_portrait(port, phases=None, freqs=None, title=None, prof=True,
     else:
         plt.show()
 
-def show_profiles(data_profiles, model_profiles=None, phases=None, freqs=None,
-        rvrsd=False, fit=False, title=None, fact=0.25, savefig=False):
+def show_stacked_profiles(data_profiles, model_profiles=None, phases=None,
+        freqs=None, rvrsd=False, fit=False, title=None, fact=0.25,
+        savefig=False):
     """
     Show stacked, offset data profiles, with optional overlaid model profiles.
 
@@ -3362,6 +3363,19 @@ def show_profiles(data_profiles, model_profiles=None, phases=None, freqs=None,
         plt.close()
     else:
         plt.show()
+
+def show_profiles(model, cmap=plt.cm.Spectral, s=1, offset=None):
+    """
+    """
+    model_min = model.min()
+    model_max = model.max()
+    model_range = model_max - model_min
+    phases = get_bin_centers(len(model[0]))
+    if offset is None: offset = model_range / float(len(model))
+    for iprof,prof in enumerate(model):
+        norm_prof = (prof - model_min) / model_range
+        c = cmap(norm_prof)
+        plt.scatter(phases, prof + (offset*iprof), c=c, edgecolor='none', s=s)
 
 def show_residual_plot(port, model, resids=None, phases=None, freqs=None,
         titles=(None,None,None), rvrsd=False, colorbar=True, savefig=False,
@@ -3462,18 +3476,6 @@ def show_residual_plot(port, model, resids=None, phases=None, freqs=None,
         plt.close()
     else:
         plt.show()
-
-def show_model_profiles(model, cmap=plt.cm.Spectral, s=1, offset=None):
-    """
-    """
-    model_min = model.min()
-    model_max = model.max()
-    model_range = model_max - model_min
-    if offset is None: offset = model_range / float(len(model))
-    for iprof,prof in enumerate(model):
-        norm_prof = (prof - model_min) / model_range
-        c = cmap(norm_prof)
-        plt.scatter(phases, prof + (offset*iprof), c=c, edgecolor='none', s=s)
 
 def show_spline_curve_projections(projected_port, tck, freqs, weights=None,
         ncoord=None, icoord=None, title=None, savefig=False):
