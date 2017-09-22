@@ -20,17 +20,20 @@ The technical description of this work is:
 
 Requirements:
     -PSRCHIVE, compiled with the python-interface enabled,
-    -at least numpy 1.7.1 & scipy 0.12.0, and
-    -lmfit is required for portrait modelling.
+    -numpy & scipy, and
+    -lmfit is required for Gaussian portrait modelling.
 
 In short:
     -pplib contains all functions and classes needed for the fitting scripts.
-    -ppgauss is a command-line utility to build gaussian-component model
+    -ppinterp is a command-line utility to build smoothly varying model
+        portraits based on PCA decomposition, wavelet smoothing, and B-spline
+        interpolation between the components.
+    -ppgauss is a command-line utility to build Gaussian-component model
         portraits.
     -pptoas is a command-line utility to measure TOAs and DMs.
     -ppalign is a command-line utility to average homogeneous data by measuring
         phases and DMs.
-    -Both ppgauss and pptoas can be imported into ipython for additional
+    -The command-line programs can be imported into ipython for additional
         flexibility of use.
     -***See examples/README for simple command-line use.***
     -Run and examine examples/example.py for a more in-depth demonstration.

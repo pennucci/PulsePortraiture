@@ -27,7 +27,7 @@ class DataPortrait(DataPortrait):
         modeling profile evolution with a B-spline curve.
     """
 
-    def make_interp_model(self, ncomp=None, awid=0.0025, smooth=False, k=3,
+    def make_interp_model(self, ncomp=None, awid=0.0025, smooth=True, k=3,
             sfac=1.0, model_name=None, quiet=False):
         """
         Make a model based on PCA and B-spline interpolation.
@@ -136,7 +136,7 @@ class DataPortrait(DataPortrait):
             if proj_port.sum():
                 print "B-spline interpolation model %s uses %d basis profile components."%(self.model_name, ncomp)
             else:
-                print "B-spline interpolation model %s uses %d basis profile components; it returns the average profile."%(self.model_name, ncomp)
+                print "B-spline interpolation model %s uses 0 basis profile components; it returns the average profile."%(self.model_name)
 
     def write_model(self, outfile, quiet=False):
         """

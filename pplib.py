@@ -3364,8 +3364,15 @@ def show_stacked_profiles(data_profiles, model_profiles=None, phases=None,
     else:
         plt.show()
 
-def show_profiles(model, cmap=plt.cm.Spectral, s=1, offset=None):
+def show_profiles(model, cmap=plt.cm.Spectral, s=1, offset=None, **kwargs):
     """
+    Show stacked profiles colored by amplitude; good for displaying models.
+
+    model is an nchan x nbin array of profiles to display.
+    cmap is a matplotlib.colormap instance.
+    s is the marker size in squared points.
+    offset=None calculates the offset between profiles.
+    **kwargs gets passed to plt.scatter(...).
     """
     model_min = model.min()
     model_max = model.max()
@@ -3375,7 +3382,8 @@ def show_profiles(model, cmap=plt.cm.Spectral, s=1, offset=None):
     for iprof,prof in enumerate(model):
         norm_prof = (prof - model_min) / model_range
         c = cmap(norm_prof)
-        plt.scatter(phases, prof + (offset*iprof), c=c, edgecolor='none', s=s)
+        plt.scatter(phases, prof + (offset*iprof), c=c, edgecolor='none', s=s,
+                **kwargs)
 
 def show_residual_plot(port, model, resids=None, phases=None, freqs=None,
         titles=(None,None,None), rvrsd=False, colorbar=True, savefig=False,
@@ -3524,10 +3532,12 @@ def show_spline_curve_projections(projected_port, tck, freqs, weights=None,
     buff = 1 #inches
     fig = plt.figure(figsize=((ncoord-1)*size + buff, (ncoord-1)*size + buff))
     fmt = 'bo'
-    if weights is None: weights = np.ones(len(projected_port))
-    ms = (weights - weights.min())
-    ms /= (ms.max() / 9.0)
-    ms += 1.0 + 3.0
+    if weights is None:
+        ms = np.ones(len(projected_port)) + 3.0
+    else:
+        ms = (weights - weights.min())
+        ms /= (ms.max() / 9.0)
+        ms += 1.0 + 3.0
     alpha = np.linspace(0.25,1.0,nprof)
     for icoord in range(ncoord):
         nplot = (ncoord - icoord - 1) #number of plots in the column for icoord

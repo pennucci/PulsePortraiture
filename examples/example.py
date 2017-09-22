@@ -3,13 +3,18 @@
 import os
 from pplib import *
 
+
 #Use example.gmodel and example.par to design a fake pulsar
 modelfile = "example.gmodel"
 ephemeris = "example.par"
 
+
+#Choose which modeling program to use
+model_with = "ppinterp" #"ppinterp" or "ppgauss"
+
+
 #Generate some fake datafiles
 #These files will be homogenous, even though they don't need to be
-
 nfiles = 2       #Number of datafiles/epochs
 MJD0 = 50000.00  #Start day [MJD]
 days = 20.0      #Days between epochs
@@ -20,7 +25,7 @@ nbin = 512       #Number of phase bins
 nu0 = 1500.0     #Center of the band [MHz]
 bw = 800.0       #Bandwidth [MHz]
 tsub = 60.0      #Length of subintegration [s]
-noise_std = 2.75 #Noise level of the band, per subintegration [flux units]
+noise_std = 1.75 #Noise level of the band, per subintegration [flux units]
 dDM_mean = 3e-4  #Add in random dispersion measure offsets with this mean value
 dDM_std = 2e-4   #Add in random dispersion measure offsets with this std
 dDMs = np.random.normal(dDM_mean, dDM_std, nfiles)
@@ -31,7 +36,6 @@ scint = True     #Add random scintillation
 #Adding/fitting scattering to the fake data may slow down the fit:
 fitscat = True   #Fit scattering timescale
 fitalpha = False #Fit the scattering index
-
 weights = np.ones([nsub, nchan]) #Change if you want to have an "RFI" mask
                                  #e.g. band edges zapped:
                                  #weights[:,:10] = 0 ; weights[:,-10:] = 0
@@ -52,6 +56,7 @@ for ifile in range(nfiles):
     #NB: the input parfile for fake data cannot yet have binary parameters
 os.system('psredit -q -m -c rcvr:name="fake_rx" -c be:name="fake_be" example-*.fits')
 
+
 #Here we build an average portrait from the data
 if nfiles > 1:
     import ppalign as pa
@@ -64,39 +69,65 @@ if nfiles > 1:
     #...or you could use PSRCHIVE's psradd to get a high SNR portrait.
     #os.system("psradd -T -P -E %s -M %s -o %s"%(ephemeris, metafile, outfile))
 
-#Now we want to "build" our gaussian model from the data
-print "Running ppgauss.py to fit a gaussian model..."
-import ppgauss as pg
+
+#Now we want to "build" our model from the data...
 if nfiles > 1: datafile = "example.port"
 else: datafile = "example-1.fits"
-#Initiate Class instance
-dp = pg.DataPortrait(datafile)
-#Have a look at the data you're fitting
-dp.show_data_portrait()
-#Fit a model; see ppgauss.py for all options
-dp.make_gaussian_model(ref_prof=(nu0, bw/4), fixloc=True, fixscat=not(fitscat),
-        fixalpha=not(fitalpha), niter=3, fiducial_gaussian=True,
-        writemodel=True, outfile="example-fit.gmodel", writeerrfile=True,
-        model_name="example-fit", residplot="example-fit.png", quiet=False)
-#You can always then continue iterations using the ppgauss option -I or by:
-#niter = # 
-#modelfile = example-fit.gmodel
-#dp.make_gaussian_model(modelfile, niter=niter)
-#You can check this fitted model against the "input" true model example.gmodel,
-#assuming the reference frequencies are the same.
+norm = "prof" #Normalization method
+
+#...with ppinterp...
+if not model_with == "ppgauss":
+    print "Running ppinterp.py to fit a PCA/B-spline model..."
+    import ppinterp as ppi
+    fitted_modelfile = "example-fit.spl"
+    #Initial Class instance
+    dp = ppi.DataPortrait(datafile)
+    dp.normalize_portrait(norm)
+    #Have a look at the data you're fitting
+    dp.show_data_portrait()
+    dp.make_interp_model(ncomp=None, awid=0.0025, smooth=True, k=3,
+            sfac=1.0, model_name="example-fit", quiet=False)
+    show_spline_curve_projections(dp.proj_port, dp.tck, dp.freqsxs[0],
+            weights=dp.noise_stdsxs, ncoord=min(dp.proj_port.shape[-1],3))
+    plt.show()
+    dp.write_model(fitted_modelfile, quiet=False)
+
+#...or using ppgauss...
+else:
+    print "Running ppgauss.py to fit a gaussian model..."
+    import ppgauss as ppg
+    fitted_modelfile = "example-fit.gmodel"
+    #Initiate Class instance
+    dp = ppg.DataPortrait(datafile)
+    dp.normalize_portrait(norm)
+    #Have a look at the data you're fitting
+    dp.show_data_portrait()
+    #Fit a model; see ppgauss.py for all options
+    dp.make_gaussian_model(ref_prof=(nu0, bw/4), fixloc=True,
+            fixscat=not(fitscat), fixalpha=not(fitalpha), niter=3,
+            fiducial_gaussian=True, writemodel=True, outfile=fitted_modelfile,
+            writeerrfile=True, model_name="example-fit",
+            residplot=None, quiet=False)
+    #You can always then continue iterations using the ppgauss option -I or by:
+    #niter = #
+    #modelfile = example-fit.gmodel
+    #dp.make_gaussian_model(modelfile, niter=niter)
+    #You can check this fitted model against the "input" true model
+    #example.gmodel, assuming the reference frequencies are the same.
+dp.show_model_fit()
 
 #Now we would measure TOAs and DMs
 print "Running pptoas.py to fit TOAs and DMs..."
-import pptoas as pt
+import pptoas as ppt
 #Set the DM to which the offsets are referenced (e.g. from the input ephemeris)
 i,o = os.popen4("grep DM %s"%ephemeris)
 DM0 = float(o.readline().split()[1])
 #Initiate Class instance; one could also use a smoothed average of the data
 #as a model instead of the analytic gaussian model
-gt = pt.GetTOAs(metafile, "example-fit.gmodel")
+gt = ppt.GetTOAs(metafile, fitted_modelfile)
 gt.get_TOAs(DM0=DM0)
 #Show results from first datafile
-gt.show_results()
+#gt.show_results()
 #Show typical fit
 gt.show_fit()
 #Write TOAs
@@ -106,7 +137,7 @@ write_TOAs(gt.TOA_list, format="tempo2", outfile="example.tim", append=False)
 #print "Injected DMs, mean, std:"
 #print dDMs, dDM_mean, dDM_std
 #print "Measured average DM offsets, mean, std:"
-dDM_fit = pt.np.array(gt.DeltaDM_means)
+dDM_fit = ppt.np.array(gt.DeltaDM_means)
 #print dDM_fit, dDM_fit.mean(), dDM_fit.std()
 diff = dDMs - dDM_fit
 #print "Difference, mean, std:"
