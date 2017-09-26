@@ -27,21 +27,16 @@ class DataPortrait(DataPortrait):
         modeling profile evolution with a B-spline curve.
     """
 
-    def make_interp_model(self, ncomp=None, awid=0.0025, smooth=True, k=3,
-            sfac=1.0, model_name=None, quiet=False):
+    def make_interp_model(self, ncomp=None, smooth=True, k=3, sfac=1.0,
+            model_name=None, quiet=False):
         """
         Make a model based on PCA and B-spline interpolation.
 
         ncomp is the number of PCA components to use in the B-spline
             parameterization; ncomp <= 10.  If None, ncomp is the largest
-            number of consecutive eigenvectors that have an autocorrelation
-            displaying a main peak that has a width at 10% maximum greater than
-            awid [rot].  ncomp = 0 will return a portrait with just the mean
-            profile.
-        awid [rot] determines ncomp if ncomp is None.  Default is 0.25% of a
-            rotation, or about 5 phase bins for a 2048 phase bin profile.  For
-            awid=0.0, this uses all eigenvectors; i.e., it returns an identical
-            reconstruction.
+            number of consecutive eigenvectors that, after being smoothed, have
+            a non-zero autocorrelation.  ncomp = 0 will return a portrait with
+            just the mean profile.
         smooth=True will smooth the eigenvectors and mean profile using
             wavelet_smooth and a reduced chi2 figure-of-merit.
         k is the degree of the spline; cubic splines (k=3) recommended;
@@ -57,13 +52,13 @@ class DataPortrait(DataPortrait):
         #Definitions
         port = self.portx
         pca_weights = self.noise_stdsxs**-2
-        mean_prof = np.average(port, axis=0) #Seems to work best
+        mean_prof = port.mean(axis=0) #Seems to work best
         freqs = self.freqsxs[0]
         nu_lo = freqs.min()
         nu_hi = freqs.max()
         #Do principal component analysis
         ncomp, reconst_port, eigvec, eigval = pca(port, mean_prof, pca_weights,
-                ncomp=ncomp, awid=awid, quiet=quiet)
+                ncomp=ncomp, quiet=quiet)
         if ncomp > 10: ncomp = 10
         if ncomp == 0: #Will make model with constant average port
             eigval = np.zeros(len(eigval))
@@ -221,7 +216,7 @@ if __name__ == "__main__":
     if norm in ("mean", "max", "prof", "rms", "abs"):
         dp.normalize_portrait(norm)
 
-    dp.make_interp_model(ncomp=ncomp, awid=0.0025, smooth=smooth, k=k,
+    dp.make_interp_model(ncomp=ncomp, smooth=smooth, k=k,
             sfac=1.0, model_name=model_name, quiet=quiet)
 
     if modelfile is None: modelfile = datafile + ".spl"

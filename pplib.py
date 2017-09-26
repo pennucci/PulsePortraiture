@@ -1399,8 +1399,7 @@ def find_kc(pows, errs=1.0, fn='exp_dc'):
     else:
         return len(data)-1
 
-def pca(port, mean_prof=None, weights=None, ncomp=None, awid=0.0025,
-        quiet=False):
+def pca(port, mean_prof=None, weights=None, ncomp=None, quiet=False):
     """
     Compute the pricinpal components of port and reconstruct port.
 
@@ -1415,13 +1414,10 @@ def pca(port, mean_prof=None, weights=None, ncomp=None, awid=0.0025,
     weights are the nchan weights passed to np.cov as 'aweights' for the
         construction of the covariance matrix.
     ncomp is the number of principal components to use in the reconstruction of
-        port.  If None, ncomp is the largest number of consecutive eigenvectors
-        that have an autocorrelation displaying a main peak that has a width
-        at 10% maximum greater than awid [rot].  ncomp = 0 will return a
-        portrait with just the mean profile.
-    awid [rot] determines ncomp if ncomp is None.  Default is 0.25% of a
-        rotation, or about 5 phase bins for a 2048 phase bin profile.  For
-        awid=0.0, this uses all eigenvectors; i.e., it returns an identical
+        port.  If None, ncomp is the largest number of consecutive
+        eigenvectors that, after being smoothed, have a non-zero
+        autocorrelation.  ncomp = 0 will return a portrait with just the mean
+        profile, while setting ncomp = port.shape[1] will return an identical
         reconstruction.
     quiet=True suppresses output.
 
@@ -1454,13 +1450,10 @@ def pca(port, mean_prof=None, weights=None, ncomp=None, awid=0.0025,
     if ncomp is None:
         ncomp = 0
         while(1):
-            ev = eigvec.T[ncomp]
-            acorr = np.correlate(ev, ev, mode="full")
-            bins = np.where(acorr > 0.1*acorr.max())[0]
-            wid = bins.max() - bins.min()
-            if wid > int(awid*ndim): ncomp += 1
+            ev = smart_smooth(eigvec.T[ncomp])
+            if np.correlate(ev, ev, mode="full").sum(): ncomp += 1
             else: break
-            if ncomp == ndim - 1: break
+            if ncomp == ndim: break
     some_eigvec = eigvec[:,:ncomp]
     reconst_port = np.dot(some_eigvec, np.dot(some_eigvec.T, delta_port.T)).T \
             + mean_prof

@@ -25,7 +25,7 @@ nbin = 512       #Number of phase bins
 nu0 = 1500.0     #Center of the band [MHz]
 bw = 800.0       #Bandwidth [MHz]
 tsub = 60.0      #Length of subintegration [s]
-noise_std = 1.75 #Noise level of the band, per subintegration [flux units]
+noise_std = 1.5  #Noise level of the band, per subintegration [flux units]
 dDM_mean = 3e-4  #Add in random dispersion measure offsets with this mean value
 dDM_std = 2e-4   #Add in random dispersion measure offsets with this std
 dDMs = np.random.normal(dDM_mean, dDM_std, nfiles)
@@ -85,10 +85,10 @@ if not model_with == "ppgauss":
     dp.normalize_portrait(norm)
     #Have a look at the data you're fitting
     dp.show_data_portrait()
-    dp.make_interp_model(ncomp=None, awid=0.0025, smooth=True, k=3,
-            sfac=1.0, model_name="example-fit", quiet=False)
+    dp.make_interp_model(ncomp=None, smooth=True, k=3, sfac=1.0,
+            model_name="example-fit", quiet=False)
     show_spline_curve_projections(dp.proj_port, dp.tck, dp.freqsxs[0],
-            weights=dp.noise_stdsxs, ncoord=min(dp.proj_port.shape[-1],3))
+            weights=dp.noise_stdsxs, ncoord=min(dp.proj_port.shape[-1], 4))
     plt.show()
     dp.write_model(fitted_modelfile, quiet=False)
 
