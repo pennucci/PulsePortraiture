@@ -161,7 +161,7 @@ if __name__ == "__main__":
     #                  help="Show this help message and exit.")
     parser.add_option("-d", "--datafile",
                       action="store", metavar="archive", dest="datafile",
-                      help="PSRCHIVE archive from which to make model.")
+                      help="PSRCHIVE archive from which to make model, or a metafile listing multiple archives (i.e., from different bands).  If providing a metafile, the achives must already be aligned.")
     parser.add_option("-o", "--modelfile",
                       action="store", metavar="modelfile", dest="modelfile",
                       help="Name for output model (pickle) file. [default=datafile.spl].")
@@ -172,7 +172,7 @@ if __name__ == "__main__":
     parser.add_option("-a", "--archive",
                       action="store", metavar="archive", dest="archive",
                       default=None,
-                      help="Name for optional output PSRCHIVE archive.")
+                      help="Name for optional output PSRCHIVE archive.  Will work only if the input is a single archive.")
     parser.add_option("-N", "--norm",
                       action="store", metavar="normalization", dest="norm",
                       default="mean",
@@ -222,4 +222,5 @@ if __name__ == "__main__":
     if modelfile is None: modelfile = datafile + ".spl"
     dp.write_model(modelfile, quiet=quiet)
 
-    if archive is not None: dp.write_archive(archive, quiet=quiet)
+    if archive is not None and len(dp.datafiles) == 1:
+        dp.write_archive(archive, quiet=quiet)

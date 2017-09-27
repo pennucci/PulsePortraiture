@@ -292,12 +292,19 @@ class DataPortrait(object):
                     sys.exit()
             self.all_join_params = [self.join_ichanxs, self.join_params,
                     self.join_fit_flags]
+            if len(self.datafiles) == 1:
+                self.data = data
+                #Unpack the data dictionary into the local namespace;
+                #see load_data for dictionary keys.
+                for key in self.data.keys():
+                    exec("self." + key + " = self.data['" + key + "']")
         else:
             self.njoin = 0
             self.join_params = []
             self.join_ichans = []
             self.all_join_params = []
             self.datafile = datafile
+            self.datafiles = [datafile]
             self.data = load_data(datafile, dedisperse=True,
                     dededisperse=False, tscrunch=True, pscrunch=True,
                     fscrunch=False, flux_prof=True, refresh_arch=True,
