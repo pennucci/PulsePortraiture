@@ -342,112 +342,67 @@ class DataPortrait(object):
         #self.modelx = np.compress(self.masks[0,0].mean(axis=1), self.model,
         #        axis=0)
 
-    def smooth_portrait(self, **kwargs):
-        """
-        Smooth portrait data using default settings from wavelet_smooth.
-
-        Optional keyword arguments can be passed.
-        """
-        self.port = wavelet_smooth(self.port, **kwargs)
-        for ichan in range(len(self.port)):
-            self.noise_stds[0,0,ichan] = get_noise(self.port[ichan])
-        self.flux_prof = self.port.mean(axis=1)
-        self.portx = wavelet_smooth(self.portx, **kwargs)
-        for ichanx in range(len(self.portx)):
-            self.noise_stdsxs[ichanx] = get_noise(self.portx[ichanx])
-        self.flux_profx = self.portx.mean(axis=1)
-
-    def filter_portrait(self, **kwargs):
-        """
-        Filter portrait using default settings from find_kc.
-
-        Optional keyword arguments can be passed.
-        """
-        portx_fft = np.fft.rfft(self.portx, axis=1)
-        pows = np.real(portx_fft * np.conj(portx_fft))
-        for ichanx,ichan in enumerate(self.ok_ichans[0]):
-            kc = find_kc(pows[ichanx])
-            portx_fft[ichanx,kc:] = 0.0
-            self.portx[ichanx] = np.fft.irfft(portx_fft[ichanx])
-            self.port[ichan] = np.fft.irfft(portx_fft[ichanx])
-            self.noise_stdsxs *= 0.0
-            self.noise_stds[0,0,ichan] *= 0.0
-
     def normalize_portrait(self, method="rms"):
         """
-        Normalize each profile.
-
-        method is either "mean", "max", "prof", "rms", or "abs".
-            if "mean", then normalize by the profile mean (flux).
-            if "max", then normalize by the profile maximum.
-            if "prof", then normalize by the mean profile.
-            if "rms", then normalize by the noise level, such that
-                get_noise(profile) = 1.
-            if "abs", then normalize such that each profile would have the same
-                'length' in an nbin vector space.
+        Normalize each channel's profile using normalize_portrait(...).
         """
         if method not in ("mean", "max", "prof", "rms", "abs"):
-            print "Unknown method for normalize_portrait, '%s'"%method
-            return 1
+            print "Unknown method for normalize_portrait(...), '%s'."%method
         else:
             #Full portrait
-            self.norm_values = np.ones(len(self.port))
             self.unnorm_noise_stds = np.copy(self.noise_stds)
-            if method == "prof": mean_prof = self.portx.mean(axis=0)
-            for ichan in range(len(self.port)):
-                if self.port[ichan].any():
-                    if method == "mean":
-                        norm = self.port[ichan].mean()
-                    elif method == "max":
-                        norm = self.port[ichan].max()
-                    elif method == "prof":
-                        norm = fit_phase_shift(self.port[ichan],
-                                mean_prof).scale
-                    elif method == "rms":
-                        norm = get_noise(self.port[ichan])
-                    else:
-                        norm = (pow(self.port[ichan], 2.0).sum())**0.5
-                    self.port[ichan] /= norm
-                    self.norm_values[ichan] = norm
-                    self.noise_stds[0,0,ichan] = get_noise(self.port[ichan])
+            self.port, self.norm_values = normalize_portrait(self.port, method,
+                    return_norms=True)
+            self.noise_stds[0,0] = get_noise(self.port, chans=True)
             self.flux_prof = self.port.mean(axis=1)
-            #Reduced portrait
-            self.norm_valuesx = np.ones(len(self.portx))
+            #Condensed portrait
             self.unnorm_noise_stdsxs = np.copy(self.noise_stdsxs)
-            for ichanx in range(len(self.portx)):
-                if method == "mean":
-                    norm = self.portx[ichanx].mean()
-                elif method == "max":
-                    norm = self.portx[ichanx].max()
-                elif method == "prof":
-                    norm = fit_phase_shift(self.portx[ichanx], mean_prof).scale
-                elif method == "rms":
-                    norm = get_noise(self.portx[ichanx])
-                else:
-                    norm = (pow(self.portx[ichanx], 2.0).sum())**0.5
-                self.portx[ichanx] /= norm
-                self.norm_valuesx[ichanx] = norm
-                self.noise_stdsxs[ichanx] = get_noise(self.portx[ichanx])
+            self.portx = normalize_portrait(self.portx, method,
+                    return_norms=False)
+            self.noise_stdsxs = get_noise(self.portx, chans=True)
             self.flux_profx = self.portx.mean(axis=1)
 
     def unnormalize_portrait(self):
         """
-        Undo normalize_portrait
+        Undo normalize_portrait.
         """
         if hasattr(self, 'unnorm_noise_stds'):
             self.port = (self.norm_values * self.port.transpose()).transpose()
-            self.norm_values = np.ones(len(self.port))
             self.noise_stds = np.copy(self.unnorm_noise_stds)
             del(self.unnorm_noise_stds)
-            self.portx = (self.norm_valuesx * \
+            self.flux_prof = self.port.mean(axis=1)
+            self.portx = (self.norm_values[self.ok_ichans[0]] * \
                     self.portx.transpose()).transpose()
-            self.norm_valuesx = np.ones(len(self.portx))
             self.noise_stdsxs = np.copy(self.unnorm_noise_stdsxs)
             del(self.unnorm_noise_stdsxs)
-            self.flux_prof = self.port.mean(axis=1)
             self.flux_profx = self.portx.mean(axis=1)
+            self.norm_values = np.ones(len(self.port))
+
+    def smooth_portrait(self, smart=False, **kwargs):
+        """
+        Smooth portrait data using default settings from wavelet_smooth.
+
+        smart=True uses smart_smooth(...).
+        Optional keyword arguments can be passed.
+        """
+        #Full portrait
+        if smart:
+            self.port = smart_smooth(self.port, try_nlevels=8,
+                    errs=self.noise_stds[0,0], **kwargs)
         else:
-            return 1
+            self.port = wavelet_smooth(self.port, **kwargs)
+        for ichan in range(len(self.port)):
+            self.noise_stds[0,0,ichan] = get_noise(self.port[ichan])
+        self.flux_prof = self.port.mean(axis=1)
+        #Condensed portrait
+        if smart:
+            self.portx = smart_smooth(self.portx, try_nlevels=8,
+                    errs=self.noise_stdsxs, **kwargs)
+        else:
+            self.portx = wavelet_smooth(self.portx, **kwargs)
+        for ichanx in range(len(self.portx)):
+            self.noise_stdsxs[ichanx] = get_noise(self.portx[ichanx])
+        self.flux_profx = self.portx.mean(axis=1)
 
     def fit_flux_profile(self, channel_errs=None, guessA=1.0, guessalpha=0.0,
             plot=True, quiet=False):
@@ -539,48 +494,60 @@ class DataPortrait(object):
             jf.write(line)
         jf.close()
 
-    def rotate_stuff(self, phase=0.0, DM=0.0, nu_ref=None):
+    def rotate_stuff(self, phase=0.0, DM=0.0, ichans=None, ichanxs=None,
+            nu_ref=None, model=False):
         """
-        Rotates the data and model portraits according to rotate_portrait(...).
+        Rotates the data or model portraits according to rotate_portrait(...).
 
         phase is a value specifying the amount of achromatic rotation [rot].
         DM is a value specifying the amount of rotation based on the
         cold-plasma dispersion law [cm**-3 pc].
+        ichans is an array specifying the channel indices to be rotated; in
+            this way, disparate bands can be aligned.  ichans=None defaults to
+            all channels.
+        ichanxs is the same as ichans, but for the condensed portrait.
         nu_ref is the reference frequency [MHz] that has zero dispersive delay.
             If nu_ref=None, defaults to self.nu0.
+        model=True applies the rotation to the model.
         """
-        if nu_ref is None: nu_ref = self.nu0
         P = self.Ps[0]
-        freqs = self.freqs[0]
-        freqsxs = self.freqsxs[0]
+        if nu_ref is None: nu_ref = self.nu0
+        if ichans is None: ichans = np.arange(len(self.freqs[0]))
+        if ichanxs is None: ichanxs = np.arange(len(self.freqsxs[0]))
+        freqs = self.freqs[0][ichans]
+        freqsxs = self.freqsxs[0][ichanxs]
 
-        self.port = rotate_portrait(self.port, phase, DM, P, freqs, nu_ref)
-        self.portx = rotate_portrait(self.portx, phase, DM, P, freqsxs, nu_ref)
-
-        if hasattr(self, 'model'):
-            self.model = rotate_portrait(self.model, phase, DM, P, freqs,
-                    nu_ref)
-            self.modelx = rotate_portrait(self.modelx, phase, DM, P, freqsxs,
-                    nu_ref)
-            self.model_masked = rotate_portrait(self.model_masked, phase, DM,
+        if not model:
+            self.port[ichans] = rotate_portrait(self.port[ichans], phase, DM,
                     P, freqs, nu_ref)
+            self.portx[ichanxs] = rotate_portrait(self.portx[ichanxs], phase,
+                    DM, P, freqsxs, nu_ref)
+
+        if model and hasattr(self, 'model'):
+            self.model[ichans] = rotate_portrait(self.model[ichans], phase, DM,
+                    P, freqs, nu_ref)
+            self.modelx[ichanxs] = rotate_portrait(self.modelx[ichanxs], phase,
+                    DM, P, freqsxs, nu_ref)
+            self.model_masked[ichans] = rotate_portrait(
+                    self.model_masked[ichans], phase, DM, P, freqs, nu_ref)
 
     def write_archive(self, outfile, quiet=False):
         """
         Write a PSRCHIVE archive to outfile containing the model.
 
-        This archive will have the same zero-weighted channels as the input
+        Only works if input datafile is a PSRCHIVE archive.  The written
+            archive will have the same zero-weighted channels as the input
             datafile.
         """
-        if not hasattr(self, 'model'): return None
-        shape = self.arch.get_data().shape
-        nsub,npol,nchan,nbin = shape
-        model_data = np.zeros(shape)
-        for isub in range(nsub):
-            for ipol in range(npol):
-                model_data[isub,ipol] = self.model
-        unload_new_archive(model_data, self.arch, outfile, DM=0.0, dmc=0,
-                weights=self.weights, quiet=quiet)
+        if hasattr(self, 'model') and hasattr(self, 'arch'):
+            shape = self.arch.get_data().shape
+            nsub,npol,nchan,nbin = shape
+            model_data = np.zeros(shape)
+            for isub in range(nsub):
+                for ipol in range(npol):
+                    model_data[isub,ipol] = self.model
+            unload_new_archive(model_data, self.arch, outfile, DM=0.0, dmc=0,
+                    weights=self.weights, quiet=quiet)
 
     def show_data_portrait(self, **kwargs):
         """
@@ -2244,6 +2211,47 @@ def rotate_portrait(port, phase=0.0, DM=None, P=None, freqs=None,
                 (D * (freq**-2.0 - nu_ref**-2.0))))
             pFFT[nn,:] *= phasor
     return fft.irfft(pFFT)
+
+def normalize_portrait(port, method='rms', return_norms=False):
+    """
+    Normalize each profile in a portrait.
+
+    method is either "mean", "max", "prof", "rms", or "abs".
+        if "mean", then normalize by the profile mean (flux).
+        if "max", then normalize by the profile maximum.
+        if "prof", then normalize by the mean profile.
+        if "rms", then normalize by the noise level, such that
+            get_noise(profile) = 1.
+        if "abs", then normalize such that each profile would have the same
+            'length' in an nbin vector space.
+    return_norms=True returns an array of the normalization values.
+    """
+    if method not in ("mean", "max", "prof", "rms", "abs"):
+        print "Unknown method for normalize_portrait(...), '%s'."%method
+    else:
+        norm_port = np.zeros(port.shape)
+        norm_vals = np.ones(len(port))
+        if method == "prof":
+            good_ichans = np.where(port.sum(axis=1) != 0.0)[0]
+            mean_prof = port[good_ichans].mean(axis=0)
+        for ichan in range(len(port)):
+            if port[ichan].any():
+                if method == "mean":
+                    norm = port[ichan].mean()
+                elif method == "max":
+                    norm = port[ichan].max()
+                elif method == "prof":
+                    norm = fit_phase_shift(port[ichan], mean_prof).scale
+                elif method == "rms":
+                    norm = get_noise(port[ichan])
+                else:
+                    norm = (pow(port[ichan], 2.0).sum())**0.5
+                norm_port[ichan] = port[ichan] / norm
+                norm_vals[ichan] = norm
+        if return_norms:
+            return norm_port, norm_vals
+        else:
+            return norm_port
 
 def add_DM_nu(port, phase=0.0, DM=None, P=None, freqs=None, xs=[-2.0],
         Cs=[1.0], nu_ref=np.inf):

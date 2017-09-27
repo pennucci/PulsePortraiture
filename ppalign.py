@@ -182,25 +182,8 @@ def align_archives(metafile, initial_guess, tscrunch=False, pscrunch=True,
         niter -= 1
         count += 1
     if norm in ("mean", "max", "prof", "rms", "abs"):
-        if norm == "prof":
-            ok_ichans = np.where(aligned_port.sum(axis=1) != 0.0)[0]
-            mean_prof = aligned_port[ok_ichans].mean(axis=0)
         for ipol in range(npol):
-            for ichan in range(nchan):
-                if aligned_port[ipol,ichan].any():
-                    if norm == "mean":
-                        norm_val = aligned_port[ipol,ichan].mean()
-                    elif norm == "max":
-                        norm_val = aligned_port[ipol,ichan].max()
-                    elif norm == "prof":
-                        norm_val = fit_phase_shift(aligned_port[ipol,ichan],
-                                mean_prof).scale
-                    elif norm == "rms":
-                        norm_val = get_noise(aligned_port[ipol,ichan])
-                    else:
-                        norm_val = (pow(aligned_port[ipol,ichan],
-                            2.0).sum)**0.5
-                    aligned_port[ipol,ichan] /= norm_val
+            aligned_port[ipol] = normalize_portrait(aligned_port[ipol], norm)
     if rot_phase:
         aligned_port = rotate_data(aligned_port, rot_phase)
     if place is not None:
