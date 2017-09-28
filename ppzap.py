@@ -59,7 +59,7 @@ if __name__ == "__main__":
     parser.add_option("-t", "--threshold",
                       metavar="red_chi2", action="store", dest="threshold",
                       default=1.5,
-                      help="Set a reduced chi2 threshold for flagging bad channels [default=1.5].")
+                      help="Set a reduced chi-squared threshold for flagging bad channels [default=1.5].")
     parser.add_option("-o", "--outfile",
                       action="store", metavar="outfile", dest="outfile",
                       default=None,
