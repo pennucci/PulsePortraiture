@@ -6,7 +6,7 @@
 #    programs ppgauss and pptoas, as well as some additional functions used in
 #    our #wideband timing analysis.
 
-#Written by Timothy T. Pennucci (TTP; pennucci@email.virginia.edu).
+#Written by Timothy T. Pennucci (TTP; tim.pennucci@nanograv.org).
 #Contributions by Scott M. Ransom (SMR), Paul B. Demorest (PBD), and Emmanuel
 #    Fonseca (EF).
 
@@ -3201,7 +3201,7 @@ def write_TOAs(TOAs, format="tempo2", SNR_cutoff=0.0, outfile=None,
     if outfile is not None: of.close()
 
 def show_portrait(port, phases=None, freqs=None, title=None, prof=True,
-        fluxprof=True, rvrsd=False, colorbar=True, savefig=False,
+        fluxprof=True, rvrsd=False, colorbar=True, savefig=False, show=True,
         aspect="auto", interpolation="none", origin="lower", extent=None,
         **kwargs):
     """
@@ -3304,7 +3304,7 @@ def show_portrait(port, phases=None, freqs=None, title=None, prof=True,
     if savefig:
         plt.savefig(savefig, format='png')
         plt.close()
-    else:
+    if show:
         plt.show()
 
 def show_stacked_profiles(data_profiles, model_profiles=None, phases=None,

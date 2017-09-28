@@ -33,6 +33,8 @@ In short:
     -pptoas is a command-line utility to measure TOAs and DMs.
     -ppalign is a command-line utility to average homogeneous data by measuring
         phases and DMs.
+    -ppzap is a command-line utility which uses pptoas to identify potentially
+        overlooked bad channels to zap.
     -The command-line programs can be imported into ipython for additional
         flexibility of use.
     -***See examples/README for simple command-line use.***

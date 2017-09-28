@@ -10,7 +10,7 @@
 #    to ppgauss.py with -M to make a Gaussian model, or to smooth and use as a
 #    model with pptoas.py.
 
-#Written by Timothy T. Pennucci (TTP; pennucci@email.virginia.edu).
+#Written by Timothy T. Pennucci (TTP; tim.pennucci@nanograv.org).
 
 #Need option for constant Gaussian initial guess.
 

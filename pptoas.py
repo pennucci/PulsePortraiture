@@ -8,7 +8,7 @@
 #    and dispersion measures (DMs).  Full-functionality is obtained when using
 #    pptoas within an interactive python environment.
 
-#Written by Timothy T. Pennucci (TTP; pennucci@email.virginia.edu).
+#Written by Timothy T. Pennucci (TTP; tim.pennucci@nanograv.org).
 #Contributions by Scott M. Ransom (SMR) and Paul B. Demorest (PBD).
 
 from pplib import *
@@ -247,9 +247,6 @@ class GetTOAs:
                                 self.modelfile, phases, freqs[isub], Ps[isub],
                                 quiet=bool(quiet+(itoa-1)))
                     except UnboundLocalError:
-                        if not already_warned:
-                            print warning_message
-                            already_warned = True
                         self.model_name, model = read_interp_model(
                                 self.modelfile, freqs[isub], nbin,
                                 quiet=True) #bool(quiet+(itoa-1)))
@@ -465,6 +462,49 @@ class GetTOAs:
             print "Total time: %.2f min, ~%.4f min/TOA"%(tot_duration / 60,
                     tot_duration / (60 * np.array(map(len,
                         self.ok_isubs)).sum()))
+
+    def get_channel_red_chi2s(self, threshold=1.5, show=False):
+        """
+        Calculate reduced chi-squared values for each profile fit.
+
+        Adds attributes self.channel_red_chi2s and self.zap_channels, the
+            latter based on a thresholding value.
+
+        threshold is a reduced chi-squared value which is used to flag channels
+            for zapping (cf. ppzap.py).  Values above threshold are added to
+            self.zap_channels.
+        show=True will show the before/after portraits for each subint with
+            proposed channels to zap.
+        """
+        self.channel_red_chi2s = []
+        self.zap_channels = []
+        for iarch, datafile in enumerate(self.datafiles):
+            channel_red_chi2s = []
+            zap_channels = []
+            for isub in self.ok_isubs[iarch]:
+                red_chi2s = []
+                bad_ichans = []
+                port, model, ok_ichans, freqs, noise_stds = self.show_fit(
+                        datafile=datafile, isub=isub, rotate=0.0, show=False,
+                        return_fit=True, quiet=True)
+                for ichan in ok_ichans:
+                    channel_red_chi2 = get_red_chi2(port[ichan],
+                            model[ichan], errs=noise_stds[ichan],
+                            dof=len(port[ichan])-0) #Not sure about exact dof
+                    red_chi2s.append(channel_red_chi2)
+                    if channel_red_chi2 > threshold: bad_ichans.append(ichan)
+                channel_red_chi2s.append(red_chi2s)
+                zap_channels.append(bad_ichans)
+                if show and len(bad_ichans):
+                    show_portrait(port, get_bin_centers(port.shape[1]),
+                            title="%s, subint: %d\nbad chans: %s"%(datafile,
+                                isub, bad_ichans), show=False)
+                    port[bad_ichans] *= 0.0
+                    show_portrait(port, get_bin_centers(port.shape[1]),
+                            title="%s, subint: %d\nbad chans: %s"%(datafile,
+                                isub, bad_ichans), show=True)
+            self.channel_red_chi2s.append((channel_red_chi2s))
+            self.zap_channels.append((zap_channels))
 
     def write_princeton_TOAs(self, datafile=None, outfile=None, nu_ref=None,
             one_DM=False, dmerrfile=None):
@@ -759,7 +799,7 @@ if __name__ == "__main__":
     parser.add_option("-o", "--outfile",
                       action="store", metavar="timfile", dest="outfile",
                       default=None,
-                      help="Name of output .tim file name. Will append. [default=stdout]")
+                      help="Name of output .tim file. Will append. [default=stdout]")
     parser.add_option("-f", "--format",
                       action="store", metavar="format", dest="format",
                       help="Format of output .tim file; either 'princeton' or 'tempo2'.  Default is tempo2 format.")

@@ -15,7 +15,7 @@
 #    input data should be high S/N, averaged, and "aligned" (e.g. output from
 #    ppalign.py).  Channel normalization and profile smoothing is encouraged.
 
-#Written by Timothy T. Pennucci (TTP; pennucci@email.virginia.edu).
+#Written by Timothy T. Pennucci (TTP; tim.pennucci@nanograv.org).
 
 from pplib import *
 

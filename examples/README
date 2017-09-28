@@ -34,6 +34,8 @@
     >Measure TOAs & DMs from an archive using another archive:
           pptoas.py -d psrfits_archive.fits -m similar_psrfits_archive.fits
 
+    >Find overlooked bad channels to zap in data:
+          ppzap.py -d psrfits_archive.fits -m model_from_ppinterp_or_ppgauss
 
 --More involved command-line use with some additional options (combinable):
 
@@ -71,3 +73,9 @@
     >Add additonal flags (in pairs) to the output TOA lines:
           pptoas.py -d psrfits_archive.fits -m model_from_ppinterp_or_ppgauss \
             --flags pta,pta_name,release,release_number
+
+    >Use a different reduced chi-squared threshold for channel zapping, output
+        paz commands to a file, which modify the original input archives that
+        are read in from a metafile:
+          ppzap.py -d metafile_with_archive_names \
+          -m model_from_ppinterp_or_ppgauss -t 1.3 -o paz_cmds.out --modify
