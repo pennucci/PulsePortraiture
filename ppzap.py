@@ -102,4 +102,4 @@ if __name__ == "__main__":
             for isub in range(len(gt.channel_red_chi2s[iarch])):
                 nchan += len(gt.channel_red_chi2s[iarch][isub])
                 nzap += len(gt.zap_channels[iarch][isub])
-        print "Found %d bad channels out of a total %d channels fit (=%.2f%%)."%(nzap, nchan, float(nzap)/nchan)
+        print "ppzap.py found %d bad channels out of a total %d channels fit (=%.2f%%)."%(nzap, nchan, float(nzap)/nchan)
