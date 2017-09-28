@@ -20,24 +20,25 @@ def print_paz_cmds(datafiles, zap_list, modify=True, outfile=None,
     if outfile is not None:
         sys.stdout = open(outfile, "a")
     lines = []
-    for iarch,datafile in enumerate(datafiles):
+    for iarch, datafile in enumerate(datafiles):
         count = 0
         for isub in range(len(zap_list[iarch])):
             count += len(zap_list[iarch][isub])
         if count:
             if modify:
-                outfile = datafile
+                paz_outfile = datafile
             else:
                 ii = datafile[::-1].find(".")
-                if ii < 0: outfile = datafile + ".zap"
-                else: outfile = datafile[:-ii] + "zap"
+                if ii < 0: paz_outfile = datafile + ".zap"
+                else: paz_outfile = datafile[:-ii] + "zap"
                 print "paz -e zap %s"%datafile
-        for isub,bad_ichans in enumerate(zap_list[iarch]):
+        for isub, bad_ichans in enumerate(zap_list[iarch]):
             for bad_ichan in bad_ichans:
-                print "paz -m -I -z %d -w %d %s"%(bad_ichan, isub, outfile)
+                print "paz -m -I -z %d -w %d %s"%(bad_ichan, isub, paz_outfile)
     sys.stdout = sys.__stdout__
     if outfile is not None and not quiet:
         print "Wrote %s."%outfile
+
 
 if __name__ == "__main__":
 
@@ -70,6 +71,9 @@ if __name__ == "__main__":
     parser.add_option("--show",
                       action="store_true", dest="show", default=False,
                       help="Show zapped portrait for each subint with proposed channels to zap.")
+    parser.add_option("--hist",
+                      action="store_true", dest="hist", default=False,
+                      help="Plot histogram of channel reduced chi-squared values.")
     parser.add_option("--quiet",
                       action="store_true", dest="quiet", default=False,
                       help="Suppress output.")
@@ -88,6 +92,7 @@ if __name__ == "__main__":
     outfile = options.outfile
     modify = options.modify
     show = options.show
+    hist = options.hist
     quiet = options.quiet
 
     gt = GetTOAs(datafiles=datafiles, modelfile=modelfile, quiet=True)
@@ -103,3 +108,17 @@ if __name__ == "__main__":
                 nchan += len(gt.channel_red_chi2s[iarch][isub])
                 nzap += len(gt.zap_channels[iarch][isub])
         print "ppzap.py found %d bad channels out of a total %d channels fit (=%.2f%%)."%(nzap, nchan, 100*float(nzap)/nchan)
+    if hist:
+        red_chi2s = []
+        for iarch in range(len(gt.datafiles)):
+            for isub in range(len(gt.channel_red_chi2s[iarch])):
+                red_chi2s.extend(gt.channel_red_chi2s[iarch][isub])
+        red_chi2s = np.array(red_chi2s)
+        plt.hist(red_chi2s, bins=min(50, len(red_chi2s)), log=True)
+        ymin, ymax = plt.ylim()
+        plt.vlines(threshold, ymin, ymax, linestyles='dashed')
+        plt.ylim(ymin, ymax)
+        plt.xlabel(r"Reduced $\chi^2$")
+        plt.ylabel("#")
+        plt.title(datafiles)
+        plt.savefig(datafiles+"_ppzap_hist.png")
