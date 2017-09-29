@@ -134,7 +134,7 @@ class GetTOAs:
 
     def get_TOAs(self, datafile=None, nu_ref=None, DM0=None, bary_DM=True,
             fit_DM=True, bounds=[(None, None), (None, None)], nu_fit=None,
-            show_plot=False, addtnl_toa_flags={}, quiet=False):
+            show_plot=False, addtnl_toa_flags={}, quiet=None):
         """
         Measure phases (TOAs) and dispersion measures (DMs).
 
@@ -159,6 +159,7 @@ class GetTOAs:
             to all tempo2-formatted TOAs. e.g. ('pta','NANOGrav','version',0.1)
         quiet=True suppresses output.
         """
+        if quiet is None: quiet = self.quiet
         already_warned = False
         warning_message = \
                 "You are using an experimental functionality of pptoas!"
@@ -446,7 +447,7 @@ class GetTOAs:
             if not quiet:
                 print "--------------------------"
                 print datafile
-                print "~%.4f min/TOA"%(fit_duration / (60. * len(ok_isubs)))
+                print "~%.4f sec/TOA"%(fit_duration / len(ok_isubs))
                 print "Avg. TOA error is %.3f us"%(phi_errs[ok_isubs].mean() *
                         Ps.mean() * 1e6)
             if show_plot:
@@ -459,9 +460,8 @@ class GetTOAs:
             tot_duration = time.time() - start
         if not quiet:
             print "--------------------------"
-            print "Total time: %.2f min, ~%.4f min/TOA"%(tot_duration / 60,
-                    tot_duration / (60 * np.array(map(len,
-                        self.ok_isubs)).sum()))
+            print "Total time: %.2f min, ~%.4f sec/TOA"%(tot_duration,
+                    tot_duration / (np.array(map(len, self.ok_isubs)).sum()))
 
     def get_channel_red_chi2s(self, threshold=1.5, show=False):
         """
@@ -493,6 +493,7 @@ class GetTOAs:
                             dof=len(port[ichan])-0) #Not sure about exact dof
                     red_chi2s.append(channel_red_chi2)
                     if channel_red_chi2 > threshold: bad_ichans.append(ichan)
+                    elif np.isnan(channel_red_chi2): bad_ichans.append(ichan)
                 channel_red_chi2s.append(red_chi2s)
                 zap_channels.append(bad_ichans)
                 if show and len(bad_ichans):
@@ -585,7 +586,7 @@ class GetTOAs:
             dmerrs.close()
         sys.stdout = sys.__stdout__
 
-    def show_subint(self, datafile=None, isub=0, rotate=0.0, quiet=False):
+    def show_subint(self, datafile=None, isub=0, rotate=0.0, quiet=None):
         """
         Plot a phase-frequency portrait of a subintegration.
 
@@ -598,6 +599,7 @@ class GetTOAs:
         To be improved.
         (see show_portrait(...))
         """
+        if quiet is None: quiet = self.quiet
         if datafile is None:
             datafile = self.datafiles[0]
         ifile = self.datafiles.index(datafile)
@@ -614,7 +616,7 @@ class GetTOAs:
                 title=title, prof=True, fluxprof=True, rvrsd=bool(data.bw < 0))
 
     def show_fit(self, datafile=None, isub=0, rotate=0.0, show=True,
-            return_fit=False, quiet=False):
+            return_fit=False, quiet=None):
         """
         Plot the fit results from a subintegration.
 
@@ -627,6 +629,7 @@ class GetTOAs:
         To be improved.
         (see show_residual_plot(...))
         """
+        if quiet is None: quiet = self.quiet
         if datafile is None:
             datafile = self.datafiles[0]
         ifile = self.datafiles.index(datafile)

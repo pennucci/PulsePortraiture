@@ -113,7 +113,7 @@ if __name__ == "__main__":
         for iarch in range(len(gt.datafiles)):
             for isub in range(len(gt.channel_red_chi2s[iarch])):
                 red_chi2s.extend(gt.channel_red_chi2s[iarch][isub])
-        red_chi2s = np.array(red_chi2s)
+        red_chi2s = np.nan_to_num(np.array(red_chi2s))
         plt.hist(red_chi2s, bins=min(50, len(red_chi2s)), log=True)
         ymin, ymax = plt.ylim()
         plt.vlines(threshold, ymin, ymax, linestyles='dashed')
