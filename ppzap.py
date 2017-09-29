@@ -109,7 +109,7 @@ if __name__ == "__main__":
             nzap += len(gt.zap_channels[iarch][isub])
 
     if not quiet:
-        print "ppzap.py found %d bad channels out of a total %d channels fit (=%.2f%%)."%(nzap, nchan, 100*float(nzap)/nchan)
+        print "ppzap.py found %d bad channels out of a total %d channels fit (=%.2f%%) in %s."%(nzap, nchan, 100*float(nzap)/nchan, datafiles)
 
     if hist:
         red_chi2s = []
