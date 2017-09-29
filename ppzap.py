@@ -100,14 +100,17 @@ if __name__ == "__main__":
     gt.get_channel_red_chi2s(threshold=threshold, show=show)
     print_paz_cmds(gt.datafiles, gt.zap_channels, modify=modify,
             outfile=outfile, quiet=quiet)
+
+    nchan = 0
+    nzap = 0
+    for iarch in range(len(gt.datafiles)):
+        for isub in range(len(gt.channel_red_chi2s[iarch])):
+            nchan += len(gt.channel_red_chi2s[iarch][isub])
+            nzap += len(gt.zap_channels[iarch][isub])
+
     if not quiet:
-        nchan = 0
-        nzap = 0
-        for iarch in range(len(gt.datafiles)):
-            for isub in range(len(gt.channel_red_chi2s[iarch])):
-                nchan += len(gt.channel_red_chi2s[iarch][isub])
-                nzap += len(gt.zap_channels[iarch][isub])
         print "ppzap.py found %d bad channels out of a total %d channels fit (=%.2f%%)."%(nzap, nchan, 100*float(nzap)/nchan)
+
     if hist:
         red_chi2s = []
         for iarch in range(len(gt.datafiles)):
@@ -120,5 +123,5 @@ if __name__ == "__main__":
         plt.ylim(ymin, ymax)
         plt.xlabel(r"Reduced $\chi^2$")
         plt.ylabel("#")
-        plt.title(datafiles)
+        plt.title("%s\n"%datafiles + r"%d / %d channels w/ $\chi^2_{red}$ > %.1f"%(nzap, nchan, threshold))
         plt.savefig(datafiles+"_ppzap_hist.png")
