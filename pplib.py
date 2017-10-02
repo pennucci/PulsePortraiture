@@ -3533,8 +3533,8 @@ def show_spline_curve_projections(projected_port, tck, freqs, weights=None,
         else: plot_this_coord = None
     if freqs[0] > freqs[-1]: flip = -1 #has negative bandwidth
     else: flip = 1
-    freqs = np.linspace(freqs.min(), freqs.max(), nprof*10)
-    proj_port_interp = np.array(si.splev(freqs, tck, der=0, ext=0)).T
+    interp_freqs = np.linspace(freqs.min(), freqs.max(), nprof*10)
+    proj_port_interp = np.array(si.splev(interp_freqs, tck, der=0, ext=0)).T
 
     size = 3 #inches per plot
     buff = 1 #inches
@@ -3571,18 +3571,18 @@ def show_spline_curve_projections(projected_port, tck, freqs, weights=None,
             fig = plt.figure(figsize=(size + 2*buff, size + 2*buff))
             ax = fig.add_subplot(111)
             for iprof,prof in enumerate(projected_port):
-                ax.plot(iprof, prof[icoord], fmt, ms=ms[iprof],
+                ax.plot(freqs[iprof], prof[icoord], fmt, ms=ms[iprof],
                         alpha=alpha[iprof], mew=0.0)
-            ax.plot(projected_port[:,icoord], color='k', ls='solid', lw=1)
-            ax.plot(np.linspace(0, nprof-1, len(freqs)),
-                    proj_port_interp[:,icoord][::flip], color='r', ls='solid',
-                    lw=2)
+            ax.plot(freqs, projected_port[:,icoord], color='k', ls='solid',
+                    lw=1)
+            ax.plot(interp_freqs[::flip], proj_port_interp[:,icoord][::flip],
+                    color='r', ls='solid', lw=2)
     if ncoord > 1:
         fig.text(0.025, 0.5, "Coordinate Index", rotation='vertical',
                 ha='center', va='center')
         fig.text(0.5, 0.025, "Coordinate Index", ha='center', va='center')
     else:
-        ax.set_xlabel("Profile index")
+        ax.set_xlabel("Frequency [MHz]")
         ax.set_ylabel("Coordinate %d"%plot_this_coord)
     if title is not None: plt.suptitle(title+'\n')
     if savefig:

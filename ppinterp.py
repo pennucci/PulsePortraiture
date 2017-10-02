@@ -38,7 +38,7 @@ class DataPortrait(DataPortrait):
             a non-zero autocorrelation.  ncomp = 0 will return a portrait with
             just the mean profile.
         smooth=True will smooth the eigenvectors and mean profile using
-            wavelet_smooth and a reduced chi2 figure-of-merit.
+            wavelet_smooth and a reduced chi-squared figure-of-merit.
         k is the degree of the spline; cubic splines (k=3) recommended;
             1 <= k <= 5.
         sfac is a multiplicative smoothing factor passed to si.splprep; greater
