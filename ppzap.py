@@ -20,7 +20,7 @@ def get_zap_channels(data, nstd=5):
     Return list of proposed channels to zap using median algorithm.
 
     The algorithm looks at the median noise level in each total intensity
-        subintegration and flags channels that are more than nstd standard 
+        subintegration and flags channels that are more than nstd standard
         deviations away from it.  The channels are removed, and the process
         iterates until there are no more flagged channels.
 
@@ -188,7 +188,7 @@ if __name__ == "__main__":
             data = load_data(datafile, dedisperse=False,
                     dededisperse=False, tscrunch=False, pscrunch=True,
                     fscrunch=False, rm_baseline=rm_baseline, flux_prof=False,
-                    refresh_arch=False, return_arch=False, quiet=quiet)
+                    refresh_arch=False, return_arch=False, quiet=True)
             nchan += np.array(map(len, data.ok_ichans)).sum()
             if norm is not None:
                 for isub in data.ok_isubs:
