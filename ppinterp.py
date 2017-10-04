@@ -28,7 +28,7 @@ class DataPortrait(DataPortrait):
     """
 
     def make_interp_model(self, ncomp=None, smooth=True, k=3, sfac=1.0,
-            model_name=None, quiet=False):
+            nmax=None, model_name=None, quiet=False):
         """
         Make a model based on PCA and B-spline interpolation.
 
@@ -39,13 +39,18 @@ class DataPortrait(DataPortrait):
             just the mean profile.
         smooth=True will smooth the eigenvectors and mean profile using
             wavelet_smooth and a reduced chi-squared figure-of-merit.
-        k is the degree of the spline; cubic splines (k=3) recommended;
-            1 <= k <= 5.
+        k is the polynomial degree of the spline; cubic splines (k=3)
+            recommended; 1 <= k <= 5.
         sfac is a multiplicative smoothing factor passed to si.splprep; greater
             values result in more smoothing.  sfac=0 will make an interpolating
             model anchored on the input data profiles.
-        model_name is the name of the model; defaults to
-            self.datafile + '.interp'
+        nmax is the maximum number of unique knots to allow.  If provided, this
+            may override sfac and enforce smoothing based on nmax knots.  That
+            is, in the case the fit returns n > nmax knots, it will refit using
+            maximum nmax unique knots, irrespective of the other smoothing
+            condition.
+        model_name is the name of the model; defaults to self.datafile +
+            '.interp'
         quiet=True suppresses output.
         """
 
@@ -95,7 +100,14 @@ class DataPortrait(DataPortrait):
                 w=spl_weights[::flip], u=freqs[::flip], ub=nu_lo, ue=nu_hi,
                 k=k, task=0, s=s, t=None, full_output=1, nest=None, per=0,
                 quiet=int(quiet))
-        if ier > 0:
+        if nmax is not None and len(np.unique(tck[0])) > nmax:
+            if nmax == 2: s = np.inf
+            (tck,u), fp, ier, msg = si.splprep(proj_port[::flip].T,
+                    w=spl_weights[::flip], u=freqs[::flip], ub=nu_lo, ue=nu_hi,
+                    k=k, task=0, s=s, t=None, full_output=1, nest=nmax+(k*2),
+                    per=0, quiet=int(quiet))
+
+        if ier > 1: #Will also catch when ier == "unknown"
             print "Something went wrong in si.splprep for %s:\n%s"%(
                     self.source, msg)
 
@@ -188,6 +200,10 @@ if __name__ == "__main__":
     parser.add_option("-k", "--degree",
                       action="store", metavar="degree", dest="k", default=3,
                       help="Degree of the spline.  Cubic splines (k=3) are recommended [default]. 1 <= k <=5.")
+    parser.add_option("-t", "--knots",
+                      action="store", metavar="max_knots", dest="nmax",
+                      default=None,
+                      help="The maximum number of unique knots.  This functions esentially as an ignorant smoothing condition in case the default settings return a fit with more than max_knots number of unique knots in the spline model.  e.g., 10 unique knots are more than usually necessary.")
     parser.add_option("--quiet",
                       action="store_true", dest="quiet", default=False,
                       help="Suppresses output.")
@@ -209,6 +225,8 @@ if __name__ == "__main__":
     if options.ncomp is not None: ncomp = int(options.ncomp)
     else: ncomp = None
     k = int(options.k)
+    if options.nmax is not None: nmax = int(options.nmax)
+    else: nmax = None
     quiet = options.quiet
 
     dp = DataPortrait(datafile)
@@ -216,8 +234,8 @@ if __name__ == "__main__":
     if norm in ("mean", "max", "prof", "rms", "abs"):
         dp.normalize_portrait(norm)
 
-    dp.make_interp_model(ncomp=ncomp, smooth=smooth, k=k,
-            sfac=1.0, model_name=model_name, quiet=quiet)
+    dp.make_interp_model(ncomp=ncomp, smooth=smooth, k=k, sfac=1.0, nmax=nmax,
+            model_name=model_name, quiet=quiet)
 
     if modelfile is None: modelfile = datafile + ".spl"
     dp.write_model(modelfile, quiet=quiet)

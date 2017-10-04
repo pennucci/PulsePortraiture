@@ -3535,6 +3535,7 @@ def show_spline_curve_projections(projected_port, tck, freqs, weights=None,
     else: flip = 1
     interp_freqs = np.linspace(freqs.min(), freqs.max(), nprof*10)
     proj_port_interp = np.array(si.splev(interp_freqs, tck, der=0, ext=0)).T
+    knots = np.array(si.splev(tck[0], tck, der=0, ext=0)).T
 
     size = 3 #inches per plot
     buff = 1 #inches
@@ -3561,6 +3562,7 @@ def show_spline_curve_projections(projected_port, tck, freqs, weights=None,
                         color='k', ls='solid', lw=1)
                 ax.plot(proj_port_interp[:,icoord], proj_port_interp[:,ocoord],
                         color='r', ls='solid', lw=2)
+                ax.plot(knots[:,icoord], knots[:,ocoord], 'k*', ms=5)
                 if ocoord == ncoord-1: ax.set_xlabel(icoord)
                 else: ax.tick_params(labelbottom=False)
                 if icoord == 0: ax.set_ylabel(ocoord)
@@ -3577,6 +3579,7 @@ def show_spline_curve_projections(projected_port, tck, freqs, weights=None,
                     lw=1)
             ax.plot(interp_freqs[::flip], proj_port_interp[:,icoord][::flip],
                     color='r', ls='solid', lw=2)
+            ax.plot(tck[0][::flip], knots[:,icoord][::flip], 'k*', ms=5)
     if ncoord > 1:
         fig.text(0.025, 0.5, "Coordinate Index", rotation='vertical',
                 ha='center', va='center')
