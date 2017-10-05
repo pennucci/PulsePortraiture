@@ -118,10 +118,16 @@ def align_archives(metafile, initial_guess, tscrunch=False, pscrunch=True,
         aligned_port = np.zeros((npol,nchan,nbin))
         total_weights = np.zeros((nchan,nbin))
         for ifile in xrange(len(datafiles)):
-            data = load_data(datafiles[ifile], dedisperse=False,
-                    tscrunch=tscrunch, pscrunch=pscrunch, fscrunch=False,
-                    rm_baseline=True, flux_prof=False, refresh_arch=False,
-                    return_arch=False, quiet=load_quiet)
+            try:
+                data = load_data(datafiles[ifile], dedisperse=False,
+                        tscrunch=tscrunch, pscrunch=pscrunch, fscrunch=False,
+                        rm_baseline=True, flux_prof=False, refresh_arch=False,
+                        return_arch=False, quiet=load_quiet)
+            except RuntimeError:
+                if not quiet:
+                    print "Cannot load_data(%s).  Skipping it."%\
+                            datafiles[ifile]
+                continue
             if data.nbin != model_data.nbin: continue
             if data.prof_SNR < SNR_cutoff: continue
             try:

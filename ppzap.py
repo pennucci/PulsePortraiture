@@ -59,6 +59,10 @@ def print_paz_cmds(datafiles, zap_list, modify=True, outfile=None,
     outfile=None prints to std_out, otherwise it's a file to append to.
     quiet=True suppresses output.
     """
+    if not len(datafiles) or not len(zap_list):
+        if not quiet:
+            print "Nothing to zap."
+            return None
     if outfile is not None:
         sys.stdout = open(outfile, "a")
     lines = []
@@ -148,19 +152,20 @@ if __name__ == "__main__":
         gt = GetTOAs(datafiles=datafiles, modelfile=modelfile, quiet=True)
         gt.get_TOAs(quiet=True)
         gt.get_channel_red_chi2s(threshold=threshold, show=False)
-        print_paz_cmds(gt.datafiles, gt.zap_channels, modify=modify,
+        ok_datafiles = list(np.array(gt.datafiles)[gt.ok_idatafiles])
+        print_paz_cmds(ok_datafiles, gt.zap_channels, modify=modify,
                 outfile=outfile, quiet=quiet)
 
         nchan = 0
         nzap = 0
-        for iarch in range(len(gt.datafiles)):
+        for iarch in range(len(ok_datafiles)):
             for isub in range(len(gt.channel_red_chi2s[iarch])):
                 nchan += len(gt.channel_red_chi2s[iarch][isub])
                 nzap += len(gt.zap_channels[iarch][isub])
 
         if hist:
             red_chi2s = []
-            for iarch in range(len(gt.datafiles)):
+            for iarch in range(len(ok_datafiles)):
                 for isub in range(len(gt.channel_red_chi2s[iarch])):
                     red_chi2s.extend(gt.channel_red_chi2s[iarch][isub])
             red_chi2s = np.nan_to_num(np.array(red_chi2s))
@@ -185,10 +190,16 @@ if __name__ == "__main__":
         nchan = 0
         zap_channels = []
         for datafile in all_datafiles:
-            data = load_data(datafile, dedisperse=False,
-                    dededisperse=False, tscrunch=False, pscrunch=True,
-                    fscrunch=False, rm_baseline=rm_baseline, flux_prof=False,
-                    refresh_arch=False, return_arch=False, quiet=True)
+            try:
+                data = load_data(datafile, dedisperse=False,
+                        dededisperse=False, tscrunch=False, pscrunch=True,
+                        fscrunch=False, rm_baseline=rm_baseline,
+                        flux_prof=False, refresh_arch=False, return_arch=False,
+                        quiet=True)
+            except RuntimeError:
+                if not quiet:
+                    print "Cannot load_data(%s).  Skipping it."%datafile
+                continue
             nchan += np.array(map(len, data.ok_ichans)).sum()
             if norm is not None:
                 for isub in data.ok_isubs:

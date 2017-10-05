@@ -166,6 +166,7 @@ class GetTOAs:
         self.nu_ref = nu_ref
         self.DM0 = DM0
         self.bary_DM = bary_DM
+        self.ok_idatafiles = []
         start = time.time()
         tot_duration = 0.0
         nu_fit_default = nu_fit
@@ -173,22 +174,30 @@ class GetTOAs:
             datafiles = self.datafiles
         else:
             datafiles = [datafile]
-        for datafile in datafiles:
+        for iarch, datafile in enumerate(datafiles):
             fit_duration = 0.0
             #Load data
-            data = load_data(datafile, dedisperse=False,
-                    dededisperse=False, tscrunch=False, pscrunch=True,
-                    fscrunch=False, rm_baseline=rm_baseline, flux_prof=False,
-                    refresh_arch=False, return_arch=False, quiet=quiet)
+            try:
+                data = load_data(datafile, dedisperse=False,
+                        dededisperse=False, tscrunch=False, pscrunch=True,
+                        fscrunch=False, rm_baseline=rm_baseline,
+                        flux_prof=False, refresh_arch=False, return_arch=False,
+                        quiet=quiet)
+                if not len(data.ok_isubs):
+                    if not quiet:
+                        print "No subints to fit for %s.  Skipping it."%\
+                                datafile
+                    continue
+                else: self.ok_idatafiles.append(iarch)
+            except RuntimeError:
+                if not quiet:
+                    print "Cannot load_data(%s).  Skipping it."%datafile
+                    continue
             #Unpack the data dictionary into the local namespace; see load_data
             #for dictionary keys.
             for key in data.keys():
                 exec(key + " = data['" + key + "']")
             if source is None: source = "noname"
-            if not len(ok_isubs):
-                if not quiet:
-                    print "No subints to fit for %s."%datafile
-                continue
             #Observation info
             obs = DataBunch(telescope=telescope, backend=backend,
                     frontend=frontend, tempo_code=tempo_code)
@@ -458,7 +467,7 @@ class GetTOAs:
                 start = time.time()
         if not show_plot:
             tot_duration = time.time() - start
-        if not quiet:
+        if not quiet and len(self.ok_isubs):
             print "--------------------------"
             print "Total time: %.2f min, ~%.4f sec/TOA"%(tot_duration,
                     tot_duration / (np.array(map(len, self.ok_isubs)).sum()))
@@ -478,7 +487,8 @@ class GetTOAs:
         """
         self.channel_red_chi2s = []
         self.zap_channels = []
-        for iarch, datafile in enumerate(self.datafiles):
+        for iarch,ok_idatafile in enumerate(self.ok_idatafiles):
+            datafile = self.datafiles[ok_idatafile]
             channel_red_chi2s = []
             zap_channels = []
             for isub in self.ok_isubs[iarch]:
@@ -534,7 +544,8 @@ class GetTOAs:
         if dmerrfile is not None:
             dmerrs = open(dmerrfile,"a")
         for datafile in datafiles:
-            ifile = datafiles.index(datafile)
+            ifile = list(np.array(self.datafiles)[self.ok_idatafiles]).index(
+                    datafile)
             ok_isubs = self.ok_isubs[ifile]
             DM0 = self.DM0s[ifile]
             nsub = len(self.nu_refs[ifile])
@@ -602,7 +613,8 @@ class GetTOAs:
         if quiet is None: quiet = self.quiet
         if datafile is None:
             datafile = self.datafiles[0]
-        ifile = self.datafiles.index(datafile)
+        ifile = list(np.array(self.datafiles)[self.ok_idatafiles]).index(
+                datafile)
         data = load_data(datafile, dedisperse=True,
                 dededisperse=False, tscrunch=False,
                 #pscrunch=True, fscrunch=False, rm_baseline=rm_baseline,
@@ -632,7 +644,8 @@ class GetTOAs:
         if quiet is None: quiet = self.quiet
         if datafile is None:
             datafile = self.datafiles[0]
-        ifile = self.datafiles.index(datafile)
+        ifile = list(np.array(self.datafiles)[self.ok_idatafiles]).index(
+                datafile)
         data = load_data(datafile, dedisperse=False,
                 dededisperse=False, tscrunch=False,
                 #pscrunch=True, fscrunch=False, rm_baseline=rm_baseline,
@@ -694,10 +707,10 @@ class GetTOAs:
 
         To be improved.
         """
-        if datafile:
-            ifile = self.datafiles.index(datafile)
-        else:
-            ifile = 0
+        if datafile is None:
+            datafile = self.datafiles[0]
+        ifile = list(np.array(self.datafiles)[self.ok_idatafiles]).index(
+                datafile)
         ok_isubs = self.ok_isubs[ifile]
         nu_fits = self.nu_fits[ifile][ok_isubs]
         nu_refs = self.nu_refs[ifile][ok_isubs]
@@ -881,7 +894,8 @@ if __name__ == "__main__":
         if one_DM:
             gt.TOA_one_DM_list = [toa for toa in gt.TOA_list]
             for toa in gt.TOA_one_DM_list:
-                ifile = gt.datafiles.index(toa.archive)
+                ifile = list(np.array(gt.datafiles)[gt.ok_idatafiles]).index(
+                        toa_archive)
                 DDM = gt.DeltaDM_means[ifile]
                 DDM_err = gt.DeltaDM_errs[ifile]
                 toa.DM = DDM + gt.DM0s[ifile]
