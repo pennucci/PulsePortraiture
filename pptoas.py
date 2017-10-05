@@ -469,7 +469,7 @@ class GetTOAs:
             tot_duration = time.time() - start
         if not quiet and len(self.ok_isubs):
             print "--------------------------"
-            print "Total time: %.2f min, ~%.4f sec/TOA"%(tot_duration,
+            print "Total time: %.2f sec, ~%.4f sec/TOA"%(tot_duration,
                     tot_duration / (np.array(map(len, self.ok_isubs)).sum()))
 
     def get_channel_red_chi2s(self, threshold=1.5, show=False):
