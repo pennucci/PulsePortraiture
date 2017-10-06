@@ -192,7 +192,7 @@ class GetTOAs:
             except RuntimeError:
                 if not quiet:
                     print "Cannot load_data(%s).  Skipping it."%datafile
-                    continue
+                continue
             #Unpack the data dictionary into the local namespace; see load_data
             #for dictionary keys.
             for key in data.keys():
