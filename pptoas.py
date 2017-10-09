@@ -395,6 +395,7 @@ class GetTOAs:
                 toa_flags['nbin'] = nbin
                 toa_flags['nch'] = nchan
                 toa_flags['nchx'] = len(freqsx)
+                toa_flags['bw'] = freqsx.max() - freqsx.min()
                 toa_flags['subint'] = isub
                 toa_flags['tobs'] = subtimes[isub]
                 toa_flags['pp_tmplt'] = self.modelfile
