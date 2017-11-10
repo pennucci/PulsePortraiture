@@ -1950,7 +1950,8 @@ def fit_portrait(data, model, init_params, P, freqs, nu_fit=None, nu_out=None,
     #These are true 1-sigma errors iff covariance == 0
     param_errs = list(covariance_matrix.diagonal()**0.5)
     dof = len(data.ravel()) - (len(freqs) + 2)
-    red_chi2 = (d + results.fun) / dof
+    chi2 = (d + results.fun)
+    red_chi2 = chi2 / dof
     #Calculate scales
     scales = get_scales(data, model, phi, DM, P, freqs, nu_fit)
     #Errors on scales, if ever needed (these may be wrong b/c of covariances)
@@ -1959,8 +1960,8 @@ def fit_portrait(data, model, init_params, P, freqs, nu_fit=None, nu_out=None,
     snr = pow(np.sum(scales**2.0 * p_n / errs**2.0), 0.5)
     results = DataBunch(phase=phi_out, phase_err=param_errs[0], DM=DM,
             DM_err=param_errs[1], scales=scales, scale_errs=scale_errs,
-            nu_ref=nu_out, covariance=covariance, red_chi2=red_chi2, snr=snr,
-            duration=duration, nfeval=nfeval, return_code=return_code)
+            nu_ref=nu_out, covariance=covariance, chi2=chi2, red_chi2=red_chi2,
+            snr=snr, duration=duration, nfeval=nfeval, return_code=return_code)
     return results
 
 def get_noise(data, method=default_noise_method, **kwargs):

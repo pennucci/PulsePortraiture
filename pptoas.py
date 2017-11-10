@@ -87,9 +87,8 @@ class GetTOAs:
 
         datafiles is either a single PSRCHIVE file name, or a name of a
             metafile containing a list of archive names.
-        modelfile is a a write_model(...)-type of model file specifying the
-            Gaussian model parameters.  modelfile can also be an arbitrary
-            PSRCHIVE archive, although this feature is
+        modelfile is a ppgauss or ppinterp model file.  modelfile can also be
+            an arbitrary PSRCHIVE archive, although this feature is
             *not*quite*implemented*yet*.
         quiet=True suppresses output.
         """
