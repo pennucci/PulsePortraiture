@@ -1918,7 +1918,7 @@ def fit_portrait(data, model, init_params, P, freqs, nu_fit=None, nu_out=None,
     #If the fit fails...????  These don't seem to be great indicators of the
     #fit failing -- in particular return code 4.
     #if results.success is not True:
-    if not quiet and results.success is not True and results.status != 4:
+    if not quiet and results.success is not True: #and results.status != 4:
         if id is not None:
             ii = id[::-1].index("_")
             isub = id[-ii:]

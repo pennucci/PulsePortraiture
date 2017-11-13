@@ -306,9 +306,9 @@ class GetTOAs:
                 #Finally, Ns should be larger than nbin for very low S/N data,
                 #especially in the case of noisy models...
                 rot_port = rotate_data(portx, 0.0,
-                        DM_stored, P, freqsx, nu_fit)
+                        DM_stored, P, freqsx, np.inf)
                 #PSRCHIVE Dedisperses w.r.t. center of band, which is
-                #different, in general, from nu_fit; this results in a
+                #different, in general, from nu_fit or inf; this results in a
                 #phase offset w.r.t to what would be seen in the PSRCHIVE
                 #dedispersed portrait.
                 phase_guess = fit_phase_shift(rot_port.mean(axis=0),
@@ -320,6 +320,8 @@ class GetTOAs:
                 if phase_guess >= 0.5:
                     phase_guess -= 1.0
                 DM_guess = DM_stored
+                phase_guess = phase_transform(phase_guess, DM_guess, np.inf,
+                        nu_fit, P, mod=False)
                 #Need a status bar?
 
                 ####################
