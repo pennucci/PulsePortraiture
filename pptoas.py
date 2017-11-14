@@ -275,6 +275,7 @@ class GetTOAs:
                 #and the discrepancy in the phase estimates is at the sub-1ns
                 #level, and sub-micro-DM level; the covariances are also
                 #different, but all very similar as well.
+                nu_mean = freqsx.mean()
                 if nu_fit_default is None:
                     nu_fit = guess_fit_freq(freqsx, SNRsx)
                 else:
@@ -306,21 +307,15 @@ class GetTOAs:
                 #Finally, Ns should be larger than nbin for very low S/N data,
                 #especially in the case of noisy models...
                 rot_port = rotate_data(portx, 0.0,
-                        DM_stored, P, freqsx, np.inf)
+                        DM_stored, P, freqsx, nu_mean)
                 #PSRCHIVE Dedisperses w.r.t. center of band, which is
-                #different, in general, from nu_fit or inf; this results in a
-                #phase offset w.r.t to what would be seen in the PSRCHIVE
-                #dedispersed portrait.
+                #different, in general, from nu_mean; this results in a phase
+                #offset w.r.t to what would be seen in the PSRCHIVE dedispersed
+                #portrait.
                 phase_guess = fit_phase_shift(rot_port.mean(axis=0),
                         modelx.mean(axis=0), Ns=100).phase
-                #Currently, fit_phase_shift returns an unbounded phase,
-                #so here we transform to be on the interval [-0.5, 0.5]
-                #This may not be needed, but hasn't proved dangerous yet...
-                phase_guess = phase_guess % 1
-                if phase_guess >= 0.5:
-                    phase_guess -= 1.0
                 DM_guess = DM_stored
-                phase_guess = phase_transform(phase_guess, DM_guess, np.inf,
+                phase_guess = phase_transform(phase_guess, DM_guess, nu_mean,
                         nu_fit, P, mod=False)
                 #Need a status bar?
 

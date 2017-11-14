@@ -1908,17 +1908,16 @@ def fit_portrait(data, model, init_params, P, freqs, nu_fit=None, nu_out=None,
     start = time.time()
     results = minimize(fit_portrait_function, init_params, args=other_args,
             method=method, jac=fit_portrait_function_deriv, bounds=bounds,
-            options={'maxiter':1000, 'disp':False})
+            options={'maxiter':1000, 'disp':False, 'xtol':1e-9})
     duration = time.time() - start
     phi = results.x[0]
     DM = results.x[1]
     nfeval = results.nfev
     return_code = results.status
     rcstring = RCSTRINGS["%s"%str(return_code)]
-    #If the fit fails...????  These don't seem to be great indicators of the
-    #fit failing -- in particular return code 4.
-    #if results.success is not True:
-    if not quiet and results.success is not True: #and results.status != 4:
+    #return code 4, LSFAIL, has to proved to give bad results
+    #if not quiet and results.success is not True and results.status != 4:
+    if not quiet and results.success is not True:
         if id is not None:
             ii = id[::-1].index("_")
             isub = id[-ii:]
@@ -1940,7 +1939,7 @@ def fit_portrait(data, model, init_params, P, freqs, nu_fit=None, nu_out=None,
             p_n, dFFT, errs, P, freqs, nu_fit)[1]
     if nu_out is None:
         nu_out = nu_zero
-    phi_out = phase_transform(phi, DM, nu_fit, nu_out, P, mod=False)
+    phi_out = phase_transform(phi, DM, nu_fit, nu_out, P, mod=True)
     #Calculate Hessian
     hessian = fit_portrait_function_2deriv(np.array([phi_out, DM]),
             mFFT, p_n, dFFT, errs, P, freqs, nu_out)[0]
