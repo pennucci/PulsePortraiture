@@ -296,6 +296,7 @@ class GetTOAs:
                 ###############
                 #INITIAL GUESS#
                 ###############
+                DM_guess = DM_stored
                 #Having only one initial guess doesn't speed things up (at all)
                 #Having multiple initial guesses is better for generality,
                 #e.g. binary systems with poorly determined parameters.
@@ -307,16 +308,15 @@ class GetTOAs:
                 #Finally, Ns should be larger than nbin for very low S/N data,
                 #especially in the case of noisy models...
                 rot_port = rotate_data(portx, 0.0,
-                        DM_stored, P, freqsx, nu_mean)
+                        DM_guess, P, freqsx, nu_mean)
                 #PSRCHIVE Dedisperses w.r.t. center of band, which is
                 #different, in general, from nu_mean; this results in a phase
                 #offset w.r.t to what would be seen in the PSRCHIVE dedispersed
                 #portrait.
                 phase_guess = fit_phase_shift(rot_port.mean(axis=0),
                         modelx.mean(axis=0), Ns=100).phase
-                DM_guess = DM_stored
                 phase_guess = phase_transform(phase_guess, DM_guess, nu_mean,
-                        nu_fit, P, mod=False)
+                        nu_fit, P, mod=True)
                 #Need a status bar?
 
                 ####################

@@ -1908,14 +1908,16 @@ def fit_portrait(data, model, init_params, P, freqs, nu_fit=None, nu_out=None,
     start = time.time()
     results = minimize(fit_portrait_function, init_params, args=other_args,
             method=method, jac=fit_portrait_function_deriv, bounds=bounds,
-            options={'maxiter':1000, 'disp':False, 'xtol':1e-9})
+            options={'maxiter':1000, 'disp':False, 'xtol':1e-10})
     duration = time.time() - start
     phi = results.x[0]
     DM = results.x[1]
     nfeval = results.nfev
     return_code = results.status
     rcstring = RCSTRINGS["%s"%str(return_code)]
-    #return code 4, LSFAIL, has to proved to give bad results
+    #return code 4, LSFAIL, has not proved to give bad results
+    #Someimes a failure code is returned because xtol is too stringent, or
+    # the initial phase_guess is 'bad'
     #if not quiet and results.success is not True and results.status != 4:
     if not quiet and results.success is not True:
         if id is not None:
