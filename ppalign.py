@@ -255,7 +255,7 @@ if __name__ == "__main__":
     parser.add_option("-N", "--norm",
                       action="store", metavar="normalization", dest="norm",
                       default=None,
-                      help="Normalize the final averaged data by channel ('None' [default], 'mean', 'max' (not recommended), 'rms', or 'abs').")
+                      help="Normalize the final averaged data by channel ('None' [default], 'mean', 'max' (not recommended), 'prof', 'rms', or 'abs').")
     parser.add_option("-s", "--smooth",
                       default=False,
                       action="store_true", dest="smooth",

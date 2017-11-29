@@ -188,7 +188,7 @@ if __name__ == "__main__":
     parser.add_option("-N", "--norm",
                       action="store", metavar="normalization", dest="norm",
                       default="mean",
-                      help="Normalize the input data by channel ('None', 'mean' [default], 'max' (not recommended), 'rms' (off-pulse noise), or 'abs' (sqrt{vector modulus})).")
+                      help="Normalize the input data by channel ('None', 'mean' [default], 'max' (not recommended), 'rms' (off-pulse noise), 'prof' (mean profile flux), or 'abs' (sqrt{vector modulus})).")
     parser.add_option("-s", "--smooth",
                       action="store_true", metavar="smooth", dest="smooth",
                       default=False,
