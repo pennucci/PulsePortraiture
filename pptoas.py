@@ -20,8 +20,8 @@ from pplib import *
 #should be able to handle almost 1000.
 max_nfile = 999
 
-#See DC_fact in pplib.py
-if DC_fact:
+#See F0_fact in pplib.py
+if F0_fact:
     rm_baseline = True
 else:
     rm_baseline = False

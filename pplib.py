@@ -55,8 +55,9 @@ scattering_alpha = -4.0
 #_To_be_improved_.
 default_noise_method = 'PS'
 
-#Ignore DC component in Fourier fit if DC_fact == 0, else set DC_fact == 1.
-DC_fact = 0
+#Ignore 0-frequency (sum) component in Fourier fit if F0_fact == 0, else set
+#F0_fact == 1.
+F0_fact = 0
 
 #Upper limit on the width of a Gaussian component to "help" in fitting.
 #Should be either None or > 0.0.
@@ -469,7 +470,7 @@ class DataPortrait(object):
         Write the JOIN parameters to file.
 
         This function is a hack until something better is developed for how to
-        deal with these alignment parameters.
+            deal with these alignment parameters.
 
         NB: The join parameters are "opposite" of how they are used to rotate
             the data with e.g. rotate_data; use a negative!
@@ -802,7 +803,7 @@ def gen_gaussian_portrait(model_code, params, scattering_index, phases, freqs,
         to be provided.
 
     The units of the evolution parameters and the frequencies need to match
-    appropriately.
+        appropriately.
     """
     njoin = len(join_ichans)
     if njoin:
@@ -949,8 +950,8 @@ def powlaw_freqs(lo, hi, N, alpha, mid=False):
     Return frequencies spaced such that each channel has equal flux.
 
     Given a bandwidth from lo to hi frequencies, split into N channels, and a
-    power-law index alpha, this function finds the frequencies such that each
-    channel contains the same amount of flux.
+        power-law index alpha, this function finds the frequencies such that
+        each channel contains the same amount of flux.
 
     mid=True, returns N frequencies, corresponding to the center frequency in
         each channel. Default behavior returns N+1 frequencies (includes both
@@ -1378,8 +1379,8 @@ def pca(port, mean_prof=None, weights=None, ncomp=None, quiet=False):
     Compute the pricinpal components of port and reconstruct port.
 
     Returns the number ncomp, the reconstructed port projected into the space
-    of ncomp principle components, all eigenvectors, and all eigenvales.
-    The latter two are sorted by the eigenvalues.
+        of ncomp principle components, all eigenvectors, and all eigenvales.
+        The latter two are sorted by the eigenvalues.
 
     port is an nchan x nbin array of data values; in the PCA, these dimensions
         are interpreted as nmeasurements of nvariables, respectively.
@@ -1613,8 +1614,8 @@ def fit_gaussian_profile(data, init_params, errs, fit_flags=None,
 
     lmfit is used for the minimization.
     Returns an object containing an array of fitted parameter values, an array
-    of parameter errors, an array of the residuals, the chi-squared value, and
-    the number of degrees of freedom.
+        of parameter errors, an array of the residuals, the chi-squared value,
+        and the number of degrees of freedom.
 
     data is the pulse profile array of length nbin used in the fit.
     init_params is a list of initial guesses for the 2 + (ngauss*3) values;
@@ -1694,8 +1695,8 @@ def fit_gaussian_portrait(model_code, data, init_params, scattering_index,
 
     lmfit is used for the minimization.
     Returns an object containing an array of fitted parameter values, an array
-    of parameter errors, the chi-squared value, and the number of degrees of
-    freedom.
+        of parameter errors, the chi-squared value, and the number of degrees
+        of freedom.
 
     model_code is a three digit string specifying the evolutionary functions
         to be used for the three Gaussian parameters (loc,wid,amp); see
@@ -1820,11 +1821,11 @@ def fit_phase_shift(data, model, noise=None, bounds=[-0.5, 0.5], Ns=100):
 
     This is a simple implementation of FFTFIT using a brute-force algorithm
     Returns an object containing the fitted parameter values (phase and scale),
-    the parameter errors, and the reduced chi-squared value.
+        the parameter errors, and the reduced chi-squared value.
 
     The returned phase is the phase of the data with respect to the model.
     NB: the provided rotation functions rotate to earlier phases, given a
-    positive phase.
+        positive phase.
 
     data is the array of data profile values.
     model is the array of model profile values.
@@ -1833,9 +1834,9 @@ def fit_phase_shift(data, model, noise=None, bounds=[-0.5, 0.5], Ns=100):
     Ns is the number of grid points passed to opt.brute; *linear* slow-down!
     """
     dFFT = fft.rfft(data)
-    dFFT[0] *= DC_fact
+    dFFT[0] *= F0_fact
     mFFT = fft.rfft(model)
-    mFFT[0] *= DC_fact
+    mFFT[0] *= F0_fact
     if noise is None:
         #err = np.real(dFFT[-len(dFFT)/4:]).std()
         err = get_noise(data) * np.sqrt(len(data)/2.0)
@@ -1857,7 +1858,7 @@ def fit_phase_shift(data, model, noise=None, bounds=[-0.5, 0.5], Ns=100):
     scale_error = p**-0.5
     red_chi2 = (d - ((fmin**2) / p)) / (len(data) - 2)
     #SNR of the fit, based on PDB's notes
-    snr = pow(scale**2 * p / err**2, 0.5)
+    snr = pow(scale**2 * p, 0.5)
     return DataBunch(phase=phase, phase_err=phase_error, scale=scale,
             scale_error=scale_error, snr=snr, red_chi2=red_chi2,
             duration=duration)
@@ -1869,7 +1870,7 @@ def fit_portrait(data, model, init_params, P, freqs, nu_fit=None, nu_out=None,
 
     A truncated Newtonian algorithm is used.
     Returns an object containing the fitted parameter values, the parameter
-    errors, and other attributes.
+        errors, and other attributes.
 
     data is the nchan x nbin phase-frequency data portrait.
     model is the nchan x nbin phase-frequency model portrait.
@@ -1888,9 +1889,9 @@ def fit_portrait(data, model, init_params, P, freqs, nu_fit=None, nu_out=None,
     quiet = False produces more diagnostic output.
     """
     dFFT = fft.rfft(data, axis=1)
-    dFFT[:, 0] *= DC_fact
+    dFFT[:, 0] *= F0_fact
     mFFT = fft.rfft(model, axis=1)
-    mFFT[:, 0] *= DC_fact
+    mFFT[:, 0] *= F0_fact
     if errs is None:
         #errs = np.real(dFFT[:, -len(dFFT[0])/4:]).std(axis=1)
         errs = get_noise(data, chans=True) * np.sqrt(len(data[0])/2.0)
@@ -2019,8 +2020,8 @@ def get_noise_fit(data, fact=1.1, chans=False):
     Estimate the off-pulse noise.
 
     This function will estimate the noise based on the mean of the highest
-    harmonics, where critical cutoff harmonic is found by a fit of a
-    half-triangle function to the power-spectrum of the data.
+        harmonics, where critical cutoff harmonic is found by a fit of a
+        half-triangle function to the power-spectrum of the data.
 
     data is a 1- or 2-D array of values.
     fact is a value to scale the fitted cutoff harmonic.
@@ -2085,9 +2086,9 @@ def get_scales(data, model, phase, DM, P, freqs, nu_ref=np.inf):
     """
     scales = np.zeros(len(freqs))
     dFFT = fft.rfft(data, axis=1)
-    dFFT[:, 0] *= DC_fact
+    dFFT[:, 0] *= F0_fact
     mFFT = fft.rfft(model, axis=1)
-    mFFT[:, 0] *= DC_fact
+    mFFT[:, 0] *= F0_fact
     p_n = np.real(np.sum(mFFT * np.conj(mFFT), axis=1))
     D = Dconst * DM / P
     harmind = np.arange(len(mFFT[0]))
@@ -2101,8 +2102,8 @@ def rotate_data(data, phase=0.0, DM=0.0, Ps=None, freqs=None, nu_ref=np.inf):
     """
     Rotate and/or dedisperse data.
 
-    Positive values of phase and DM rotate the data to earlier phases
-    (i.e. it "dedisperses").
+    Positive values of phase and DM rotate the data to earlier phases (i.e., it
+        "dedisperses") for freqs < nu_ref.
 
     Simpler functions are rotate_portrait or rotate_profile.
 
@@ -2193,10 +2194,10 @@ def rotate_portrait(port, phase=0.0, DM=None, P=None, freqs=None,
     Rotate and/or dedisperse a portrait.
 
     Positive values of phase and DM rotate the data to earlier phases
-    (i.e. it "dedisperses").
+        (i.e. it "dedisperses") for freqs < nu_ref.
 
     When used to dediserpse, rotate_portrait is virtually identical to
-    arch.dedisperse() in PSRCHIVE.
+        arch.dedisperse() in PSRCHIVE.
 
     port is a nchan x nbin array of data values.
     phase is a value specifying the amount of achromatic rotation [rot].
@@ -2376,7 +2377,7 @@ def guess_fit_freq(freqs, SNRs=None):
     Estimate a zero-covariance frequency.
 
     Returns a "center of mass" frequency, where the weights are given by
-    SNR*(freq**-2).
+        SNR*(freq**-2).
 
     freqs is an array of frequencies.
     SNRs is an array of signal-to-noise ratios (defaults to 1s).
@@ -2615,7 +2616,7 @@ def read_model(modelfile, phases=None, freqs=None, P=None, quiet=False):
         (model name, model reference frequency, number of Gaussian components,
         list of parameters, list of fit flags).
     Otherwise, builds a model based on the input phases, frequencies, and
-    period (if scattering timescale != 0.0).
+        period (if scattering timescale != 0.0).
 
     modelfile is the name of the write_model(...)-type of model file.
     phases is an array of phase-bin centers [rot].
