@@ -524,8 +524,8 @@ class GetTOAs:
                 toa_flags['subint'] = isub
                 toa_flags['tobs'] = subtimes[isub]
                 toa_flags['tmplt'] = self.modelfile
-                if nu_ref_tuple is not None and self.fit_phi and self.fit_DM:
-                    toa_flags['phi_DM_cov'] = results.covariance[0,1]
+                if nu_ref_DM is not None and self.fit_phi and self.fit_DM:
+                    toa_flags['phi_DM_cov'] = results.covariance_matrix[0,1]
                 toa_flags['gof'] = results.red_chi2
                 if print_phase: toa_flags['phs'] = results.phi
                 toa_flags['snr'] = results.snr
