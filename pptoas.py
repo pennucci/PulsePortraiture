@@ -11,7 +11,7 @@
 #Written by Timothy T. Pennucci (TTP; tim.pennucci@nanograv.org).
 #Contributions by Scott M. Ransom (SMR) and Paul B. Demorest (PBD).
 
-from pplib import *
+from pptoaslib import *
 
 #cfitsio defines a maximum number of files (NMAXFILES) that can be opened in
 #the header file fitsio2.h.  Without calling unload() with PSRCHIVE, which
@@ -101,59 +101,87 @@ class GetTOAs:
             print "Too many archives.  See/change max_nfile(=%d) in pptoas.py."%max_nfile
             sys.exit()
         self.is_FITS_model = file_is_type(modelfile, "FITS")
-        self.modelfile = modelfile
-        self.obs = []
-        self.nu0s = []
-        self.nu_fits = []
-        self.nu_refs = []
-        self.ok_isubs = []
-        self.epochs = []
-        self.MJDs = []
-        self.Ps = []
-        self.phis = []
-        self.phi_errs = []
-        self.TOAs = []
-        self.TOA_errs = []
-        self.DM0s = []
-        self.DMs = []
-        self.DM_errs = []
-        self.DeltaDM_means = []
-        self.DeltaDM_errs = []
-        self.doppler_fs = []
-        self.scales = []
-        self.scale_errs = []
-        self.covariances = []
-        self.red_chi2s = []
-        self.nfevals = []
-        self.rcs = []
-        self.fit_durations = []
-        self.quiet = quiet
-        self.order = []
-        self.TOA_list = []
+        self.modelfile = modelfile  # the model file in use
+        self.obs = []  # observatories from the observations
+        self.doppler_fs = []  # PSRCHIVE Doppler factors from Earth's motion
+        self.nu0s = []  # PSRCHIVE center frequency
+        self.nu_fits = []  # reference frequencies for the fit
+        self.nu_refs = []  # reference frequencies for the output
+        self.ok_isubs = [] # list of indices for the good subintegrations
+        self.epochs = []  # PSRCHIVE midpoints of the subintegrations
+        self.MJDs = []  # same as epochs, in days
+        self.Ps = []  # PSRCHIVE spin period at each epoch
+        self.phis = []  # the fitted phase shifts / phi parameter
+        self.phi_errs = [] # their uncertainties
+        self.TOAs = []  # the fitted TOA
+        self.TOA_errs = []  # their uncertainties
+        self.DM0s = []  # the stored PSRCHIVE header DMs
+        self.DMs = []  # the fitted DMs (may include the Doppler correction)
+        self.DM_errs = []  # their uncertainties
+        self.DeltaDM_means = []  # fitted single mean DM-DM0
+        self.DeltaDM_errs = []  # their uncertainties
+        self.taus = []  # fitted scattering timescales
+        self.tau_errs = []  # their uncertainties
+        self.alphas = []  # fitted scattering indices
+        self.alpha_errs = []  # their uncertainties
+        self.GMs = []  # fitted "GM" parameter, from delays that go as nu**-4
+        self.GM_errs = []  # their uncertainties
+        self.scales = []  # fitted per-channel scaling parameters
+        self.scale_errs = []  # their uncertainties
+        self.covariances = []  # full covariance matrices
+        self.red_chi2s = []  # reduced chi2 values of the fit
+        self.nfevals = []  # number of likelihood function evaluations
+        self.rcs = []  # return codes from the fit
+        self.fit_durations = []  # durations of the fit
+        self.order = []  # order that datafiles are examined (deprecated)
+        self.TOA_list = []  # complete, single list of TOAs
+        self.quiet = quiet  # be quiet?
 
-    def get_TOAs(self, datafile=None, nu_ref=None, DM0=None, bary_DM=True,
-            fit_DM=True, bounds=[(None, None), (None, None)], nu_fit=None,
-            show_plot=False, addtnl_toa_flags={}, quiet=None):
+    def get_TOAs(self, datafile=None, nu_refs=None, DM0=None,
+            bary_DM=True, fit_DM=True, fit_GM=False, fit_scat=False,
+            log10_tau=True, fix_alpha=False, print_phase=False,
+            method='trust-ncg', bounds=None, nu_fits=None, show_plot=False,
+            addtnl_toa_flags={}, quiet=None):
         """
-        Measure phases (TOAs) and dispersion measures (DMs).
+        Measure TOAs from wideband data accounting for numerous ISM effects.
 
         datafile defaults to self.datafiles, otherwise it is a single
             PSRCHIVE archive name
-        nu_ref is the desired output reference frequency [MHz] of the TOAs;
-            defaults to the zero-covariance frequency.
+        nu_refs is a tuple containing two output reference frequencies [MHz],
+            one for the TOAs, and the other for the scattering timescales;
+            defaults to the zero-covariance frequency between the TOA and DM,
+            and the scattering timescale and index, respectively.
         DM0 is the baseline dispersion measure [cm**-3 pc]; defaults to what is
             stored in each datafile.
-        bary_DM=True corrects the measured DMs based on the Doppler motion of
-            the observatory with respect to the solar system barycenter.
-        fit_DM=False will fit only for a phase; if this is the case, you might
-            want to set bary_DM to False.
-        bounds is a list of two 2-tuples, giving the lower and upper bounds on
-            the phase and dispersion measure, respectively.
-        nu_fit is the reference frequency [MHz] used in the fit; defaults to
-            a guess at the zero-covariance frequency based on signal-to-noise
+        bary_DM=True corrects the measured DMs (and GMs) based on the Doppler
+            motion of the observatory with respect to the solar system
+            barycenter.
+        fit_DM=False will not fit for DM; if this is the case, you might want
+            to set bary_DM to False.
+        fit_GM=True will fit for a parameter ('GM') characterizing a delay term
+            for each TOA that scales as nu**-4.  Will be highly covariant with
+            DM.
+        fit_scat=True will fit the scattering timescale and index for each TOA.
+        log10_tau=True does the scattering fit with log10(scattering timescale)
+            as the parameter.
+        fix_alpha=True will hold the scattering index fixed, in the case that
+            fit_scat==True.  alpha is fixed to the value specified in the
+            .gmodel file, or scattering_alpha in pplib.py if no .gmodel is
+            provided.
+        print_phase=True will print the fitted parameter phi on the TOA line
+            with the flag -phs.
+        method is the scipy.optimize.minimize method; currently can be 'TNC',
+            'Newton-CG', or 'trust-cng', which are all Newton
+            Conjugate-Gradient algorithms.
+        bounds is a list of five 2-tuples, giving the lower and upper bounds on
+            the phase, dispersion measure, GM, tau, and alpha parameters,
+            respectively.  NB: this is only used if method=='TNC'.
+        nu_fits is a tuple (deprecated), analogous to nu_ref, where these
+            reference frequencies [MHz] are used in the fit; defaults to a
+            guess at the zero-covariance frequency based on signal-to-noise
             ratios.
-        show_plot=True will show a plot at the end of the fitting; it is only
-            useful if the number of subintegrations in a datafile > 1.
+        show_plot=True will show a plot of the fitted model, data, and
+            residuals at the end of the fitting.
         addtnl_toa_flags are pairs making up TOA flags to be written uniformly
             to all tempo2-formatted TOAs. e.g. ('pta','NANOGrav','version',0.1)
         quiet=True suppresses output.
@@ -162,13 +190,34 @@ class GetTOAs:
         already_warned = False
         warning_message = \
                 "You are using an experimental functionality of pptoas!"
-        self.nu_ref = nu_ref
+        self.nfit = 1
+        self.nchan_min = 1
+        if fit_DM:
+            self.nfit += 1
+            self.nchan_min += 1
+        if fit_GM:
+            self.nfit += 1
+            self.nchan_min += 1
+        if fit_scat: self.nfit += 2
+        if fix_alpha: self.nfit -= 1
+        self.fit_phi = True
+        self.fit_DM = fit_DM
+        self.fit_GM = fit_GM
+        self.fit_tau = self.fit_alpha = fit_scat
+        if fit_scat: self.fit_alpha = not fix_alpha
+        if self.fit_alpha: self.nchan_min = max(2, self.nchan_min)
+        self.fit_flags = [int(self.fit_phi), int(self.fit_DM),
+                int(self.fit_GM), int(self.fit_tau), int(self.fit_alpha)]
+        self.log10_tau = log10_tau
+        if not fit_scat:
+            self.log10_tau = log10_tau = False
+        nu_ref_tuple = nu_refs
+        nu_fit_tuple = nu_fits
         self.DM0 = DM0
         self.bary_DM = bary_DM
         self.ok_idatafiles = []
         start = time.time()
         tot_duration = 0.0
-        nu_fit_default = nu_fit
         if datafile is None:
             datafiles = self.datafiles
         else:
@@ -200,24 +249,31 @@ class GetTOAs:
             #Observation info
             obs = DataBunch(telescope=telescope, backend=backend,
                     frontend=frontend, tempo_code=tempo_code)
-            nu_fits = np.zeros(nsub, dtype=np.float64)
-            nu_refs = np.zeros(nsub, dtype=np.float64)
+            doppler_fs = np.ones(nsub, dtype=np.float64)
+            nu_fits = list(np.zeros([nsub, 3], dtype=np.float64))
+            nu_refs = list(np.zeros([nsub, 3], dtype=np.float64))
             phis = np.zeros(nsub, dtype=np.double)
             phi_errs = np.zeros(nsub, dtype=np.double)
             TOAs = np.zeros(nsub, dtype="object")
             TOA_errs = np.zeros(nsub, dtype="object")
             DMs = np.zeros(nsub, dtype=np.float64)
             DM_errs = np.zeros(nsub, dtype=np.float64)
-            doppler_fs = np.ones(nsub, dtype=np.float64)
+            GMs = np.zeros(nsub, dtype=np.float64)
+            GM_errs = np.zeros(nsub, dtype=np.float64)
+            taus = np.zeros(nsub, dtype=np.float64)
+            tau_errs = np.zeros(nsub, dtype=np.float64)
+            alphas = np.zeros(nsub, dtype=np.float64)
+            alpha_errs = np.zeros(nsub, dtype=np.float64)
             nfevals = np.zeros(nsub, dtype="int")
             rcs = np.zeros(nsub, dtype="int")
             scales = np.zeros([nsub, nchan], dtype=np.float64)
             scale_errs = np.zeros([nsub, nchan], dtype=np.float64)
-            red_chi2s = np.zeros(nsub)
-            covariances = np.zeros(nsub)
+            red_chi2s = np.zeros(nsub, dtype=np.float64)
+            covariances = np.zeros([nsub, self.nfit, self.nfit],
+                    dtype=np.float64)
             #PSRCHIVE epochs are *midpoint* of the integration
-            MJDs = np.array([epochs[isub].in_days()
-                for isub in xrange(nsub)], dtype=np.double)
+            MJDs = np.array([epochs[isub].in_days() \
+                    for isub in xrange(nsub)], dtype=np.double)
             DM_stored = DM # = arch.get_dispersion_measure()
             if self.DM0 is None:
                 DM0 = DM_stored
@@ -252,9 +308,29 @@ class GetTOAs:
                 if not self.is_FITS_model:
                     #Read model
                     try:
-                        self.model_name, self.ngauss, model = read_model(
-                                self.modelfile, phases, freqs[isub], Ps[isub],
-                                quiet=bool(quiet+(itoa-1)))
+                        if not fit_scat:
+                            self.model_name, self.ngauss, model = read_model(
+                                    self.modelfile, phases, freqs[isub],
+                                    Ps[isub],
+                                    quiet=bool(quiet+(itoa-1)))
+                        else:
+                            if not already_warned:
+                                print warning_message
+                                already_warned = True
+                            self.model_name, self.ngauss, full_model = \
+                                    read_model(self.modelfile, phases,
+                                            freqs[isub], Ps[isub],
+                                            quiet=bool(quiet+(itoa-1)))
+                            self.model_name, self.model_code, \
+                                    self.model_nu_ref, self.ngauss, \
+                                    self.gparams, fit_flags, self.alpha, \
+                                    fit_alpha = read_model(self.modelfile,
+                                            quiet=bool(quiet+(itoa-1)))
+                            unscat_params = np.copy(self.gparams)
+                            unscat_params[1] = 0.0
+                            model = unscat_model = gen_gaussian_portrait(
+                                    self.model_code, unscat_params, 0.0,
+                                    phases, freqs[isub], self.model_nu_ref)
                     except UnboundLocalError:
                         self.model_name, model = read_interp_model(
                                 self.modelfile, freqs[isub], nbin,
@@ -269,84 +345,111 @@ class GetTOAs:
                 SNRsx = SNRs[isub,0,ok_ichans[isub]]
                 #NB: Time-domain uncertainties below
                 errs = noise_stds[isub,0,ok_ichans[isub]]
-                #nu_fit is a guess at nu_zero, the zero-covariance frequency,
-                #which is calculated after. This attempts to minimize the
-                #number of function calls.  Lower frequencies mean more calls,
-                #and the discrepancy in the phase estimates is at the sub-1ns
-                #level, and sub-micro-DM level; the covariances are also
-                #different, but all very similar as well.
+                #nu_fit is the reference frequency for parameters in the fit
                 nu_mean = freqsx.mean()
-                if nu_fit_default is None:
+                if nu_fit_tuple is None:
+                    #NB: the subints are dedispersed at different nu_fit.
                     nu_fit = guess_fit_freq(freqsx, SNRsx)
+                    nu_fit_DM = nu_fit_GM = nu_fit_tau = nu_fit
                 else:
-                    nu_fit = nu_fit_default
-                nu_fits[isub] = nu_fit
+                    nu_fit_DM = nu_fit_GM = nu_fit_tuple[0]
+                    nu_fit_tau = nu_fit_tuple[1]
+                nu_fits[isub] = [nu_fit_DM, nu_fit_GM, nu_fit_tau]
+                if nu_ref_tuple is None:
+                    nu_ref = None
+                    nu_ref_DM = nu_ref_GM = nu_ref_tau = nu_ref
+                else:
+                    nu_ref_DM = nu_ref_GM = nu_ref_tuple[0]
+                    nu_ref_tau = nu_ref_tuple[1]
+                nu_refs[isub] = [nu_ref_DM, nu_ref_GM, nu_ref_tau]
 
-                ####################
-                #DOPPLER CORRECTION#
-                ####################
-                #In principle, we should be able to correct the frequencies,
-                #but since this is a messy business, it is easier to correct
-                #the DM itself (below).
-                #df = arch.get_Integration(int(isub)).get_doppler_factor()
-                #freqsx = doppler_correct_freqs(freqsx, df)
-                #nu0 = doppler_correct_freqs(nu0, df)
-                ####################
-
-                ###############
-                #INITIAL GUESS#
-                ###############
+                #################
+                #INITIAL GUESSES#
+                #################
                 DM_guess = DM_stored
-                #Having only one initial guess doesn't speed things up (at all)
-                #Having multiple initial guesses is better for generality,
-                #e.g. binary systems with poorly determined parameters.
-                #One may envision a system that uses the previous phase
-                #estimate as the next guess, but that could be bad, if one
-                #subint is contaminated or very poorly determined.
-                #Also have to be careful below, since the subints are 
-                #dedispersed at different nu_fit.
-                #Finally, Ns should be larger than nbin for very low S/N data,
-                #especially in the case of noisy models...
-                rot_port = rotate_data(portx, 0.0,
-                        DM_guess, P, freqsx, nu_mean)
-                #PSRCHIVE Dedisperses w.r.t. center of band, which is
-                #different, in general, from nu_mean; this results in a phase
-                #offset w.r.t to what would be seen in the PSRCHIVE dedispersed
-                #portrait.
-                phase_guess = fit_phase_shift(rot_port.mean(axis=0),
-                        modelx.mean(axis=0), Ns=100).phase
-                phase_guess = phase_transform(phase_guess, DM_guess, nu_mean,
-                        nu_fit, P, mod=True)
+                rot_port = rotate_data(portx, 0.0, DM_guess, P, freqsx,
+                        nu_mean)
+                rot_prof = rot_port.mean(axis=0)
+                GM_guess = 0.0
+                tau_guess = 0.0
+                alpha_guess = 0.0
+                if fit_scat:
+                    if hasattr(self, 'alpha'): alpha_guess = self.alpha
+                    else: alpha_guess = scattering_alpha
+                    if hasattr(self, 'gparams'):
+                        tau_guess = (self.gparams[1] / P) * \
+                                (nu_fit_tau/self.model_nu_ref)**alpha_guess
+                    else:
+                        #tau_guess = guess_tau(rot_prof, modelx.mean(axis=0))
+                        tau_guess = 0.0
+                    model_prof_scat = np.fft.irfft(scattering_portrait_FT(
+                        np.array([scattering_times(tau_guess, alpha_guess,
+                            nu_mean, nu_mean)]), nbin)[0] * np.fft.rfft(
+                                modelx.mean(axis=0)))
+                    phi_guess = fit_phase_shift(rot_prof,
+                            model_prof_scat, Ns=100).phase
+                    if self.log10_tau:
+                        if tau_guess == 0.0: tau_guess = nbin**-1
+                        tau_guess = np.log10(tau_guess)
+                else:
+                    #NB: Ns should be larger than nbin for very low S/N data,
+                    #especially in the case of noisy models...
+                    phi_guess = fit_phase_shift(rot_prof, modelx.mean(axis=0),
+                            Ns=100).phase
+                phi_guess = phase_transform(phi_guess, DM_guess, nu_mean,
+                        nu_fit_DM, P, mod=True) # why not use nu_fit at first?
                 #Need a status bar?
+                param_guesses = [phi_guess, DM_guess, GM_guess, tau_guess,
+                        alpha_guess]
+                if bounds is None and method == 'TNC':
+                    phi_bounds = (None, None)
+                    DM_bounds = (None, None)
+                    GM_bounds = (None, None)
+                    if not self.log10_tau: tau_bounds = (0.0, None)
+                    else: tau_bounds = (np.log10((10*nbin)**-1), None)
+                    alpha_bounds = (-10.0, 10.0)
+                    bounds = [phi_bounds, DM_bounds, GM_bounds, tau_bounds,
+                            alpha_bounds]
 
                 ####################
                 #      THE FIT     #
                 ####################
                 if not quiet:
                     print "Fitting for TOA #%d"%(itoa)
-                if len(freqsx) > 1:
-                    results = fit_portrait(portx, modelx,
-                            np.array([phase_guess, DM_guess]), P, freqsx,
-                            nu_fit, self.nu_ref, errs, bounds=bounds, id=id,
-                            quiet=quiet)
+                if len(freqsx) >= self.nchan_min:
+                    results = fit_portrait_full(portx, modelx, param_guesses,
+                            P, freqsx, nu_fits[isub], nu_refs[isub], errs,
+                            self.fit_flags, bounds, self.log10_tau, option=0,
+                            id=id, method=method, quiet=quiet)
+                    # Old code
+                    #results = fit_portrait(portx, modelx,
+                    #        np.array([phi_guess, DM_guess]), P, freqsx,
+                    #        nu_fit_DM, nu_ref_DM, errs, bounds=bounds, id=id,
+                    #        quiet=quiet)
+                    #results.phi = results.phase
+                    #results.phi_err = results.phase_err
+                    #results.GM = results.GM_err = 0.0
+                    #results.tau = results.tau_err = 0.0
+                    #results.alpha = results.alpha_err = 0.0
+                    #results.covariance_matrix = np.zeros([2,2])
+                    #results.nu_DM = results.nu_GM = results.nu_tau = results.nu_ref
                 else:  #1-channel hack
                     if not quiet:
-                        print "TOA has one frequency channel!..."
-                        print "...using Fourier phase gradient routine..."
+                        print "TOA only has %d frequency channel!..."%len(
+                                freqsx)
+                        print "...using Fourier phase gradient routine to fit phase only..."
                         if self.nu_ref is not None:
                             print "--nu_ref will be ignored!"
                     results = fit_phase_shift(portx[0], modelx[0], errs[0],
                             Ns=nbin)
                     results.DM = None #DM_stored
                     results.DM_err = None #0.0
-                    results.nu_ref = freqsx[0]
+                    results.nu_refs = [freqsx[0], freqsx[0], freqsx[0]]
                     results.nfeval = 0
                     results.return_code = -2
                     results.scales = np.array([results.scale])
                     results.scale_errs = np.array([results.scale_error])
-                    results.covariance = 0.0
-                results.phi = results.phase
-                results.phi_err = results.phase_err
+                    results.covariance_matrix = np.identity(self.nfit)
                 fit_duration += results.duration
 
                 ####################
@@ -366,25 +469,48 @@ class GetTOAs:
                     df = doppler_factors[isub]
                     if len(freqsx) > 1:
                         results.DM *= df  #NB: No longer the *fitted* value!
+                        results.GM *= df  #NB: No longer the *fitted* value!
                     doppler_fs[isub] = df
                 else:
                     doppler_fs[isub] = 1.0
 
-                nu_refs[isub] = results.nu_ref
+                #show_portrait(portx)
+                nu_refs[isub] = [results.nu_DM, results.nu_GM, results.nu_tau]
                 phis[isub] = results.phi
                 phi_errs[isub] = results.phi_err
                 TOAs[isub] = results.TOA
                 TOA_errs[isub] = results.TOA_err
                 DMs[isub] = results.DM
                 DM_errs[isub] = results.DM_err
+                GMs[isub] = results.GM
+                GM_errs[isub] = results.GM_err
+                taus[isub] = results.tau
+                tau_errs[isub] = results.tau_err
+                alphas[isub] = results.alpha
+                alpha_errs[isub] = results.alpha_err
                 nfevals[isub] = results.nfeval
                 rcs[isub] = results.return_code
                 scales[isub, ok_ichans[isub]] = results.scales
                 scale_errs[isub, ok_ichans[isub]] = results.scale_errs
-                covariances[isub] = results.covariance
+                covariances[isub] = results.covariance_matrix
                 red_chi2s[isub] = results.red_chi2
                 #Compile useful TOA flags
                 toa_flags = {}
+                if fit_GM:
+                    toa_flags['gm'] = results.GM
+                    toa_flags['gm_err'] = results.GM_err
+                if fit_scat:
+                    if self.log10_tau:
+                        toa_flags['scat_time'] = 10**results.tau * P * 1e6#usec
+                        toa_flags['log10_scat_time'] = results.tau + \
+                                np.log10(P)
+                        toa_flags['log10_scat_time_err'] = results.tau_err
+                    else:
+                        toa_flags['scat_time'] = results.tau * P * 1e6 # usec
+                        toa_flags['scat_time_err'] = results.tau_err * P * 1e6
+                    toa_flags['scat_ind'] = results.alpha
+                    toa_flags['scat_ind_err'] = results.alpha_err
+                    toa_flags['scat_ref_freq'] = results.nu_tau
                 toa_flags['be'] = backend
                 toa_flags['fe'] = frontend
                 toa_flags['f'] = frontend + "_" + backend
@@ -394,17 +520,17 @@ class GetTOAs:
                 toa_flags['bw'] = freqsx.max() - freqsx.min()
                 toa_flags['subint'] = isub
                 toa_flags['tobs'] = subtimes[isub]
-                toa_flags['pp_tmplt'] = self.modelfile
-                if self.nu_ref is not None:
-                    toa_flags['pp_cov'] = results.covariance
-                toa_flags['pp_gof'] = results.red_chi2
-                #toa_flags['pp_phs'] = results.phi
-                toa_flags['pp_snr'] = results.snr
+                toa_flags['tmplt'] = self.modelfile
+                if nu_ref_tuple is not None and self.fit_phi and self.fit_DM:
+                    toa_flags['phi_DM_cov'] = results.covariance[0,1]
+                toa_flags['gof'] = results.red_chi2
+                if print_phase: toa_flags['phs'] = results.phi
+                toa_flags['snr'] = results.snr
                 for k,v in addtnl_toa_flags.iteritems():
                     toa_flags[k] = v
-                self.TOA_list.append(TOA(datafile, results.nu_ref, results.TOA,
-                        results.TOA_err, telescope.lower(), results.DM,
-                        results.DM_err, toa_flags))
+                self.TOA_list.append(TOA(datafile, results.nu_DM, results.TOA,
+                    results.TOA_err, telescope.lower(), results.DM,
+                    results.DM_err, toa_flags))
                 itoa += 1
 
             DeltaDMs = DMs - DM0
@@ -423,6 +549,7 @@ class GetTOAs:
             DeltaDM_err = DeltaDM_var**0.5
             self.order.append(datafile)
             self.obs.append(obs)
+            self.doppler_fs.append(doppler_fs)
             self.nu0s.append(nu0)
             self.nu_fits.append(nu_fits)
             self.nu_refs.append(nu_refs)
@@ -442,7 +569,12 @@ class GetTOAs:
             self.DM_errs.append(DM_errs)
             self.DeltaDM_means.append(DeltaDM_mean)
             self.DeltaDM_errs.append(DeltaDM_err)
-            self.doppler_fs.append(doppler_fs)
+            self.GMs.append(GMs)
+            self.GM_errs.append(GM_errs)
+            self.taus.append(taus)
+            self.tau_errs.append(tau_errs)
+            self.alphas.append(alphas)
+            self.alpha_errs.append(alpha_errs)
             self.scales.append(scales)
             self.scale_errs.append(scale_errs)
             self.covariances.append(covariances)
@@ -459,8 +591,7 @@ class GetTOAs:
             if show_plot:
                 stop = time.time()
                 tot_duration += stop - start
-                self.show_results(datafile)
-                #self.show_fit(datafile)
+                self.show_fit(datafile)
                 start = time.time()
         if not show_plot:
             tot_duration = time.time() - start
@@ -652,9 +783,10 @@ class GetTOAs:
         phi = self.phis[ifile][isub]
         #Pre-corrected DM, if corrected
         DM_fitted = self.DMs[ifile][isub] / self.doppler_fs[ifile][isub]
+        GM_fitted = self.GMs[ifile][isub] / self.doppler_fs[ifile][isub]
         scales = self.scales[ifile][isub]
         freqs = data.freqs[isub]
-        nu_ref = self.nu_refs[ifile][isub]
+        nu_ref_DM, nu_ref_GM, nu_ref_tau = self.nu_refs[ifile][isub]
         P = data.Ps[isub]
         phases = data.phases
         if self.is_FITS_model:
@@ -673,11 +805,25 @@ class GetTOAs:
                 model_name, ngauss, model = read_model(self.modelfile, phases,
                         freqs, data.Ps.mean(), quiet=quiet)
                         #freqs, data.Ps[isub], quiet=quiet)     #Track down
+                if self.taus[ifile][isub] != 0.0:
+                    model_name, model_code, model_nu_ref, ngauss, gparams, \
+                            fit_flags, alpha, fit_alpha = read_model(
+                                    self.modelfile, quiet=quiet)
+                    gparams[1] = 0.0
+                    model = gen_gaussian_portrait(model_code, gparams, 0.0,
+                            phases, freqs, model_nu_ref)
             except:
                 model_name, model = read_interp_model(self.modelfile,
                         freqs, data.nbin, quiet=True) #quiet=bool(quiet+(itoa-1)))
-        port = rotate_data(data.subints[isub,0], phi, DM_fitted, P, freqs,
-                nu_ref)
+        if self.taus[ifile][isub] != 0.0:
+            tau = self.taus[ifile][isub]
+            if self.log10_tau: tau = 10**tau
+            alpha = self.alphas[ifile][isub]
+            model = np.fft.irfft(scattering_portrait_FT(
+                scattering_times(tau, alpha, freqs, nu_ref_tau), data.nbin) * \
+                        np.fft.rfft(model, axis=1), axis=1)
+        port = rotate_portrait_full(data.subints[isub,0], phi, DM_fitted,
+                GM_fitted, freqs, nu_ref_DM, nu_ref_GM, P)
         if rotate:
             model = rotate_data(model, rotate)
             port = rotate_data(port, rotate)
@@ -692,104 +838,6 @@ class GetTOAs:
         if return_fit:
             return (port, model_scaled, data.ok_ichans[isub], freqs,
                     data.noise_stds[isub,0])
-
-    def show_results(self, datafile=None):
-        """
-        Show a plot of the fitted phases and dispersion measures.
-
-        Only useful if the number of subintegrations > 1.
-
-        datafile is a single PSRCHIVE archive name; defaults to the first one
-            listed in self.datafiles.
-
-        To be improved.
-        """
-        if datafile is None:
-            datafile = self.datafiles[0]
-        ifile = list(np.array(self.datafiles)[self.ok_idatafiles]).index(
-                datafile)
-        ok_isubs = self.ok_isubs[ifile]
-        nu_fits = self.nu_fits[ifile][ok_isubs]
-        nu_refs = self.nu_refs[ifile][ok_isubs]
-        MJDs = self.MJDs[ifile][ok_isubs]
-        Ps = self.Ps[ifile][ok_isubs]
-        phis = self.phis[ifile][ok_isubs]
-        phi_errs = self.phi_errs[ifile][ok_isubs]
-        #These are the 'barycentric' DMs, if they were corrected (default yes)
-        DMs = self.DMs[ifile][ok_isubs]
-        DM_errs = self.DM_errs[ifile][ok_isubs]
-        DMs_fitted = DMs / self.doppler_fs[ifile][ok_isubs]
-        DM0 = self.DM0s[ifile]
-        DeltaDM_mean = self.DeltaDM_means[ifile]
-        DeltaDM_err = self.DeltaDM_errs[ifile]
-        rcs = self.rcs[ifile]
-        cols = ['b','k','g','b','r']
-        fig = plt.figure()
-        pf = np.polynomial.polynomial.polyfit
-        #This is to obtain the TOA phase offsets w.r.t. nu_ref
-        #Apparently, changing phis in place changes self.phis ???
-        phi_primes = phase_transform(phis, DMs_fitted, nu_refs,
-                    self.nu0s[ifile], Ps, mod=False)
-        #phi_primes may have N rotations incorporated...
-        milli_sec_shifts = (phi_primes) * Ps * 1e3
-        #Not sure weighting works...
-        fit_results = pf(MJDs, milli_sec_shifts, 1, full=True, w=phi_errs**-2)
-        resids = (milli_sec_shifts) - (fit_results[0][0] + (fit_results[0][1] *
-            MJDs))
-        resids_mean,resids_var = np.average(resids, weights=phi_errs**-2,
-                returned=True)
-        resids_var = resids_var**-1
-        if len(ok_isubs) > 1:
-            resids_var *= np.sum(((resids - resids_mean)**2) /
-                    (phi_errs**2)) / (len(resids) - 1)
-        resids_err = resids_var**0.5
-        RMS = resids_err
-        ax1 = fig.add_subplot(311)
-        for ii in range(len(ok_isubs)):
-            ax1.errorbar(MJDs[ii], milli_sec_shifts[ii] * 1e3,
-                    phi_errs[ii] * Ps[ii] * 1e6, color='%s'
-                    %cols[rcs[ii]], fmt='+')
-        plt.plot(MJDs, (fit_results[0][0] + (fit_results[0][1] * MJDs)) * 1e3,
-                "m--")
-        plt.xlabel("MJD")
-        plt.ylabel(r"Offset [$\mu$s]")
-        ax1.text(0.1, 0.9, "%.2e ms/s"%(fit_results[0][1] / (3600 * 24)),
-                ha='center', va='center', transform=ax1.transAxes)
-        ax2 = fig.add_subplot(312)
-        for ii in range(len(ok_isubs)):
-            ax2.errorbar(MJDs[ii], resids[ii] * 1e3, phi_errs[ii] *
-                    Ps[ii] * 1e6, color='%s'%cols[rcs[ii]], fmt='+')
-        plt.plot(MJDs, np.ones(len(MJDs)) * resids_mean * 1e3, "m--")
-        xverts = np.array([MJDs[0], MJDs[0], MJDs[-1], MJDs[-1]])
-        yverts = np.array([resids_mean - resids_err, resids_mean + resids_err,
-            resids_mean + resids_err, resids_mean - resids_err]) * 1e3
-        plt.fill(xverts, yverts, "m", alpha=0.25, ec='none')
-        plt.xlabel("MJD")
-        plt.ylabel(r"Offset [$\mu$s]")
-        ax2.text(0.1, 0.9, r"$\sim$weighted RMS = %d ns"%int(resids_err * 1e6),
-                ha='center', va='center', transform=ax2.transAxes)
-        ax3 = fig.add_subplot(313)
-        for ii in range(len(ok_isubs)):
-            ax3.errorbar(MJDs[ii], DMs[ii], DM_errs[ii],
-                    color='%s'%cols[rcs[ii]], fmt='+')
-        if abs(DeltaDM_mean) / DeltaDM_err < 10:
-            plt.plot(MJDs, np.ones(len(MJDs)) * DM0, "r-", label="DM0")
-            #plt.text(MJDs[-1], DM0, "DM0", ha="left", va="center", color="r")
-            plt.legend(loc=1)
-        plt.plot(MJDs, np.ones(len(MJDs)) * (DeltaDM_mean + DM0), "m--")
-        xverts = [MJDs[0], MJDs[0], MJDs[-1], MJDs[-1]]
-        yverts = [DeltaDM_mean + DM0 - DeltaDM_err,
-                  DeltaDM_mean + DM0 + DeltaDM_err,
-                  DeltaDM_mean + DM0 + DeltaDM_err,
-                  DeltaDM_mean + DM0 - DeltaDM_err]
-        plt.fill(xverts, yverts, "m", alpha=0.25, ec='none')
-        plt.xlabel("MJD")
-        plt.ylabel(r"DM [cm$^{3}$ pc]")
-        ax3.text(0.15, 0.9, r"$\Delta$ DM = %.2e $\pm$ %.2e"%(DeltaDM_mean,
-            DeltaDM_err), ha='center',
-                va='center', transform=ax3.transAxes)
-        plt.title(datafile)
-        plt.show()
 
 
 if __name__ == "__main__":
@@ -844,9 +892,24 @@ if __name__ == "__main__":
     parser.add_option("--fix_DM",
                       action="store_false", dest="fit_DM", default=True,
                       help="Do not fit for DM. NB: the parfile DM will still be 'barycentered' in the TOA lines unless --no_bary_DM is used!")
+    parser.add_option("--fit_dt4",
+                      action="store_true", dest="fit_GM", default=False,
+                      help="Fit for delays that scale as nu**-4 and return 'GM' parameters s.t. dt4 = Dconst**2 * GM * nu**-4.  GM has units [cm**-6 pc**2 s**-1] and can be related to a discrete cloud causing refractive, geometric delays.")
+    parser.add_option("--fit_scat",
+                      action="store_true", dest="fit_scat", default=False,
+                      help="Fit for scattering timescale and index per TOA.  Can be used with --fix_alpha.")
+    parser.add_option("--no_logscat",
+                      action="store_false", dest="log10_tau", default=True,
+                      help="If using fit_scat, this flag specifies not to fit the log10 of the scattering timescale, but simply the scattering timescale.")
+    parser.add_option("--fix_alpha",
+                      action="store_true", dest="fix_alpha", default=False,
+                      help="Fix the scattering index value to the value specified as scattering_alpha in pplib.py or alpha in the provided .gmodel file.  Only used in combination with --fit_scat.")
+    parser.add_option("--print_phase",
+                      action="store_true", dest="print_phase", default=False,
+                      help="Print the fitted phase shift on the TOA line with the flag -phs")
     parser.add_option("--showplot",
-                      action="store_true", dest="showplot", default=False,
-                      help="Plot fit results for each epoch. Only useful if nsubint > 1.")
+                      action="store_true", dest="show_plot", default=False,
+                      help="Show a plot of fitted data/model/residuals for each subint.  Good for diagnostic purposes only.")
     parser.add_option("--quiet",
                       action="store_true", dest="quiet", default=False,
                       help="Only TOAs printed to standard output, if outfile is None.")
@@ -867,23 +930,33 @@ if __name__ == "__main__":
             nu_ref = np.inf
         else:
             nu_ref = np.float64(nu_ref)
+        nu_refs = (nu_ref, None)
+    else: nu_refs = None
     DM0 = options.DM0
     if DM0: DM0 = np.float64(DM0)
     bary_DM = options.bary_DM
     one_DM = options.one_DM
     fit_DM = options.fit_DM
+    fit_GM = options.fit_GM
+    fit_scat = options.fit_scat
+    log10_tau = options.log10_tau
+    fix_alpha = options.fix_alpha
+    print_phase = options.print_phase
     outfile = options.outfile
     format = options.format
     k,v = options.toa_flags.split(',')[::2],options.toa_flags.split(',')[1::2]
     addtnl_toa_flags = dict(zip(k,v))
     snr_cutoff = float(options.snr_cutoff)
     errfile = options.errfile
-    showplot = options.showplot
+    show_plot = options.show_plot
     quiet = options.quiet
 
     gt = GetTOAs(datafiles=datafiles, modelfile=modelfile, quiet=quiet)
-    gt.get_TOAs(nu_ref=nu_ref, DM0=DM0, bary_DM=bary_DM, fit_DM=fit_DM,
-            show_plot=showplot, addtnl_toa_flags=addtnl_toa_flags, quiet=quiet)
+    gt.get_TOAs(datafile=None, nu_refs=nu_refs, DM0=DM0, bary_DM=bary_DM,
+            fit_DM=fit_DM, fit_GM=fit_GM, fit_scat=fit_scat,
+            log10_tau=log10_tau, fix_alpha=fix_alpha, print_phase=print_phase,
+            method='trust-ncg', bounds=None, nu_fits=None, show_plot=show_plot,
+            addtnl_toa_flags=addtnl_toa_flags, quiet=quiet)
     if format == "princeton":
         gt.write_princeton_TOAs(outfile=outfile, one_DM=one_DM,
             dmerrfile=errfile)

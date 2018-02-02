@@ -3160,8 +3160,8 @@ def write_TOAs(TOAs, format="tempo2", SNR_cutoff=0.0, outfile=None,
 
     TOAs is a single TOA of the TOA class from pptoas, or a list of them.
     format is one of 'tempo2', ... others coming ...
-    SNR_cutoff is a value specifying which TOAs are written based on the flag
-        pp_snr.
+    SNR_cutoff is a value specifying which TOAs are written based on the snr
+        flag
     outfile is the output file name; if None, will print to standard output.
     append=False will overwrite a file with the same name as outfile.
     """
@@ -3170,7 +3170,7 @@ def write_TOAs(TOAs, format="tempo2", SNR_cutoff=0.0, outfile=None,
         return 0
     if not hasattr(TOAs, "__len__"): toas = [TOAs]
     else: toas = TOAs
-    toas = filter_TOAs(toas, "pp_snr", SNR_cutoff, ">=", pass_unflagged=False)
+    toas = filter_TOAs(toas, "snr", SNR_cutoff, ">=", pass_unflagged=False)
     if outfile is not None:
         if append: mode = 'a'
         else: mode = 'w'
@@ -3182,8 +3182,10 @@ def write_TOAs(TOAs, format="tempo2", SNR_cutoff=0.0, outfile=None,
                             toa.TOA_error,
                             tempo_codes[toa.telescope.lower()]))[1:]
             if toa.DM is not None:
+                #toa_string += " -dm %.7f"%toa.DM
                 toa_string += " -pp_dm %.7f"%toa.DM
             if toa.DM_error is not None:
+                #toa_string += " -dm_err %.7f"%toa.DM_error
                 toa_string += " -pp_dme %.7f"%toa.DM_error
             for flag,value in toa.flags.iteritems():
                 if hasattr(value, "lower"):

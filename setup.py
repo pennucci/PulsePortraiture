@@ -8,7 +8,7 @@ setup(name='PulsePortraiture',
       author='Tim Pennucci',
       author_email='tim.pennucci@nanograv.org',
       url='http://github.com/pennucci/PulsePortraiture',
-      py_modules=['pplib'],
+      py_modules=['pplib, pptoaslib'],
       scripts=['ppalign.py','ppgauss.py', 'ppinterp.py', 'pptoas.py',
           'ppzap.py']
      )
