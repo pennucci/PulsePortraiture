@@ -428,9 +428,9 @@ class GetTOAs:
                     #        quiet=quiet)
                     #results.phi = results.phase
                     #results.phi_err = results.phase_err
-                    #results.GM = results.GM_err = 0.0
-                    #results.tau = results.tau_err = 0.0
-                    #results.alpha = results.alpha_err = 0.0
+                    #results.GM = results.GM_err = None
+                    #results.tau = results.tau_err = None
+                    #results.alpha = results.alpha_err = None
                     #results.covariance_matrix = np.zeros([2,2])
                     #results.nu_DM = results.nu_GM = results.nu_tau = results.nu_ref
                 else:  #1-channel hack
@@ -438,13 +438,16 @@ class GetTOAs:
                         print "TOA only has %d frequency channel!..."%len(
                                 freqsx)
                         print "...using Fourier phase gradient routine to fit phase only..."
-                        if self.nu_ref is not None:
-                            print "--nu_ref will be ignored!"
                     results = fit_phase_shift(portx[0], modelx[0], errs[0],
                             Ns=nbin)
-                    results.DM = None #DM_stored
-                    results.DM_err = None #0.0
-                    results.nu_refs = [freqsx[0], freqsx[0], freqsx[0]]
+                    results.phi = results.phase
+                    results.phi_err = results.phase_err
+                    results.DM = results.DM_err = None
+                    results.GM = results.GM_err = None
+                    results.tau = results.tau_err = None
+                    results.alpha = results.alpha_err = None
+                    results.nu_DM, results.nu_GM, results.nu_tau = \
+                            [freqsx[0], freqsx[0], freqsx[0]]
                     results.nfeval = 0
                     results.return_code = -2
                     results.scales = np.array([results.scale])

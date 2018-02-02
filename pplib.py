@@ -3188,16 +3188,20 @@ def write_TOAs(TOAs, format="tempo2", SNR_cutoff=0.0, outfile=None,
                 #toa_string += " -dm_err %.7f"%toa.DM_error
                 toa_string += " -pp_dme %.7f"%toa.DM_error
             for flag,value in toa.flags.iteritems():
-                if hasattr(value, "lower"):
-                    exec("toa_string += ' -%s %s'"%(flag, value))
-                elif hasattr(value, "bit_length"):
-                    exec("toa_string += ' -%s %d'"%(flag, value))
-                elif flag.find("_cov") >= 0:
-                    exec("toa_string += ' -%s %.1e'"%(flag, toa.flags[flag]))
-                elif flag.find("_phs") >= 0:
-                    exec("toa_string += ' -%s %.8f'"%(flag, toa.flags[flag]))
-                else:
-                    exec("toa_string += ' -%s %.3f'"%(flag, toa.flags[flag]))
+                if value is not None:
+                    if hasattr(value, "lower"):
+                        exec("toa_string += ' -%s %s'"%(flag, value))
+                    elif hasattr(value, "bit_length"):
+                        exec("toa_string += ' -%s %d'"%(flag, value))
+                    elif flag.find("_cov") >= 0:
+                        exec("toa_string += ' -%s %.1e'"%(flag,
+                            toa.flags[flag]))
+                    elif flag.find("_phs") >= 0:
+                        exec("toa_string += ' -%s %.8f'"%(flag,
+                            toa.flags[flag]))
+                    else:
+                        exec("toa_string += ' -%s %.3f'"%(flag,
+                            toa.flags[flag]))
             if outfile is not None:
                 toa_string += "\n"
                 of.write(toa_string)
