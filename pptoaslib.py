@@ -49,7 +49,7 @@ def rotate_portrait_full(port, phi, DM, GM, freqs, nu_DM=np.inf,
 
     Positive values of phi, DM, and GM rotate the data to earlier phases
         (i.e. it "dedisperses") for freqs < nu_DM.
-    
+
     When used to dediserpse, with GM=0, rotate_portrait_full is virtually
         identical to arch.dedisperse() in PSRCHIVE.
 
@@ -80,7 +80,7 @@ def GM_from_DMc(DMc, D, a_perp):
     DMc is the dispersion measure of the discrete cloud [cm**-3 pc].
     D is the Earth-cloud (or pulsar) distance [kpc].
     a_perp is the characteristic transverse length scale of the cloud [AU].
-    
+
     e.g., see Lam et al. (2016):
     """
     c = 3e10 / 3.1e21  # speed of light [cm/s / cm/kpc]
@@ -90,11 +90,11 @@ def GM_from_DMc(DMc, D, a_perp):
 def DMc_from_GM(GM, D, a_perp):
     """
     Return the 'discrete cloud' DM arising from a geometric delay factor GM.
-    
+
     GM is the geometric delay factor resulting in a pulse delay:
         Dconst**2 * GM * nu**-4 [cm**-6 pc s**-1].
     D is the Earth-cloud (or pulsar) distance [kpc].
-    a_perp is the characteristic transverse length scale of the cloud [AU].   
+    a_perp is the characteristic transverse length scale of the cloud [AU].
 
     e.g., see Lam et al. (2016):
     """
@@ -330,7 +330,7 @@ def Sbp_deriv(abs_scattering_portrait_FT_deriv, model_portrait_FT,
             axis=-1)
     gradient = np.insert(gradient, 0, np.zeros([3,gradient.shape[1]]), 0)
     if errs_FT is not None: gradient /= errs_FT**2
-    return gradient    
+    return gradient
 
 def Sbp_2deriv(abs_scattering_portrait_FT_2deriv, model_portrait_FT,
         errs_FT=None):
@@ -851,7 +851,7 @@ def fit_portrait_full(data_port, model_port, init_params, P, freqs,
     if nu_out_DM is None: nu_out_DM = nu_zero_DM
     if nu_out_GM is None: nu_out_GM = nu_zero_GM
     if nu_out_tau is None: nu_out_tau = nu_zero_tau
-    
+
     phi_inf = phase_shifts(phi_fit, DM_fit, GM_fit, np.inf, nu_fit_DM,
             nu_fit_GM, P, False)
     phi_out = phi_inf + ((Dconst / P) * DM_fit * nu_out_DM**-2) + \

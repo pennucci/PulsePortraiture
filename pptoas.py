@@ -176,10 +176,9 @@ class GetTOAs:
         bounds is a list of five 2-tuples, giving the lower and upper bounds on
             the phase, dispersion measure, GM, tau, and alpha parameters,
             respectively.  NB: this is only used if method=='TNC'.
-        nu_fits is a tuple (deprecated), analogous to nu_ref, where these
-            reference frequencies [MHz] are used in the fit; defaults to a
-            guess at the zero-covariance frequency based on signal-to-noise
-            ratios.
+        nu_fits is a tuple, analogous to nu_ref, where these reference
+            frequencies [MHz] are used in the fit; defaults to a guess at the
+            zero-covariance frequency based on signal-to-noise ratios.
         show_plot=True will show a plot of the fitted model, data, and
             residuals at the end of the fitting.
         addtnl_toa_flags are pairs making up TOA flags to be written uniformly
@@ -420,7 +419,7 @@ class GetTOAs:
                     if not quiet:
                         print "TOA #%d only has 2 frequency channels...fitting for phase and DM only..."%(itoa)
                 else:
-                    fit_flags = self.fit_flags
+                    fit_flags = list(np.copy(self.fit_flags))
                 results = fit_portrait_full(portx, modelx, param_guesses, P,
                         freqsx, nu_fits[isub], nu_refs[isub], errs, fit_flags,
                         bounds, self.log10_tau, option=0, id=id, method=method,
@@ -478,7 +477,7 @@ class GetTOAs:
                     if fit_flags[1]:
                         results.DM *= df  #NB: No longer the *fitted* value!
                     if fit_flags[2]:
-                        results.GM *= df  #NB: No longer the *fitted* value!
+                        results.GM *= df**3  #NB: No longer the *fitted* value!
                     doppler_fs[isub] = df
                 else:
                     doppler_fs[isub] = 1.0
@@ -501,7 +500,13 @@ class GetTOAs:
                 rcs[isub] = results.return_code
                 scales[isub, ok_ichans[isub]] = results.scales
                 scale_errs[isub, ok_ichans[isub]] = results.scale_errs
-                covariances[isub] = results.covariance_matrix
+                try:
+                    covariances[isub] = results.covariance_matrix
+                except ValueError:
+                    for ii,ifit in enumerate(np.where(fit_flags)[0]):
+                        for jj,jfit in enumerate(np.where(fit_flags)[0]):
+                            covariances[isub][ifit,jfit] = \
+                                    results.covariance_matrix[ii,jj]
                 red_chi2s[isub] = results.red_chi2
                 #Compile useful TOA flags
                 toa_flags = {}
@@ -717,7 +722,7 @@ class GetTOAs:
         phi = self.phis[ifile][isub]
         #Pre-corrected DM, if corrected
         DM_fitted = self.DMs[ifile][isub] / self.doppler_fs[ifile][isub]
-        GM_fitted = self.GMs[ifile][isub] / self.doppler_fs[ifile][isub]
+        GM_fitted = self.GMs[ifile][isub] / self.doppler_fs[ifile][isub]**3
         scales = self.scales[ifile][isub]
         freqs = data.freqs[isub]
         nu_ref_DM, nu_ref_GM, nu_ref_tau = self.nu_refs[ifile][isub]
@@ -803,7 +808,7 @@ if __name__ == "__main__":
                       default="",
                       help="Pairs making up TOA flags to be written uniformly to all tempo2-formatted TOAs.  e.g. ('pta','NANOGrav','version',0.1)")
     parser.add_option("--nu_ref",
-                      action="store", metavar="nu_ref", dest="nu_ref",
+                      action="store", metavar="nu_ref", dest="nu_ref_DM",
                       default=None,
                       help="Frequency [MHz] to which the output TOAs are referenced, i.e. the frequency that has zero delay from a non-zero DM. 'inf' is used for inifite frequency.  [default=nu_zero (zero-covariance frequency, recommended)]")
     parser.add_option("--DM",
@@ -838,6 +843,10 @@ if __name__ == "__main__":
     parser.add_option("--fix_alpha",
                       action="store_true", dest="fix_alpha", default=False,
                       help="Fix the scattering index value to the value specified as scattering_alpha in pplib.py or alpha in the provided .gmodel file.  Only used in combination with --fit_scat.")
+    parser.add_option("--nu_tau",
+                      action="store", metavar="nu_ref_tau", dest="nu_ref_tau",
+                      default=None,
+                      help="Frequency [MHz] to which the output scattering times are referenced, i.e. tau(freq) = tau (freq/nu_ref_tau)***alpha.  [default=nu_zero (zero-covariance frequency, recommended)]")
     parser.add_option("--print_phase",
                       action="store_true", dest="print_phase", default=False,
                       help="Print the fitted phase shift on the TOA line with the flag -phs")
@@ -858,13 +867,13 @@ if __name__ == "__main__":
 
     datafiles = options.datafiles
     modelfile = options.modelfile
-    nu_ref = options.nu_ref
-    if nu_ref:
-        if nu_ref == "inf":
-            nu_ref = np.inf
+    nu_ref_DM = options.nu_ref_DM
+    if nu_ref_DM:
+        if nu_ref_DM == "inf":
+            nu_ref_DM = np.inf
         else:
-            nu_ref = np.float64(nu_ref)
-        nu_refs = (nu_ref, None)
+            nu_ref_DM = np.float64(nu_ref_DM)
+        nu_refs = (nu_ref_DM, None)
     else: nu_refs = None
     DM0 = options.DM0
     if DM0: DM0 = np.float64(DM0)
@@ -875,6 +884,13 @@ if __name__ == "__main__":
     fit_scat = options.fit_scat
     log10_tau = options.log10_tau
     fix_alpha = options.fix_alpha
+    nu_ref_tau = options.nu_ref_tau
+    if nu_ref_tau:
+        nu_ref_tau = np.float64(nu_ref_tau)
+        if nu_ref_DM:
+            nu_refs = (nu_ref_DM, nu_ref_tau)
+        else:
+            nu_refs = (None, nu_ref_tau)
     print_phase = options.print_phase
     outfile = options.outfile
     format = options.format
