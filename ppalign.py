@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 
-#########
-#ppalign#
-#########
+###########
+# ppalign #
+###########
 
 #ppalign is a command-line program used to align homogeneous data (i.e. from
 #    the same receiver, with the same center frequency, bandwidth, and number

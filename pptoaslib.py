@@ -1,4 +1,12 @@
-#!/usr/bin/env python
+#############
+# pptoaslib #
+#############
+
+#pptoaslib contains all necessary functions and definitions for the new pptoas
+#    capabilities: fitting for scattering time and index, nu**-4 delays, and
+#    flux measurement.  Future development will merge this with pplib.
+
+#Written by Timothy T. Pennucci (TTP; tim.pennucci@nanograv.org).
 
 from pplib import *
 from scipy.special import erf

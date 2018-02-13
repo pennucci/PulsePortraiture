@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 
-#######
-#ppzap#
-#######
+#########
+# ppzap #
+#########
 
 #ppzap is a command-line program used to flag bad channels that may have gotten
 #    through other rounds of zapping.  The basic algorithm is an very simple

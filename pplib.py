@@ -1,18 +1,18 @@
-#######
-#pplib#
-#######
+#########
+# pplib #
+#########
 
-#pplib contains all necessary functions and definitions for the fitting
-#    programs ppgauss and pptoas, as well as some additional functions used in
-#    our #wideband timing analysis.
+#pplib contains most of the necessary functions and definitions for the
+#    other scripts in the PulsePortraiture package.  See pptoaslib for specific
+#    functions for the latest version of pptoas.
 
 #Written by Timothy T. Pennucci (TTP; tim.pennucci@nanograv.org).
 #Contributions by Scott M. Ransom (SMR), Paul B. Demorest (PBD), and Emmanuel
 #    Fonseca (EF).
 
-#########
-#imports#
-#########
+###########
+# imports #
+###########
 
 #Unfortunately, this has to come first in the event nodes = True
 nodes = False  #Used when needing parallelized operation
@@ -34,9 +34,9 @@ import psrchive as pr
 import matplotlib.gridspec as gs
 import matplotlib.pyplot as plt
 
-##########
-#settings#
-##########
+############
+# settings #
+############
 
 #Exact dispersion constant (e**2/(2*pi*m_e*c)) (used by PRESTO).
 Dconst_exact = 4.148808e3  #[MHz**2 cm**3 pc**-1 s]
@@ -72,9 +72,9 @@ wid_max = 0.25
 #functions will be used.  This will eventually be overhauled...!!!
 default_model = '000'
 
-#########
-#display#
-#########
+###########
+# display #
+###########
 
 #Set colormap preference
 #Decent sequential colormaps: gist_heat, pink, copper, Oranges_r, gray, bone,
@@ -92,9 +92,9 @@ cols = ['b', 'g', 'r', 'c', 'm', 'y', 'k', 'orange', 'brown', 'purple', 'pink',
         'b', 'g', 'r', 'c', 'm', 'y', 'k', 'orange', 'brown', 'purple', 'pink',
         'b', 'g', 'r', 'c', 'm', 'y', 'k', 'orange', 'brown', 'purple', 'pink']
 
-######
-#misc#
-######
+########
+# misc #
+########
 
 #Dictionary of observatory codes; not sure what "0" corresponds to.
 #These are used for Princeton formatted TOAs, which may be incorrect...
@@ -122,9 +122,9 @@ RCSTRINGS = {'-1':'INFEASIBLE: Infeasible (low > up).',
              '6':'NOPROGRESS: Unable to progress.',
              '7':'USERABORT: User requested end of minimization.'}
 
-#########
-#classes#
-#########
+###########
+# classes #
+###########
 
 class DataBunch(dict):
 
@@ -591,9 +591,9 @@ class DataPortrait(object):
                 self.freqs[0], titles, bool(self.bw < 0), **kwargs)
 
 
-###########
-#functions#
-###########
+#############
+# functions #
+#############
 
 def set_colormap(colormap):
     """
@@ -3196,8 +3196,11 @@ def write_TOAs(TOAs, format="tempo2", SNR_cutoff=0.0, outfile=None,
                     elif flag.find("_cov") >= 0:
                         exec("toa_string += ' -%s %.1e'"%(flag,
                             toa.flags[flag]))
-                    elif flag.find("_phs") >= 0:
+                    elif flag.find("phs") >= 0:
                         exec("toa_string += ' -%s %.8f'"%(flag,
+                            toa.flags[flag]))
+                    elif flag.find("flux") >= 0:
+                        exec("toa_string += ' -%s %.5f'"%(flag,
                             toa.flags[flag]))
                     else:
                         exec("toa_string += ' -%s %.3f'"%(flag,

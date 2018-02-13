@@ -1,12 +1,14 @@
 #!/usr/bin/env python
 
-########
-#pptoas#
-########
+##########
+# pptoas #
+##########
 
-#pptoas is a command-line program used to simultaneously fit for phases (TOAs),
-#    and dispersion measures (DMs).  Full-functionality is obtained when using
-#    pptoas within an interactive python environment.
+#pptoas is a command-line program used to simultaneously fit for phases
+#    (phis/TOAs), dispersion measures (DMs), frequency**-4 delays (GMs),
+#    scattering timescales (taus), and scattering indices (alphas).  Mean flux
+#    densities can also be estimated from the fitted model.  Full-functionality
+#    is obtained when using pptoas within an interactive python environment.
 
 #Written by Timothy T. Pennucci (TTP; tim.pennucci@nanograv.org).
 #Contributions by Scott M. Ransom (SMR) and Paul B. Demorest (PBD).
@@ -120,16 +122,20 @@ class GetTOAs:
         self.DM_errs = []  # their uncertainties
         self.DeltaDM_means = []  # fitted single mean DM-DM0
         self.DeltaDM_errs = []  # their uncertainties
+        self.GMs = []  # fitted "GM" parameter, from delays that go as nu**-4
+        self.GM_errs = []  # their uncertainties
         self.taus = []  # fitted scattering timescales
         self.tau_errs = []  # their uncertainties
         self.alphas = []  # fitted scattering indices
         self.alpha_errs = []  # their uncertainties
-        self.GMs = []  # fitted "GM" parameter, from delays that go as nu**-4
-        self.GM_errs = []  # their uncertainties
         self.scales = []  # fitted per-channel scaling parameters
         self.scale_errs = []  # their uncertainties
-        self.covariances = []  # full covariance matrices
+        self.profile_fluxes = []  # estimated per-channel fluxes
+        self.profile_flux_errs = []  # their uncertainties
+        self.fluxes = []  # estimated overall fluxes
+        self.flux_errs = []  # their uncertainties
         self.red_chi2s = []  # reduced chi2 values of the fit
+        self.covariances = []  # full covariance matrices
         self.nfevals = []  # number of likelihood function evaluations
         self.rcs = []  # return codes from the fit
         self.fit_durations = []  # durations of the fit
@@ -140,8 +146,8 @@ class GetTOAs:
     def get_TOAs(self, datafile=None, nu_refs=None, DM0=None,
             bary_DM=True, fit_DM=True, fit_GM=False, fit_scat=False,
             log10_tau=True, fix_alpha=False, print_phase=False,
-            method='trust-ncg', bounds=None, nu_fits=None, show_plot=False,
-            addtnl_toa_flags={}, quiet=None):
+            print_flux=False, method='trust-ncg', bounds=None, nu_fits=None,
+            show_plot=False, addtnl_toa_flags={}, quiet=None):
         """
         Measure TOAs from wideband data accounting for numerous ISM effects.
 
@@ -168,8 +174,10 @@ class GetTOAs:
             fit_scat==True.  alpha is fixed to the value specified in the
             .gmodel file, or scattering_alpha in pplib.py if no .gmodel is
             provided.
-        print_phase=True will print the fitted parameter phi on the TOA line
-            with the flag -phs.
+        print_phase=True will print the fitted parameter phi and its
+            uncertainty on the TOA line with the flags -phs and -phs_err.
+        print_flux=True will print an estimate of the overall flux density and
+            its uncertainty on the TOA line.
         method is the scipy.optimize.minimize method; currently can be 'TNC',
             'Newton-CG', or 'trust-cng', which are all Newton
             Conjugate-Gradient algorithms.
@@ -257,13 +265,17 @@ class GetTOAs:
             tau_errs = np.zeros(nsub, dtype=np.float64)
             alphas = np.zeros(nsub, dtype=np.float64)
             alpha_errs = np.zeros(nsub, dtype=np.float64)
-            nfevals = np.zeros(nsub, dtype="int")
-            rcs = np.zeros(nsub, dtype="int")
             scales = np.zeros([nsub, nchan], dtype=np.float64)
             scale_errs = np.zeros([nsub, nchan], dtype=np.float64)
+            profile_fluxes = np.zeros([nsub, nchan], dtype=np.float64)
+            profile_flux_errs = np.zeros([nsub, nchan], dtype=np.float64)
+            fluxes = np.zeros(nsub, dtype=np.float64)
+            flux_errs = np.zeros(nsub, dtype=np.float64)
             red_chi2s = np.zeros(nsub, dtype=np.float64)
             covariances = np.zeros([nsub, self.nfit, self.nfit],
                     dtype=np.float64)
+            nfevals = np.zeros(nsub, dtype="int")
+            rcs = np.zeros(nsub, dtype="int")
             #PSRCHIVE epochs are *midpoint* of the integration
             MJDs = np.array([epochs[isub].in_days() \
                     for isub in xrange(nsub)], dtype=np.double)
@@ -357,9 +369,9 @@ class GetTOAs:
                     nu_ref_tau = nu_ref_tuple[1]
                 nu_refs[isub] = [nu_ref_DM, nu_ref_GM, nu_ref_tau]
 
-                #################
-                #INITIAL GUESSES#
-                #################
+                ###################
+                # INITIAL GUESSES #
+                ###################
                 DM_guess = DM_stored
                 rot_port = rotate_data(portx, 0.0, DM_guess, P, freqsx,
                         nu_mean)
@@ -405,9 +417,9 @@ class GetTOAs:
                     bounds = [phi_bounds, DM_bounds, GM_bounds, tau_bounds,
                             alpha_bounds]
 
-                ####################
-                #      THE FIT     #
-                ####################
+                ###########
+                # THE FIT #
+                ###########
                 if not quiet: print "Fitting for TOA #%d"%(itoa)
                 if len(freqsx) == 1:
                     fit_flags = [1,0,0,0,0]
@@ -467,9 +479,9 @@ class GetTOAs:
                         (3600 * 24.))
                 results.TOA_err = results.phi_err * P * 1e6 # [us]
 
-                ##########################
-                #DOPPLER CORRECTION OF DM#
-                ##########################
+                ############################
+                # DOPPLER CORRECTION OF DM #
+                ############################
                 if self.bary_DM: #Default is True
                     #NB: the 'doppler factor' retrieved from PSRCHIVE seems to
                     #be the inverse of the convention nu_source/nu_observed
@@ -481,6 +493,29 @@ class GetTOAs:
                     doppler_fs[isub] = df
                 else:
                     doppler_fs[isub] = 1.0
+
+                #################
+                # ESTIMATE FLUX #
+                #################
+                if print_flux:
+                    if results.tau != 0.0:
+                        if self.log10_tau: tau = 10**tau
+                        alpha = self.alphas[ifile][isub]
+                        scat_model = np.fft.irfft(scattering_portrait_FT(
+                            scattering_times(tau, alpha, freqsx,
+                                results.nu_tau), data.nbin) *
+                            np.fft.rfft(modelx, axis=1), axis=1)
+                    else: scat_model = np.copy(modelx)
+                    scat_model_means = scat_model.mean(axis=1)
+                    profile_fluxes[isub, ok_ichans[isub]] = scat_model_means *\
+                            results.scales
+                    profile_flux_errs[isub, ok_ichans[isub]] = abs(
+                            scat_model_means) * results.scale_errs
+                    flux, flux_err = weighted_mean(profile_fluxes[isub,
+                        ok_ichans[isub]], profile_flux_errs[isub,
+                            ok_ichans[isub]])
+                    fluxes[isub] = flux
+                    flux_errs[isub] = flux_err
 
                 #show_portrait(portx)
                 nu_refs[isub] = [results.nu_DM, results.nu_GM, results.nu_tau]
@@ -539,11 +574,16 @@ class GetTOAs:
                 toa_flags['subint'] = isub
                 toa_flags['tobs'] = subtimes[isub]
                 toa_flags['tmplt'] = self.modelfile
+                toa_flags['snr'] = results.snr
                 if nu_ref_DM is not None and self.fit_phi and fit_flags[1]:
                     toa_flags['phi_DM_cov'] = results.covariance_matrix[0,1]
                 toa_flags['gof'] = results.red_chi2
-                if print_phase: toa_flags['phs'] = results.phi
-                toa_flags['snr'] = results.snr
+                if print_phase:
+                    toa_flags['phs'] = results.phi
+                    toa_flags['phs_err'] = results.phi_err
+                if print_flux:
+                    toa_flags['flux'] = fluxes[isub]
+                    toa_flags['flux_err'] = flux_errs[isub]
                 for k,v in addtnl_toa_flags.iteritems():
                     toa_flags[k] = v
                 self.TOA_list.append(TOA(datafile, results.nu_DM, results.TOA,
@@ -849,7 +889,10 @@ if __name__ == "__main__":
                       help="Frequency [MHz] to which the output scattering times are referenced, i.e. tau(freq) = tau (freq/nu_ref_tau)***alpha.  [default=nu_zero (zero-covariance frequency, recommended)]")
     parser.add_option("--print_phase",
                       action="store_true", dest="print_phase", default=False,
-                      help="Print the fitted phase shift on the TOA line with the flag -phs")
+                      help="Print the fitted phase shift and its uncertainty on the TOA line with the flag -phs")
+    parser.add_option("--print_flux",
+                      action="store_true", dest="print_flux", default=False,
+                      help="Print an estimate of the overall mean flux density and its uncertainty on the TOA line.")
     parser.add_option("--showplot",
                       action="store_true", dest="show_plot", default=False,
                       help="Show a plot of fitted data/model/residuals for each subint.  Good for diagnostic purposes only.")
@@ -892,6 +935,7 @@ if __name__ == "__main__":
         else:
             nu_refs = (None, nu_ref_tau)
     print_phase = options.print_phase
+    print_flux = options.print_flux
     outfile = options.outfile
     format = options.format
     k,v = options.toa_flags.split(',')[::2],options.toa_flags.split(',')[1::2]
@@ -905,7 +949,8 @@ if __name__ == "__main__":
     gt.get_TOAs(datafile=None, nu_refs=nu_refs, DM0=DM0, bary_DM=bary_DM,
             fit_DM=fit_DM, fit_GM=fit_GM, fit_scat=fit_scat,
             log10_tau=log10_tau, fix_alpha=fix_alpha, print_phase=print_phase,
-            method='trust-ncg', bounds=None, nu_fits=None, show_plot=show_plot,
+            print_flux=print_flux, method='trust-ncg', bounds=None,
+            nu_fits=None, show_plot=show_plot,
             addtnl_toa_flags=addtnl_toa_flags, quiet=quiet)
     if format == "princeton":
         gt.write_princeton_TOAs(outfile=outfile, one_DM=one_DM,

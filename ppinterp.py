@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 
-##########
-#ppinterp#
-##########
+############
+# ppinterp #
+############
 
 #ppinterp is a command-line program to make a parameterized model of wideband
 #    profile evolution.  The parameterization is good within the range of data

@@ -1,12 +1,13 @@
 #!/usr/bin/env python
 
-#########
-#ppgauss#
-#########
+###########
+# ppgauss #
+###########
 
 #ppgauss is a command-line program used to make frequency-dependent,
 #    Gaussian-component models of pulse portraits.  Full-functionality is
 #    obtained when using ppgauss within an interactive python environment.
+#    Some of this code has not been maintained, and is somewhat out of date.
 
 #Written by Timothy T. Pennucci (TTP; tim.pennucci@nanograv.org).
 #Contributions by Scott M. Ransom (SMR) and Paul B. Demorest (PBD).
