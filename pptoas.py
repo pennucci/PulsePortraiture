@@ -500,6 +500,7 @@ class GetTOAs:
                 if print_flux:
                     if results.tau != 0.0:
                         if self.log10_tau: tau = 10**results.tau
+                        else: tau = results.tau
                         alpha = results.alpha
                         scat_model = np.fft.irfft(scattering_portrait_FT(
                             scattering_times(tau, alpha, freqsx,
