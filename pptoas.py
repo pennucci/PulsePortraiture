@@ -145,9 +145,10 @@ class GetTOAs:
 
     def get_TOAs(self, datafile=None, nu_refs=None, DM0=None,
             bary_DM=True, fit_DM=True, fit_GM=False, fit_scat=False,
-            log10_tau=True, fix_alpha=False, print_phase=False,
-            print_flux=False, method='trust-ncg', bounds=None, nu_fits=None,
-            show_plot=False, addtnl_toa_flags={}, quiet=None):
+            log10_tau=True, scat_guess=None, fix_alpha=False,
+            print_phase=False, print_flux=False, method='trust-ncg',
+            bounds=None, nu_fits=None, show_plot=False, addtnl_toa_flags={},
+            quiet=None):
         """
         Measure TOAs from wideband data accounting for numerous ISM effects.
 
@@ -170,6 +171,10 @@ class GetTOAs:
         fit_scat=True will fit the scattering timescale and index for each TOA.
         log10_tau=True does the scattering fit with log10(scattering timescale)
             as the parameter.
+        scat_guess can be a list of three numbers: a guess of the scattering
+            timescale tau [s], its reference frequency [MHz], and a guess of
+            the scattering index alpha.  Will be used for all archives;
+            supercedes other initial values.
         fix_alpha=True will hold the scattering index fixed, in the case that
             fit_scat==True.  alpha is fixed to the value specified in the
             .gmodel file, or scattering_alpha in pplib.py if no .gmodel is
@@ -212,6 +217,7 @@ class GetTOAs:
         self.log10_tau = log10_tau
         if not fit_scat:
             self.log10_tau = log10_tau = False
+        self.scat_guess = scat_guess
         nu_ref_tuple = nu_refs
         nu_fit_tuple = nu_fits
         self.DM0 = DM0
@@ -380,17 +386,22 @@ class GetTOAs:
                 tau_guess = 0.0
                 alpha_guess = 0.0
                 if fit_scat:
-                    if hasattr(self, 'alpha'): alpha_guess = self.alpha
-                    else: alpha_guess = scattering_alpha
-                    if hasattr(self, 'gparams'):
-                        tau_guess = (self.gparams[1] / P) * \
-                                (nu_fit_tau/self.model_nu_ref)**alpha_guess
+                    if self.scat_guess is not None:
+                        tau_guess_s,tau_guess_ref,alpha_guess = self.scat_guess
+                        tau_guess = (tau_guess_s / P) * \
+                                (nu_fit_tau / tau_guess_ref)**alpha_guess
                     else:
-                        #tau_guess = guess_tau(rot_prof, modelx.mean(axis=0))
-                        tau_guess = 0.0
+                        if hasattr(self, 'alpha'): alpha_guess = self.alpha
+                        else: alpha_guess = scattering_alpha
+                        if hasattr(self, 'gparams'):
+                            tau_guess = (self.gparams[1] / P) * \
+                                    (nu_fit_tau/self.model_nu_ref)**alpha_guess
+                        else:
+                            tau_guess = 0.0  # nbin**-1?
+                            #tau_guess = guess_tau(...)
                     model_prof_scat = np.fft.irfft(scattering_portrait_FT(
                         np.array([scattering_times(tau_guess, alpha_guess,
-                            nu_mean, nu_mean)]), nbin)[0] * np.fft.rfft(
+                            nu_fit_tau, nu_fit_tau)]), nbin)[0] * np.fft.rfft(
                                 modelx.mean(axis=0)))
                     phi_guess = fit_phase_shift(rot_prof,
                             model_prof_scat, Ns=100).phase
@@ -881,6 +892,11 @@ if __name__ == "__main__":
     parser.add_option("--no_logscat",
                       action="store_false", dest="log10_tau", default=True,
                       help="If using fit_scat, this flag specifies not to fit the log10 of the scattering timescale, but simply the scattering timescale.")
+    parser.add_option("--scat_guess",
+                      action="store", dest="scat_guess",
+                      metavar="tau,freq,alpha",
+                      default=None,
+                      help="If using fit_scat, manually specify a comma-separated triplet containing an initial guess for the scattering timescale parameter [s], its reference frequency [MHz], and an initial guess for the scattering index.  Will be used for all archives; supercedes other initial values.")
     parser.add_option("--fix_alpha",
                       action="store_true", dest="fix_alpha", default=False,
                       help="Fix the scattering index value to the value specified as scattering_alpha in pplib.py or alpha in the provided .gmodel file.  Only used in combination with --fit_scat.")
@@ -904,7 +920,7 @@ if __name__ == "__main__":
     (options, args) = parser.parse_args()
 
     if (options.datafiles is None or options.modelfile is None):
-        print "\npptoas.py - simultaneously measure TOAs and DMs in broadband data\n"
+        print "\npptoas.py - simultaneously measure TOAs, DMs, and scattering in broadband data\n"
         parser.print_help()
         print ""
         parser.exit()
@@ -927,6 +943,10 @@ if __name__ == "__main__":
     fit_GM = options.fit_GM
     fit_scat = options.fit_scat
     log10_tau = options.log10_tau
+    scat_guess = options.scat_guess
+    if scat_guess:
+        scat_guess = [s.upper() for s in scat_guess.split(',')]
+        scat_guess = map(float, scat_guess)
     fix_alpha = options.fix_alpha
     nu_ref_tau = options.nu_ref_tau
     if nu_ref_tau:
@@ -949,9 +969,9 @@ if __name__ == "__main__":
     gt = GetTOAs(datafiles=datafiles, modelfile=modelfile, quiet=quiet)
     gt.get_TOAs(datafile=None, nu_refs=nu_refs, DM0=DM0, bary_DM=bary_DM,
             fit_DM=fit_DM, fit_GM=fit_GM, fit_scat=fit_scat,
-            log10_tau=log10_tau, fix_alpha=fix_alpha, print_phase=print_phase,
-            print_flux=print_flux, method='trust-ncg', bounds=None,
-            nu_fits=None, show_plot=show_plot,
+            log10_tau=log10_tau, scat_guess=scat_guess, fix_alpha=fix_alpha,
+            print_phase=print_phase, print_flux=print_flux, method='trust-ncg',
+            bounds=None, nu_fits=None, show_plot=show_plot,
             addtnl_toa_flags=addtnl_toa_flags, quiet=quiet)
     if format == "princeton":
         gt.write_princeton_TOAs(outfile=outfile, one_DM=one_DM,
