@@ -852,13 +852,14 @@ def fit_portrait_full(data_port, model_port, init_params, P, freqs,
     #Curvature matrix = 1/2 2deriv of chi2 (cf. Gregory sect 11.5)
     #Parameter errors are related to curvature matrix by **-0.5 
     #Calculate nu_zeros
-    nu_zero_DM, nu_zero_GM, nu_zero_tau = get_nu_zeros(results.x, data_port_FT,
-            model_port_FT, errs_FT, P, freqs, nu_fit_DM, nu_fit_GM, nu_fit_tau,
-            fit_flags, log10_tau, option=option)
     nu_out_DM, nu_out_GM, nu_out_tau = nu_outs
-    if nu_out_DM is None: nu_out_DM = nu_zero_DM
-    if nu_out_GM is None: nu_out_GM = nu_zero_GM
-    if nu_out_tau is None: nu_out_tau = nu_zero_tau
+    if not bool(np.all(nu_outs)):
+        nu_zero_DM, nu_zero_GM, nu_zero_tau = get_nu_zeros(results.x,
+                data_port_FT, model_port_FT, errs_FT, P, freqs, nu_fit_DM,
+                nu_fit_GM, nu_fit_tau, fit_flags, log10_tau, option=option)
+        if nu_out_DM is None: nu_out_DM = nu_zero_DM
+        if nu_out_GM is None: nu_out_GM = nu_zero_GM
+        if nu_out_tau is None: nu_out_tau = nu_zero_tau
 
     phi_inf = phase_shifts(phi_fit, DM_fit, GM_fit, np.inf, nu_fit_DM,
             nu_fit_GM, P, False)
@@ -882,7 +883,6 @@ def fit_portrait_full(data_port, model_port, init_params, P, freqs,
             nu_out_tau, fit_flags, log10_tau, False)
     hessian = Hij[ifit].T[ifit].T
     covariance_matrix = np.linalg.inv(0.5*hessian)
-    # !! Check that transformed params return same results.fun
     param_errs[ifit] = np.diag(covariance_matrix)**0.5
     param_errs = list(param_errs)
     # Calculate scales
