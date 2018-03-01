@@ -60,14 +60,22 @@ class TOA:
         for flag in flags.keys():
             exec('self.%s = flags["%s"]'%(flag, flag))
 
-    def write_TOA(self, outfile=None):
+    def write_TOA(self, format="tempo2", outfile=None):
         """
-        Print a loosely IPTA-formatted TOA to standard output or to file.
+        Print a formatted TOA to standard output or to file.
 
+        format is one of 'tempo2', ... others coming ...
         outfile is the output file name; if None, will print to standard
             output.
         """
-        write_TOAs(self, outfile=outfile, append=True)
+        write_TOAs(self, format=format, outfile=outfile, append=True)
+
+    def convert_TOA(self, new_frequency, covariance):
+        """
+        To do...
+        """
+        print "Convert TOA to new reference frequency, with new error, \
+            if covariance provided."
 
 class GetTOAs:
 
@@ -136,7 +144,7 @@ class GetTOAs:
         self.quiet = quiet  # be quiet?
 
     def get_TOAs(self, datafile=None, nu_refs=None, DM0=None,
-            bary=True, fit_DM=True, fit_GM=False, fit_scat=False,
+            bary_DM=True, fit_DM=True, fit_GM=False, fit_scat=False,
             log10_tau=True, scat_guess=None, fix_alpha=False,
             print_phase=False, print_flux=False, method='trust-ncg',
             bounds=None, nu_fits=None, show_plot=False, addtnl_toa_flags={},
@@ -152,11 +160,11 @@ class GetTOAs:
             and the scattering timescale and index, respectively.
         DM0 is the baseline dispersion measure [cm**-3 pc]; defaults to what is
             stored in each datafile.
-        bary=True corrects the measured DMs, GMs, taus, and nu_ref_taus based
-            on the Doppler motion of the observatory with respect to the solar
-            system barycenter.
+        bary_DM=True corrects the measured DMs (and GMs) based on the Doppler
+            motion of the observatory with respect to the solar system
+            barycenter.
         fit_DM=False will not fit for DM; if this is the case, you might want
-            to set bary to False.
+            to set bary_DM to False.
         fit_GM=True will fit for a parameter ('GM') characterizing a delay term
             for each TOA that scales as nu**-4.  Will be highly covariant with
             DM.
@@ -187,7 +195,7 @@ class GetTOAs:
         show_plot=True will show a plot of the fitted model, data, and
             residuals at the end of the fitting.
         addtnl_toa_flags are pairs making up TOA flags to be written uniformly
-            to all IPTA-formatted TOAs. e.g. ('pta','NANOGrav','version',0.1)
+            to all tempo2-formatted TOAs. e.g. ('pta','NANOGrav','version',0.1)
         quiet=True suppresses output.
         """
         if quiet is None: quiet = self.quiet
@@ -213,7 +221,7 @@ class GetTOAs:
         nu_ref_tuple = nu_refs
         nu_fit_tuple = nu_fits
         self.DM0 = DM0
-        self.bary = bary
+        self.bary_DM = bary_DM
         self.ok_idatafiles = []
         start = time.time()
         tot_duration = 0.0
@@ -248,6 +256,7 @@ class GetTOAs:
             #Observation info
             obs = DataBunch(telescope=telescope, backend=backend,
                     frontend=frontend, tempo_code=tempo_code)
+            doppler_fs = np.ones(nsub, dtype=np.float64)
             nu_fits = list(np.zeros([nsub, 3], dtype=np.float64))
             nu_refs = list(np.zeros([nsub, 3], dtype=np.float64))
             phis = np.zeros(nsub, dtype=np.double)
@@ -307,6 +316,7 @@ class GetTOAs:
                 epoch = epochs[isub]
                 MJD = MJDs[isub]
                 P = Ps[isub]
+                df = doppler_factors[isub]
                 if not self.is_FITS_model:
                     #Read model
                     try:
@@ -363,9 +373,7 @@ class GetTOAs:
                     nu_ref_DM = nu_ref_GM = nu_ref_tau = nu_ref
                 else:
                     nu_ref_DM = nu_ref_GM = nu_ref_tuple[0]
-                    nu_ref_tau = nu_ref_tuple[1]
-                    if bary:  # from bary to topo below
-                        nu_ref_tau *= doppler_factors[isub]
+                    nu_ref_tau = nu_ref_tuple[1] * df
                 nu_refs[isub] = [nu_ref_DM, nu_ref_GM, nu_ref_tau]
 
                 ###################
@@ -483,10 +491,10 @@ class GetTOAs:
                         (3600 * 24.))
                 results.TOA_err = results.phi_err * P * 1e6 # [us]
 
-                ######################
-                # DOPPLER CORRECTION #
-                ######################
-                if self.bary: #Default is True
+                ############################
+                # DOPPLER CORRECTION OF DM #
+                ############################
+                if self.bary_DM: #Default is True
                     #NB: the 'doppler factor' retrieved from PSRCHIVE seems to
                     #be the inverse of the convention nu_source/nu_observed
                     df = doppler_factors[isub]
@@ -494,8 +502,9 @@ class GetTOAs:
                         results.DM *= df  #NB: No longer the *fitted* value!
                     if fit_flags[2]:
                         results.GM *= df**3  #NB: No longer the *fitted* value!
+                    doppler_fs[isub] = df
                 else:
-                    df = 1.0
+                    doppler_fs[isub] = 1.0
 
                 #################
                 # ESTIMATE FLUX #
@@ -521,6 +530,7 @@ class GetTOAs:
                     fluxes[isub] = flux
                     flux_errs[isub] = flux_err
 
+                #show_portrait(portx)
                 nu_refs[isub] = [results.nu_DM, results.nu_GM, results.nu_tau]
                 phis[isub] = results.phi
                 phi_errs[isub] = results.phi_err
@@ -547,7 +557,6 @@ class GetTOAs:
                                     results.covariance_matrix[ii,jj]
                 red_chi2s[isub] = results.red_chi2
                 #Compile useful TOA flags
-                # Add doppler_factor?
                 toa_flags = {}
                 if not fit_flags[1]:
                     results.DM = None
@@ -557,17 +566,14 @@ class GetTOAs:
                     toa_flags['gm_err'] = results.GM_err
                 if fit_flags[3]:
                     if self.log10_tau:
-                        toa_flags['scat_time'] = 10**results.tau * P * df * 1e6
-                                                 # usec, w/ df
+                        toa_flags['scat_time'] = 10**results.tau * P * df * 1e6#usec
                         toa_flags['log10_scat_time'] = results.tau + \
-                                np.log10(P * df)  # w/ df
+                                np.log10(P)
                         toa_flags['log10_scat_time_err'] = results.tau_err
                     else:
-                        toa_flags['scat_time'] = results.tau * P * df * 1e6
-                                                 # usec, w/ df
-                        toa_flags['scat_time_err'] = results.tau_err * P * df \
-                                * 1e6  # usec, w/ df
-                    toa_flags['scat_ref_freq'] = results.nu_tau / df  # w/ df
+                        toa_flags['scat_time'] = results.tau * P * df * 1e6 # usec
+                        toa_flags['scat_time_err'] = results.tau_err * P * df * 1e6
+                    toa_flags['scat_ref_freq'] = results.nu_tau / df
                     toa_flags['scat_ind'] = results.alpha
                 if fit_flags[4]:
                     toa_flags['scat_ind_err'] = results.alpha_err
@@ -614,7 +620,7 @@ class GetTOAs:
             DeltaDM_err = DeltaDM_var**0.5
             self.order.append(datafile)
             self.obs.append(obs)
-            self.doppler_fs.append(doppler_factors)
+            self.doppler_fs.append(doppler_fs)
             self.nu0s.append(nu0)
             self.nu_fits.append(nu_fits)
             self.nu_refs.append(nu_refs)
@@ -622,18 +628,22 @@ class GetTOAs:
             self.epochs.append(epochs)
             self.MJDs.append(MJDs)
             self.Ps.append(Ps)
-            self.phis.append(phis) #NB: phis are w.r.t. nu_ref_DM
+            #NB: phis are w.r.t. nu_ref!!!
+            self.phis.append(phis)
             self.phi_errs.append(phi_errs)
-            self.TOAs.append(TOAs) #NB: TOAs are w.r.t. nu_ref_DM
+            #NB: TOAs are w.r.t. nu_ref!!!
+            self.TOAs.append(TOAs)
             self.TOA_errs.append(TOA_errs)
+            #NB: DMs are Doppler corrected, if bary_DM is set!!!
             self.DM0s.append(DM0)
             self.DMs.append(DMs)
             self.DM_errs.append(DM_errs)
             self.DeltaDM_means.append(DeltaDM_mean)
             self.DeltaDM_errs.append(DeltaDM_err)
+            #NB: GMs are Doppler corrected, if bary_DM is set!!!
             self.GMs.append(GMs)
             self.GM_errs.append(GM_errs)
-            self.taus.append(taus)  #NB: taus are w.r.t. nu_ref_tau
+            self.taus.append(taus)
             self.tau_errs.append(tau_errs)
             self.alphas.append(alphas)
             self.alpha_errs.append(alpha_errs)
@@ -767,11 +777,9 @@ class GetTOAs:
                 flux_prof=False, refresh_arch=False, return_arch=False,
                 quiet=quiet)
         phi = self.phis[ifile][isub]
-        DM = self.DMs[ifile][isub]
-        GM = self.GMs[ifile][isub]
-        if self.bary:  # get fitted values
-            DM /= self.doppler_fs[ifile][isub]
-            GM /= self.doppler_fs[ifile][isub]**3
+        #Pre-corrected DM, if corrected
+        DM_fitted = self.DMs[ifile][isub] / self.doppler_fs[ifile][isub]
+        GM_fitted = self.GMs[ifile][isub] / self.doppler_fs[ifile][isub]**3
         scales = self.scales[ifile][isub]
         freqs = data.freqs[isub]
         nu_ref_DM, nu_ref_GM, nu_ref_tau = self.nu_refs[ifile][isub]
@@ -851,21 +859,21 @@ if __name__ == "__main__":
                       help="Name of output .tim file. Will append. [default=stdout]")
     parser.add_option("-f", "--format",
                       action="store", metavar="format", dest="format",
-                      help="Format of output .tim file; either 'princeton' or 'ipta'.  Default is IPTA-like format.")
+                      help="Format of output .tim file; either 'princeton' or 'tempo2'.  Default is tempo2 format.")
     parser.add_option("--flags",
                       action="store", metavar="flags", dest="toa_flags",
                       default="",
-                      help="Pairs making up TOA flags to be written uniformly to all IPTA-formatted TOAs.  e.g. ('pta','NANOGrav','version',0.1)")
+                      help="Pairs making up TOA flags to be written uniformly to all tempo2-formatted TOAs.  e.g. ('pta','NANOGrav','version',0.1)")
     parser.add_option("--nu_ref",
                       action="store", metavar="nu_ref", dest="nu_ref_DM",
                       default=None,
-                      help="Topocentric frequency [MHz] to which the output TOAs are referenced, i.e. the frequency that has zero delay from a non-zero DM. 'inf' is used for inifite frequency. [defaults to zero-covariance frequency, recommended]")
+                      help="Frequency [MHz] to which the output TOAs are referenced, i.e. the frequency that has zero delay from a non-zero DM. 'inf' is used for inifite frequency.  [default=nu_zero (zero-covariance frequency, recommended)]")
     parser.add_option("--DM",
                       action="store", metavar="DM", dest="DM0", default=None,
                       help="Nominal DM [cm**-3 pc] from which to reference offset DM measurements.  If unspecified, will use the DM stored in each archive.")
-    parser.add_option("--no_bary",
-                      action="store_false", dest="bary", default=True,
-                      help="Do not Doppler-correct DMs, GMs, taus, or nu_tau.  Output values are 'topocentric'.")
+    parser.add_option("--no_bary_DM",
+                      action="store_false", dest="bary_DM", default=True,
+                      help='Do not Doppler-correct the DM to make a "barycentric DM".')
     parser.add_option("--one_DM",
                       action="store_true", dest="one_DM", default=False,
                       help="Returns single DM value in output .tim file for all subints in the epoch instead of a fitted DM per subint.")
@@ -876,10 +884,10 @@ if __name__ == "__main__":
     parser.add_option("--errfile",
                       action="store", metavar="errfile", dest="errfile",
                       default=None,
-                      help="If specified, will write the fitted DM errors to errfile (desirable if using non-IPTA formatted TOAs). Will append.")
+                      help="If specified, will write the fitted DM errors to errfile (desirable if using non-tempo2 formatted TOAs). Will append.")
     parser.add_option("--fix_DM",
                       action="store_false", dest="fit_DM", default=True,
-                      help="Do not fit for DM. NB: the parfile DM will still be 'barycentered' in the TOA lines unless --no_bary is used!")
+                      help="Do not fit for DM. NB: the parfile DM will still be 'barycentered' in the TOA lines unless --no_bary_DM is used!")
     parser.add_option("--fit_dt4",
                       action="store_true", dest="fit_GM", default=False,
                       help="Fit for delays that scale as nu**-4 and return 'GM' parameters s.t. dt4 = Dconst**2 * GM * nu**-4.  GM has units [cm**-6 pc**2 s**-1] and can be related to a discrete cloud causing refractive, geometric delays.")
@@ -900,7 +908,7 @@ if __name__ == "__main__":
     parser.add_option("--nu_tau",
                       action="store", metavar="nu_ref_tau", dest="nu_ref_tau",
                       default=None,
-                      help="Frequency [MHz] to which the output scattering times are referenced, i.e. tau(nu) = tau * (nu/nu_ref_tau)***alpha.  If no_bary is True, this frequency is topocentric. [default=nu_zero (zero-covariance frequency, recommended)]")
+                      help="Frequency [MHz] to which the output scattering times are referenced, i.e. tau(freq) = tau (freq/nu_ref_tau)***alpha.  [default=nu_zero (zero-covariance frequency, recommended)]")
     parser.add_option("--print_phase",
                       action="store_true", dest="print_phase", default=False,
                       help="Print the fitted phase shift and its uncertainty on the TOA line with the flag -phs")
@@ -934,7 +942,7 @@ if __name__ == "__main__":
     else: nu_refs = None
     DM0 = options.DM0
     if DM0: DM0 = np.float64(DM0)
-    bary = options.bary
+    bary_DM = options.bary_DM
     one_DM = options.one_DM
     fit_DM = options.fit_DM
     fit_GM = options.fit_GM
@@ -964,7 +972,7 @@ if __name__ == "__main__":
     quiet = options.quiet
 
     gt = GetTOAs(datafiles=datafiles, modelfile=modelfile, quiet=quiet)
-    gt.get_TOAs(datafile=None, nu_refs=nu_refs, DM0=DM0, bary=bary,
+    gt.get_TOAs(datafile=None, nu_refs=nu_refs, DM0=DM0, bary_DM=bary_DM,
             fit_DM=fit_DM, fit_GM=fit_GM, fit_scat=fit_scat,
             log10_tau=log10_tau, scat_guess=scat_guess, fix_alpha=fix_alpha,
             print_phase=print_phase, print_flux=print_flux, method='trust-ncg',
@@ -984,8 +992,8 @@ if __name__ == "__main__":
                 toa.DM = DDM + gt.DM0s[ifile]
                 toa.DM_error = DDM_err
                 toa.flags['DM_mean'] = True
-            write_TOAs(gt.TOA_one_DM_list, SNR_cutoff=snr_cutoff,
-                    outfile=outfile, append=True)
+            write_TOAs(gt.TOA_one_DM_list, format="tempo2",
+                    SNR_cutoff=snr_cutoff, outfile=outfile, append=True)
         else:
-            write_TOAs(gt.TOA_list, SNR_cutoff=snr_cutoff, outfile=outfile,
-                    append=True)
+            write_TOAs(gt.TOA_list, format="tempo2", SNR_cutoff=snr_cutoff,
+                    outfile=outfile, append=True)

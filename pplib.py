@@ -3153,21 +3153,16 @@ def write_princeton_TOA(TOA_MJDi, TOA_MJDf, TOA_err, nu_ref, dDM, obs='@',
     #else:
     #    print obs + " %13s %8.3f %s %8.3f"%(name, nu_ref, TOA, TOA_err)
 
-def write_TOAs(TOAs, format="tempo2", SNR_cutoff=0.0, outfile=None,
-        append=True):
+def write_TOAs(TOAs, SNR_cutoff=0.0, outfile=None, append=True):
     """
-    Write formatted TOAs to file.
+    Write loosely-IPTA formatted TOAs to file.
 
     TOAs is a single TOA of the TOA class from pptoas, or a list of them.
-    format is one of 'tempo2', ... others coming ...
     SNR_cutoff is a value specifying which TOAs are written based on the snr
         flag
     outfile is the output file name; if None, will print to standard output.
     append=False will overwrite a file with the same name as outfile.
     """
-    if format != "tempo2":
-        print "Only tempo2-formatted TOAs are provided for now..."
-        return 0
     if not hasattr(TOAs, "__len__"): toas = [TOAs]
     else: toas = TOAs
     toas = filter_TOAs(toas, "snr", SNR_cutoff, ">=", pass_unflagged=False)
@@ -3176,40 +3171,39 @@ def write_TOAs(TOAs, format="tempo2", SNR_cutoff=0.0, outfile=None,
         else: mode = 'w'
         of = open(outfile, mode)
     for toa in toas:
-        if format == "tempo2":
-            toa_string = "%s %.8f %d"%(toa.archive, toa.frequency,
-                    toa.MJD.intday()) + ("%.15f   %.3f  %s"%(toa.MJD.fracday(),
-                            toa.TOA_error,
-                            tempo_codes[toa.telescope.lower()]))[1:]
-            if toa.DM is not None:
-                #toa_string += " -dm %.7f"%toa.DM
-                toa_string += " -pp_dm %.7f"%toa.DM
-            if toa.DM_error is not None:
-                #toa_string += " -dm_err %.7f"%toa.DM_error
-                toa_string += " -pp_dme %.7f"%toa.DM_error
-            for flag,value in toa.flags.iteritems():
-                if value is not None:
-                    if hasattr(value, "lower"):
-                        exec("toa_string += ' -%s %s'"%(flag, value))
-                    elif hasattr(value, "bit_length"):
-                        exec("toa_string += ' -%s %d'"%(flag, value))
-                    elif flag.find("_cov") >= 0:
-                        exec("toa_string += ' -%s %.1e'"%(flag,
-                            toa.flags[flag]))
-                    elif flag.find("phs") >= 0:
-                        exec("toa_string += ' -%s %.8f'"%(flag,
-                            toa.flags[flag]))
-                    elif flag.find("flux") >= 0:
-                        exec("toa_string += ' -%s %.5f'"%(flag,
-                            toa.flags[flag]))
-                    else:
-                        exec("toa_string += ' -%s %.3f'"%(flag,
-                            toa.flags[flag]))
-            if outfile is not None:
-                toa_string += "\n"
-                of.write(toa_string)
-            else:
-                print toa_string
+        toa_string = "%s %.8f %d"%(toa.archive, toa.frequency,
+                toa.MJD.intday()) + ("%.15f   %.3f  %s"%(toa.MJD.fracday(),
+                        toa.TOA_error,
+                        tempo_codes[toa.telescope.lower()]))[1:]
+        if toa.DM is not None:
+            #toa_string += " -dm %.7f"%toa.DM
+            toa_string += " -pp_dm %.7f"%toa.DM
+        if toa.DM_error is not None:
+            #toa_string += " -dm_err %.7f"%toa.DM_error
+            toa_string += " -pp_dme %.7f"%toa.DM_error
+        for flag,value in toa.flags.iteritems():
+            if value is not None:
+                if hasattr(value, "lower"):
+                    exec("toa_string += ' -%s %s'"%(flag, value))
+                elif hasattr(value, "bit_length"):
+                    exec("toa_string += ' -%s %d'"%(flag, value))
+                elif flag.find("_cov") >= 0:
+                    exec("toa_string += ' -%s %.1e'"%(flag,
+                        toa.flags[flag]))
+                elif flag.find("phs") >= 0:
+                    exec("toa_string += ' -%s %.8f'"%(flag,
+                        toa.flags[flag]))
+                elif flag.find("flux") >= 0:
+                    exec("toa_string += ' -%s %.5f'"%(flag,
+                        toa.flags[flag]))
+                else:
+                    exec("toa_string += ' -%s %.3f'"%(flag,
+                        toa.flags[flag]))
+        if outfile is not None:
+            toa_string += "\n"
+            of.write(toa_string)
+        else:
+            print toa_string
     if outfile is not None: of.close()
 
 def show_portrait(port, phases=None, freqs=None, title=None, prof=True,
