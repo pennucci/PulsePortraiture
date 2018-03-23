@@ -356,15 +356,15 @@ class GetTOAs:
                     nu_fit_DM = nu_fit_GM = nu_fit_tau = nu_fit
                 else:
                     nu_fit_DM = nu_fit_GM = nu_fit_tuple[0]
-                    nu_fit_tau = nu_fit_tuple[1]
+                    nu_fit_tau = nu_fit_tuple[-1]
                 nu_fits[isub] = [nu_fit_DM, nu_fit_GM, nu_fit_tau]
                 if nu_ref_tuple is None:
                     nu_ref = None
                     nu_ref_DM = nu_ref_GM = nu_ref_tau = nu_ref
                 else:
                     nu_ref_DM = nu_ref_GM = nu_ref_tuple[0]
-                    nu_ref_tau = nu_ref_tuple[1]
-                    if bary:  # from bary to topo below
+                    nu_ref_tau = nu_ref_tuple[-1]
+                    if bary and nu_ref_tau:  # from bary to topo below
                         nu_ref_tau *= doppler_factors[isub]
                 nu_refs[isub] = [nu_ref_DM, nu_ref_GM, nu_ref_tau]
 
@@ -582,8 +582,10 @@ class GetTOAs:
                 toa_flags['tobs'] = subtimes[isub]
                 toa_flags['tmplt'] = self.modelfile
                 toa_flags['snr'] = results.snr
-                if nu_ref_DM is not None and self.fit_phi and fit_flags[1]:
-                    toa_flags['phi_DM_cov'] = results.covariance_matrix[0,1]
+                if (nu_ref_DM is not None and self.fit_phi and self.fit_DM) or\
+                        (np.sum(self.fit_flags) == 5):
+                            toa_flags['phi_DM_cov'] = \
+                                    results.covariance_matrix[0,1]
                 toa_flags['gof'] = results.red_chi2
                 if print_phase:
                     toa_flags['phs'] = results.phi
