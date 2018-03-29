@@ -35,7 +35,7 @@ class DataPortrait(DataPortrait):
         ncomp is the number of PCA components to use in the B-spline
             parameterization; ncomp <= 10.  If None, ncomp is the largest
             number of consecutive eigenvectors that, after being smoothed, have
-            a non-zero autocorrelation.  ncomp = 0 will return a portrait with
+            a non-zero autocorrelation.  ncomp=0 will return a portrait with
             just the mean profile.
         smooth=True will smooth the eigenvectors and mean profile using
             wavelet_smooth and a reduced chi-squared figure-of-merit.

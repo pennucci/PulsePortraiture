@@ -530,6 +530,7 @@ class DataPortrait(object):
                     P, freqs, nu_ref)
             self.portx[ichanxs] = rotate_portrait(self.portx[ichanxs], phase,
                     DM, P, freqsxs, nu_ref)
+            self.prof = rotate_portrait([self.prof], phase)[0]
 
         if model and hasattr(self, 'model'):
             self.model[ichans] = rotate_portrait(self.model[ichans], phase, DM,
@@ -1391,8 +1392,8 @@ def pca(port, mean_prof=None, weights=None, ncomp=None, quiet=False):
     ncomp is the number of principal components to use in the reconstruction of
         port.  If None, ncomp is the largest number of consecutive
         eigenvectors that, after being smoothed, have a non-zero
-        autocorrelation.  ncomp = 0 will return a portrait with just the mean
-        profile, while setting ncomp = port.shape[1] will return an identical
+        autocorrelation.  ncomp=0 will return a portrait with just the mean
+        profile, while setting ncomp=port.shape[1] will return an identical
         reconstruction.
     quiet=True suppresses output.
 
@@ -3518,7 +3519,8 @@ def show_spline_curve_projections(projected_port, tck, freqs, weights=None,
     icoord is a specific coordinate index to plot as a function of profile
         index; overrides ncoord. 0 <= icoord <= projected_port.shape[1]
     title is a string to be displayed.
-    savefig specifies a string for a saved figure; will not show the plot.
+    savefig specifies a substring for the saved figures; will not show the
+        plots.
     """
     nprof,nbin = projected_port.shape
     if icoord is not None:
@@ -3545,7 +3547,11 @@ def show_spline_curve_projections(projected_port, tck, freqs, weights=None,
 
     size = 3 #inches per plot
     buff = 1 #inches
-    fig = plt.figure(figsize=((ncoord-1)*size + buff, (ncoord-1)*size + buff))
+    fig1 = plt.figure(figsize=((ncoord-1)*size + buff, (ncoord-1)*size + buff))
+    if plot_this_coord is None:
+        fig2 = plt.figure(figsize=(2*size + buff, ncoord*size + buff))
+        axes2 = fig2.subplots(nrows=ncoord, ncols=1, sharex=True, sharey=False,
+                squeeze=True)
     fmt = 'bo'
     if weights is None:
         ms = np.ones(len(projected_port)) + 3.0
@@ -3560,7 +3566,7 @@ def show_spline_curve_projections(projected_port, tck, freqs, weights=None,
             for iplot in range(ncoord-1)[-nplot:]:
                 ocoord = iplot + 1
                 plot_number = ((ncoord-1) * iplot) + (icoord + 1)
-                ax = fig.add_subplot(ncoord-1, ncoord-1, plot_number)
+                ax = fig1.add_subplot(ncoord-1, ncoord-1, plot_number)
                 for iprof,prof in enumerate(projected_port):
                     ax.plot(prof[icoord], prof[ocoord], fmt, ms=ms[iprof],
                             alpha=alpha[iprof], mew=0.0)
@@ -3573,11 +3579,25 @@ def show_spline_curve_projections(projected_port, tck, freqs, weights=None,
                 else: ax.tick_params(labelbottom=False)
                 if icoord == 0: ax.set_ylabel(ocoord)
                 else: ax.tick_params(labelleft=False)
+        if plot_this_coord is None:
+            nuax = axes2[-icoord-1]
+            for iprof,prof in enumerate(projected_port):
+                nuax.plot(freqs[iprof], prof[icoord], fmt, ms=ms[iprof],
+                        alpha=alpha[iprof], mew=0.0)
+            nuax.plot(freqs, projected_port[:,icoord], color='k', ls='solid',
+                    lw=1)
+            nuax.plot(interp_freqs[::flip], proj_port_interp[:,icoord][::flip],
+                    color='r', ls='solid', lw=2)
+            nuax.plot(tck[0][::flip], knots[:,icoord][::flip], 'k*', ms=5)
+            nuax.set_ylabel("Coordinate %d"%icoord)
+            nuax.get_yaxis().set_label_coords(-0.1, 0.5)
+            if icoord == 0: nuax.set_xlabel("Frequency [MHz]")
+
         elif plot_this_coord is not None:
             icoord = plot_this_coord
             plt.close('all')
-            fig = plt.figure(figsize=(size + 2*buff, size + 2*buff))
-            ax = fig.add_subplot(111)
+            fig1 = plt.figure(figsize=(size + 2*buff, size + 2*buff))
+            ax = fig1.add_subplot(111)
             for iprof,prof in enumerate(projected_port):
                 ax.plot(freqs[iprof], prof[icoord], fmt, ms=ms[iprof],
                         alpha=alpha[iprof], mew=0.0)
@@ -3587,15 +3607,19 @@ def show_spline_curve_projections(projected_port, tck, freqs, weights=None,
                     color='r', ls='solid', lw=2)
             ax.plot(tck[0][::flip], knots[:,icoord][::flip], 'k*', ms=5)
     if ncoord > 1:
-        fig.text(0.025, 0.5, "Coordinate Index", rotation='vertical',
+        fig1.text(0.025, 0.5, "Coordinate Index", rotation='vertical',
                 ha='center', va='center')
-        fig.text(0.5, 0.025, "Coordinate Index", ha='center', va='center')
+        fig1.text(0.5, 0.025, "Coordinate Index", ha='center', va='center')
     else:
         ax.set_xlabel("Frequency [MHz]")
         ax.set_ylabel("Coordinate %d"%plot_this_coord)
     if title is not None: plt.suptitle(title+'\n')
     if savefig:
-        plt.savefig(savefig, format='png')
-        plt.close()
+        if plot_this_coord is None:
+            fig1.savefig(savefig + "_proj.png", format='png')
+            fig2.savefig(savefig + "_freq.png", format='png')
+        else:
+            fig1.savefig(savefig + "_freq.png", format='png')
+        plt.close('all')
     else:
         plt.show()
