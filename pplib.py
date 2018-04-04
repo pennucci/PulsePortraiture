@@ -2711,9 +2711,10 @@ def read_interp_model(modelfile, freqs=None, nbin=None, quiet=False):
 
     modelfile is the name of the make_interp_model(...)-type of model file.
     freqs in an array of frequencies at which to build the model; these should
-        be in the same units as the datafile frequencies (cf. the knot vector),
-        and they should be within the same bandwidth range.
-    nbin is the number of phase bins to use in the model.
+        be in the same units as the datafile frequencies, and they should be
+        within the same bandwidth range (cf. the knot vector).
+    nbin is the number of phase bins to use in the model; by default it uses
+        the number in modelfile.
     quiet=True suppresses output.
     """
     if freqs is None:

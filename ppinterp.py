@@ -40,15 +40,17 @@ class DataPortrait(DataPortrait):
         smooth=True will smooth the eigenvectors and mean profile using
             wavelet_smooth and a reduced chi-squared figure-of-merit.
         k is the polynomial degree of the spline; cubic splines (k=3)
-            recommended; 1 <= k <= 5.
+            recommended; 1 <= k <= 5.  NB: polynomial order = degree + 1.
         sfac is a multiplicative smoothing factor passed to si.splprep; greater
             values result in more smoothing.  sfac=0 will make an interpolating
             model anchored on the input data profiles.
-        nmax is the maximum number of unique knots to allow.  If provided, this
-            may override sfac and enforce smoothing based on nmax knots.  That
-            is, in the case the fit returns n > nmax knots, it will refit using
-            maximum nmax unique knots, irrespective of the other smoothing
-            condition.
+        nmax is the maximum number of breakpoints (unique knots) to allow.  If
+            provided, this may override sfac and enforce smoothing based on
+            nmax breakpoints.  That is, in the case the fit returns n > nmax
+            breakpoints, it will refit using maximum nmax breakpoints,
+            irrespective of the other smoothing condition.  To convert from a
+            maximum desired number of B-splines, subtract k-1.  nmax should be
+            >= 2.
         model_name is the name of the model; defaults to self.datafile +
             '.interp'
         quiet=True suppresses output.
@@ -106,6 +108,8 @@ class DataPortrait(DataPortrait):
                     w=spl_weights[::flip], u=freqs[::flip], ub=nu_lo, ue=nu_hi,
                     k=k, task=0, s=s, t=None, full_output=1, nest=nmax+(k*2),
                     per=0, quiet=int(quiet))
+        elif nmax < 2:
+            print "nmax needs to be >= 2."
 
         if ier > 1: #Will also catch when ier == "unknown"
             print "Something went wrong in si.splprep for %s:\n%s"%(
@@ -132,6 +136,12 @@ class DataPortrait(DataPortrait):
             self.smooth_mean_prof = smooth_mean_prof
             self.smooth_eigvec = smooth_eigvec
         self.proj_port = proj_port
+        #tck contains the knot locations t, B-spline coefficients c, and
+        #polynomial degree k -- end knots will have multiplicity k+1, interior
+        #breakpoints will have multiplicity 1 for maximum continuity.  The
+        #number of B-splines will be n = l + k, where l is the number of
+        #intervals.  l = number of breakpoints - 1 = number of unique knots - 1
+        # = len(tck[0]) - 2*tck[2] - 1.
         self.tck, self.u, self.fp, self.ier, self.msg = tck, u, fp, ier, msg
         if model_name is None: self.model_name = self.datafile + '.interp'
         else: self.model_name = model_name
@@ -141,7 +151,8 @@ class DataPortrait(DataPortrait):
 
         if not quiet:
             if proj_port.sum():
-                print "B-spline interpolation model %s uses %d basis profile components."%(self.model_name, ncomp)
+                print "B-spline interpolation model %s uses %d basis profile components and %d breakpoints."%(self.model_name, ncomp,
+                        len(np.unique(self.tck[0])))
             else:
                 print "B-spline interpolation model %s uses 0 basis profile components; it returns the average profile."%(self.model_name)
 
