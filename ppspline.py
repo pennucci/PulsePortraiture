@@ -1,19 +1,23 @@
 #!/usr/bin/env python
 
 ############
-# ppinterp #
+# ppspline #
 ############
 
-#ppinterp is a command-line program to make a parameterized model of wideband
-#    profile evolution.  The parameterization is good within the range of data
-#    frequencies, provided they are not widely separated frequencies.  The
-#    parameterization is a B-spline representation of the curve traced out by
-#    the nchan profile amplitude vectors in an nbin vector space.  Since the
-#    B-spline representation function is limited to a ten dimensional space,
-#    we decompose the profile variability in nbin space using PCA and choose
-#    the top ten components encompassing most of the profile evolution.  The
-#    input data should be high S/N, averaged, and "aligned" (e.g. output from
-#    ppalign.py).  Channel normalization and profile smoothing is encouraged.
+#ppspline is a command-line program to make a frequency-parameterized model of
+#    wideband profile evolution.  The parameterization is good within the range
+#    of data frequencies, provided there are not huge gaps in frequency.  For
+#    an input nchan x nbin average portrait of aligned profiles, the model is a
+#    B-spline representation of the curve traced out by the nchan profile
+#    amplitude vectors in an nbin vector space.  Since the profile shapes are
+#    highly correlated, the B-spline representation can be reduced to << nbin 
+#    dimensions, and is limited to ten dimensions.  Therefore, the profile
+#    variability is decomposed using PCA and a small number of eigenprofiles
+#    that encompass most of the profile evolution are selected.  The input data
+#    should be high S/N, averaged, and "aligned" (e.g. output from
+#    ppalign.py).  Pre-normalization of the input is encouraged (specifically
+#    using normalize_portrait('prof')), as is using smooth=True in the
+#    make_model function.
 
 #Written by Timothy T. Pennucci (TTP; tim.pennucci@nanograv.org).
 
@@ -27,7 +31,7 @@ class DataPortrait(DataPortrait):
         modeling profile evolution with a B-spline curve.
     """
 
-    def make_interp_model(self, ncomp=None, smooth=True, k=3, sfac=1.0,
+    def make_spline_model(self, ncomp=None, smooth=True, k=3, sfac=1.0,
             nmax=None, model_name=None, quiet=False):
         """
         Make a model based on PCA and B-spline interpolation.
@@ -52,14 +56,14 @@ class DataPortrait(DataPortrait):
             maximum desired number of B-splines, subtract k-1.  nmax should be
             >= 2.
         model_name is the name of the model; defaults to self.datafile +
-            '.interp'
+            '.spl'
         quiet=True suppresses output.
         """
 
         #Definitions
         port = self.portx
-        pca_weights = self.noise_stdsxs**-2
-        mean_prof = port.mean(axis=0) #Seems to work best
+        pca_weights = self.SNRsxs / np.sum(self.SNRsxs)
+        mean_prof = (port.T * pca_weights).T.sum(axis=0) / pca_weights.sum()
         freqs = self.freqsxs[0]
         nu_lo = freqs.min()
         nu_hi = freqs.max()
@@ -92,8 +96,8 @@ class DataPortrait(DataPortrait):
             #Find the projections of the profiles onto the basis components
             proj_port = np.dot(eigvec[:,:ncomp].T, delta_port.T).T
 
-        spl_weights = pca_weights**0.5
-        s = len(proj_port) * spl_weights.sum() * sfac #Seems to work OK
+        spl_weights = pca_weights
+        s = sfac
         if self.bw < 0: flip = -1   #u in si.splprep has to be increasing...
         else: flip = 1
         #Find the B-spline curve traced by the projected vectors, parameterized
@@ -103,13 +107,14 @@ class DataPortrait(DataPortrait):
                 k=k, task=0, s=s, t=None, full_output=1, nest=None, per=0,
                 quiet=int(quiet))
         if nmax is not None and len(np.unique(tck[0])) > nmax:
+            if nmax < 2:
+                print "nmax needs to be >= 2; setting nmax = 2..."
+                nmax = 2
             if nmax == 2: s = np.inf
             (tck,u), fp, ier, msg = si.splprep(proj_port[::flip].T,
                     w=spl_weights[::flip], u=freqs[::flip], ub=nu_lo, ue=nu_hi,
                     k=k, task=0, s=s, t=None, full_output=1, nest=nmax+(k*2),
                     per=0, quiet=int(quiet))
-        elif nmax < 2:
-            print "nmax needs to be >= 2."
 
         if ier > 1: #Will also catch when ier == "unknown"
             print "Something went wrong in si.splprep for %s:\n%s"%(
@@ -117,14 +122,14 @@ class DataPortrait(DataPortrait):
 
         #Build model
         if smooth:
-            modelx = gen_interp_portrait(smooth_mean_prof, freqs,
+            modelx = gen_spline_portrait(smooth_mean_prof, freqs,
                     smooth_eigvec[:,:ncomp], tck)
-            model = gen_interp_portrait(smooth_mean_prof, self.freqs[0],
+            model = gen_spline_portrait(smooth_mean_prof, self.freqs[0],
                     smooth_eigvec[:,:ncomp], tck)
         else:
-            modelx = gen_interp_portrait(mean_prof, freqs, eigvec[:,:ncomp],
+            modelx = gen_spline_portrait(mean_prof, freqs, eigvec[:,:ncomp],
                     tck)
-            model = gen_interp_portrait(mean_prof, self.freqs[0],
+            model = gen_spline_portrait(mean_prof, self.freqs[0],
                     eigvec[:,:ncomp], tck)
 
         #Assign new attributes
@@ -143,7 +148,7 @@ class DataPortrait(DataPortrait):
         #intervals.  l = number of breakpoints - 1 = number of unique knots - 1
         # = len(tck[0]) - 2*tck[2] - 1.
         self.tck, self.u, self.fp, self.ier, self.msg = tck, u, fp, ier, msg
-        if model_name is None: self.model_name = self.datafile + '.interp'
+        if model_name is None: self.model_name = self.datafile + '.spl'
         else: self.model_name = model_name
         self.model = model
         self.modelx = modelx
@@ -191,7 +196,7 @@ if __name__ == "__main__":
     parser.add_option("-l", "--model_name",
                       action="store", metavar="model_name", dest="model_name",
                       default=None,
-                      help="Optional name for model [default=datafile_interp].")
+                      help="Optional name for model [default=datafile.spl].")
     parser.add_option("-a", "--archive",
                       action="store", metavar="archive", dest="archive",
                       default=None,
@@ -207,7 +212,7 @@ if __name__ == "__main__":
     parser.add_option("-n", "--ncomp",
                       action="store", metavar="ncomp", dest="ncomp",
                       default=None,
-                      help="Number of principal components to use in PCA reconstruction of the data.  ncomp is limited to a maximum of 10 [default] by the B-spline representation in scipy.interpolate.  The default automatically finds ncomp significant eigenvectors.")
+                      help="Number of principal components to use in PCA reconstruction of the data.  ncomp is limited to a maximum of 10 by the B-spline representation in scipy.interpolate.  The default automatically finds ncomp significant, smoothed eigenvectors.")
     parser.add_option("-k", "--degree",
                       action="store", metavar="degree", dest="k", default=3,
                       help="Degree of the spline.  Cubic splines (k=3) are recommended [default]. 1 <= k <=5.")
@@ -222,7 +227,7 @@ if __name__ == "__main__":
     (options, args) = parser.parse_args()
 
     if (options.datafile is None):
-        print "\nppinterp.py - make a pulse portrait model using PCA & B-splines\n"
+        print "\nppspline.py - make a pulse portrait model using PCA & B-spline interpolation\n"
         parser.print_help()
         print ""
         parser.exit()
@@ -245,7 +250,7 @@ if __name__ == "__main__":
     if norm in ("mean", "max", "prof", "rms", "abs"):
         dp.normalize_portrait(norm)
 
-    dp.make_interp_model(ncomp=ncomp, smooth=smooth, k=k, sfac=1.0, nmax=nmax,
+    dp.make_spline_model(ncomp=ncomp, smooth=smooth, k=k, sfac=1.0, nmax=nmax,
             model_name=model_name, quiet=quiet)
 
     if modelfile is None: modelfile = datafile + ".spl"

@@ -81,7 +81,7 @@ class GetTOAs:
 
         datafiles is either a single PSRCHIVE file name, or a name of a
             metafile containing a list of archive names.
-        modelfile is a ppgauss or ppinterp model file.  modelfile can also be
+        modelfile is a ppgauss or ppspline model file.  modelfile can also be
             an arbitrary PSRCHIVE archive, although this feature is
             *not*quite*implemented*yet*.
         quiet=True suppresses output.
@@ -335,7 +335,7 @@ class GetTOAs:
                                     self.model_code, unscat_params, 0.0,
                                     phases, freqs[isub], self.model_nu_ref)
                     except UnboundLocalError:
-                        self.model_name, model = read_interp_model(
+                        self.model_name, model = read_spline_model(
                                 self.modelfile, freqs[isub], nbin,
                                 quiet=True) #bool(quiet+(itoa-1)))
                 #else:
@@ -803,7 +803,7 @@ class GetTOAs:
                     model = gen_gaussian_portrait(model_code, gparams, 0.0,
                             phases, freqs, model_nu_ref)
             except:
-                model_name, model = read_interp_model(self.modelfile,
+                model_name, model = read_spline_model(self.modelfile,
                         freqs, data.nbin, quiet=True) #quiet=bool(quiet+(itoa-1)))
         if self.taus[ifile][isub] != 0.0:
             tau = self.taus[ifile][isub]
@@ -846,7 +846,7 @@ if __name__ == "__main__":
                               i.e. vap -c dmc <datafile> should return 0!")
     parser.add_option("-m", "--modelfile",
                       action="store", metavar="model", dest="modelfile",
-                      help="Model file from ppgauss.py, ppinterp.py, or PSRCHIVE FITS file that either has same channel frequencies, nchan, & nbin as datafile(s), or is a single profile (nchan = 1, with the same nbin) to be interpreted as a constant template.")
+                      help="Model file from ppgauss.py, ppspline.py, or PSRCHIVE FITS file that either has same channel frequencies, nchan, & nbin as datafile(s), or is a single profile (nchan = 1, with the same nbin) to be interpreted as a constant template.")
     parser.add_option("-o", "--outfile",
                       action="store", metavar="timfile", dest="outfile",
                       default=None,

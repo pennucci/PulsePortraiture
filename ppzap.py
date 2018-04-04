@@ -111,7 +111,7 @@ if __name__ == "__main__":
     parser.add_option("-m", "--modelfile",
                       action="store", metavar="model", dest="modelfile",
                       default=None,
-                      help="Model file from ppgauss.py, ppinterp.py, or PSRCHIVE FITS file that either has same channel frequencies, nchan, & nbin as datafile(s), or is a single profile (nchan = 1, with the same nbin) to be interpreted as a constant template.")
+                      help="Model file from ppgauss.py, ppspline.py, or PSRCHIVE FITS file that either has same channel frequencies, nchan, & nbin as datafile(s), or is a single profile (nchan = 1, with the same nbin) to be interpreted as a constant template.")
     parser.add_option("-t", "--threshold",
                       metavar="red_chi2", action="store", dest="threshold",
                       default=1.5,

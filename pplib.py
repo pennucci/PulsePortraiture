@@ -852,9 +852,9 @@ def gen_gaussian_portrait(model_code, params, scattering_index, phases, freqs,
                     DM, P, freqs[join_ichan], nu_ref)
     return gport
 
-def gen_interp_portrait(mean_prof, freqs, eigvec, tck, nbin=None):
+def gen_spline_portrait(mean_prof, freqs, eigvec, tck, nbin=None):
     """
-    Generate an interpolated model portrait from make_interp_model(...) output.
+    Generate a model portrait from make_spline_model(...) output.
 
     mean_prof is the mean profile.
     freqs are the frequencies at which to build the model.
@@ -864,9 +864,9 @@ def gen_interp_portrait(mean_prof, freqs, eigvec, tck, nbin=None):
     nbin is the number of phase bins to use in the model; if different from
         len(mean_prof), a resampling function is used.
     """
-    delta_proj_interp = np.array(si.splev(freqs, tck, der=0, ext=0))
-    delta_interp = np.dot(eigvec, delta_proj_interp).T
-    port = delta_interp + mean_prof
+    proj_port = np.array(si.splev(freqs, tck, der=0, ext=0))
+    delta_port = np.dot(eigvec, proj_port).T
+    port = delta_port + mean_prof
     if nbin is not None:
         if len(mean_prof) != nbin:
             shift = 0.5 * (nbin**-1 - len(mean_prof)**-1)
@@ -1386,7 +1386,7 @@ def pca(port, mean_prof=None, weights=None, ncomp=None, quiet=False):
     port is an nchan x nbin array of data values; in the PCA, these dimensions
         are interpreted as nmeasurements of nvariables, respectively.
     mean_prof is an nbin array of the mean profile to be subtracted; if None,
-        an unweighted average is used.
+        a weighted average is calculated using weights.
     weights are the nchan weights passed to np.cov as 'aweights' for the
         construction of the covariance matrix.
     ncomp is the number of principal components to use in the reconstruction of
@@ -1408,14 +1408,14 @@ def pca(port, mean_prof=None, weights=None, ncomp=None, quiet=False):
 
     if not quiet: print "Performing principal component analysis on data with %d dimensions and %d measurements..." %(ndim,nmes)
 
-    #Subtract average from each set of measurements.
-    if mean_prof is None: mean_prof = port.mean(axis=0)
+    #Subtract weighted average from each set of measurements.
+    if mean_prof is None:
+        #mean_prof = port.mean(axis=0)
+        mean_prof = (port.T * weights).T.sum(axis=0) / weights.sum()
     delta_port = port - mean_prof
 
-    #Compute covariance matrix.
-    #cov = np.cov(port.T, aweights=weights)
-    #Shouldn't matter if using centered data or not?
-    cov = np.cov(delta_port.T, aweights=weights)
+    #Compute unbiased weighted covariance matrix.
+    cov = np.cov(delta_port.T, aweights=weights, ddof=1)
 
     #Compute eigenvalues/vectors of cov, and order them.
     eigval, eigvec = np.linalg.eigh(cov)
@@ -2697,9 +2697,9 @@ def read_model(modelfile, phases=None, freqs=None, P=None, quiet=False):
     else:
         return (modelname, ngauss, model)
 
-def read_interp_model(modelfile, freqs=None, nbin=None, quiet=False):
+def read_spline_model(modelfile, freqs=None, nbin=None, quiet=False):
     """
-    Read-in a model created by make_interp_model(...).
+    Read-in a model created by make_spline_model(...).
 
     If only modelfile is specified, returns the contents of the pickled model:
         (model name, source name, datafile name from which the model was
@@ -2707,9 +2707,9 @@ def read_interp_model(modelfile, freqs=None, nbin=None, quiet=False):
         'tck' tuple containing knot locations, B-spline coefficients, and
         spline degree)
     Otherwise, builds a model based on the input frequencies using the function
-        gen_interp_portrait(...).
+        gen_spline_portrait(...).
 
-    modelfile is the name of the make_interp_model(...)-type of model file.
+    modelfile is the name of the make_spline_model(...)-type of model file.
     freqs in an array of frequencies at which to build the model; these should
         be in the same units as the datafile frequencies, and they should be
         within the same bandwidth range (cf. the knot vector).
@@ -2729,7 +2729,7 @@ def read_interp_model(modelfile, freqs=None, nbin=None, quiet=False):
         return (modelname, source, datafile, mean_prof, eigvec, tck)
     else:
         return (modelname,
-                gen_interp_portrait(mean_prof, freqs, eigvec, tck, nbin))
+                gen_spline_portrait(mean_prof, freqs, eigvec, tck, nbin))
 
 def file_is_type(filename, filetype="ASCII"):
     """
@@ -3508,9 +3508,9 @@ def show_spline_curve_projections(projected_port, tck, freqs, weights=None,
 
     projected_port is the projected portrait of data into the subspace of basis
         vectors; this is an attribute of a DataPortrait instance once
-        make_interp_model is called.
+        make_spline_model is called.
     tck is output from si.splprep that parameterizes the B-spline curve; this
-        is an attribute of a DataPortrait instance once make_interp_model is
+        is an attribute of a DataPortrait instance once make_spline_model is
         called.
     freqs is the array of frequencies corresponding to the profile vectors in
         projected_port.
