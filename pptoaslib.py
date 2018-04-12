@@ -717,7 +717,17 @@ def get_nu_zeros(params, data_portrait_FT, model_portrait_FT, errs_FT, P,
         else:
             nu_zero_DM, nu_zero_GM = nu_DM, nu_GM
         nu_zero_tau = nu_tau
+    elif np.all(fit_flags == [1,1,1,1,1]):  # all fit, but using [1,1,0,1,1]
+        # In principle, we can work this out, but I haven't found any resource
+        # willing to write down the explicit formulation of the inverse of a
+        # 5x5 matrix as a function of the individual matrix entries.  Plus,
+        # the algebra to find the nu_zeros would be even more laborious...
+        print "Approximating zero-covariance frequencies..."
+        nu_zero_DM, nu_zero_GM, nu_zero_tau = get_nu_zeros(params,
+                data_portrait_FT, model_portrait_FT, errs_FT, P, freqs, nu_DM,
+                nu_GM, nu_tau, [1,1,0,1,1], log10_tau, option)
     else:
+        print "No zero-covariance frequencies found."
         nu_zero_DM, nu_zero_GM, nu_zero_tau = nu_DM, nu_GM, nu_tau
     return [nu_zero_DM, nu_zero_GM, nu_zero_tau]
 

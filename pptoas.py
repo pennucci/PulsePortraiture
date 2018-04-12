@@ -209,6 +209,9 @@ class GetTOAs:
         self.log10_tau = log10_tau
         if not fit_scat:
             self.log10_tau = log10_tau = False
+        if fit_GM or fit_scat or fit_tau or fit_alpha:
+            print warning_message
+            already_warned = True
         self.scat_guess = scat_guess
         nu_ref_tuple = nu_refs
         nu_fit_tuple = nu_fits
@@ -316,9 +319,6 @@ class GetTOAs:
                                     Ps[isub],
                                     quiet=bool(quiet+(itoa-1)))
                         else:
-                            if not already_warned:
-                                print warning_message
-                                already_warned = True
                             self.model_name, self.ngauss, full_model = \
                                     read_model(self.modelfile, phases,
                                             freqs[isub], Ps[isub],
