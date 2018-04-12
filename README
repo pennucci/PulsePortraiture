@@ -20,8 +20,10 @@ The technical description of this work is:
 
 Requirements:
     -PSRCHIVE, compiled with the python-interface enabled,
-    -numpy & scipy, and
-    -lmfit is required for Gaussian portrait modelling.
+    -numpy & scipy,
+    -pywt (PyWavelets) is required for wavelet smoothing / ppspline.py, and
+    -lmfit is required for Gaussian portrait modelling / ppgauss.py and a few
+        other functions.
 
 In short:
     -pplib contains all functions and classes needed for the fitting scripts.

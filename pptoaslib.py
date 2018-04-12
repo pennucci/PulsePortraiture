@@ -239,7 +239,7 @@ def scattering_portrait_FT(taus, nbin, binshift=binshift):
         scat_port_FT = np.ones([nchan, nharm])
     else:
         scat_port_FT = np.zeros([nchan, nharm], dtype='complex_')
-        for ichan in xrange(nchan):
+        for ichan in range(nchan):
             scat_port_FT[ichan] = scattering_profile_FT(taus[ichan], nbin,
                     binshift)
     # Not sure this is needed;
@@ -426,8 +426,8 @@ def Cdbp_2deriv(data_portrait_FT, model_portrait_FT,
     phis_deriv = phase_shifts_deriv
     nphase = phis_deriv.shape[0]
     phis_deriv_matrix = np.zeros([nphase, nphase, nchan])
-    for iparam in xrange(nphase):
-        for jparam in xrange(nphase):
+    for iparam in range(nphase):
+        for jparam in range(nphase):
             phis_deriv_matrix[iparam,jparam] = \
                     phis_deriv[iparam] * phis_deriv[jparam]
     phis_2deriv = phase_shifts_2deriv
@@ -442,8 +442,8 @@ def Cdbp_2deriv(data_portrait_FT, model_portrait_FT,
     Cdbp_cross = np.real(np.sum(2.0j * np.pi * iharm * data_port_FT * \
             np.conj(model_port_FT) * np.conj(scat_port_FT_deriv) * phasor,
             axis=-1))
-    for iparam in xrange(nphase):
-        for jparam in xrange(nscat):
+    for iparam in range(nphase):
+        for jparam in range(nscat):
             Cdbp_hess_cross[iparam,jparam] = phis_deriv[iparam] * \
                     Cdbp_cross[jparam]
     hessian = np.zeros([nphase+nscat, nphase+nscat, nchan])
@@ -547,8 +547,8 @@ def fit_portrait_full_function_2deriv(params, data_portrait_FT,
             scat_port_FT_2deriv, phsr, phis_deriv, phis_2deriv, dCdphi,
             d2Cdphi, errs_FT)
     hessian = np.zeros([5,5,len(freqs)])
-    for iparam in xrange(hessian.shape[0]):
-        for jparam in xrange(hessian.shape[1]):
+    for iparam in range(hessian.shape[0]):
+        for jparam in range(hessian.shape[1]):
             Hij_n = -2 * ((C**2 / S) * ((d2C[iparam,jparam]/C) - \
                     (0.5*d2S[iparam,jparam]/S) + (dC[iparam]*dC[jparam]/C**2) \
                     + (dS[iparam]*dS[jparam]/S**2) - \

@@ -139,7 +139,7 @@ class DataPortrait(DataPortrait):
             #All slopes, spectral indices start at 0.0
             locparams = widparams = ampparams = np.zeros(self.ngauss)
             self.init_model_params = np.empty([self.ngauss, 6])
-            for igauss in xrange(self.ngauss):
+            for igauss in range(self.ngauss):
                 self.init_model_params[igauss] = np.array(
                         [self.init_params[2::3][igauss], locparams[igauss],
                             self.init_params[3::3][igauss], widparams[igauss],
@@ -581,7 +581,7 @@ class GaussianSelector:
         tau = params[1]
         # Plot the individual Gaussians
         max_amp = 0.0
-        for igauss in xrange(self.ngauss):
+        for igauss in range(self.ngauss):
             loc, wid, amp = params[(2 + igauss*3):(5 + igauss*3)]
             if amp >= max_amp:
                 max_amp = amp

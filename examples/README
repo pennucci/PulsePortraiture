@@ -5,7 +5,7 @@
 
 --To get more help:
           ppalign.py -h
-          ppinterp.py -h
+          ppspline.py -h
           ppgauss.py -h
           pptoas.py -h
 
@@ -20,13 +20,13 @@
 
     >Make a smooth model of the data, which can be reconstructed at any
         frequency within the range of the data:
-          ppinterp.py -d average_psrfits_file.fits
+          ppspline.py -d average_psrfits_file.fits
 
     >Make a gaussian model (based on averaged data e.g. having used psradd):
           ppgauss.py -d average_psrfits_file.fits
 
-    >Measure TOAs & DMs from an archive using a ppinterp model:
-          pptoas.py -d psrfits_archive.fits -m model_from_ppinterp.spl
+    >Measure TOAs & DMs from an archive using a ppspline model:
+          pptoas.py -d psrfits_archive.fits -m model_from_ppspline.spl
 
     >Measure TOAs & DMs from an archive using a ppgauss model:
           pptoas.py -d psrfits_archive.fits -m model_from_ppgauss.gmodel
@@ -35,14 +35,14 @@
           pptoas.py -d psrfits_archive.fits -m similar_psrfits_archive.fits
 
     >Find overlooked bad channels to zap in data:
-          ppzap.py -d psrfits_archive.fits -m model_from_ppinterp_or_ppgauss
+          ppzap.py -d psrfits_archive.fits -m model_from_ppspline_or_ppgauss
 
 --More involved command-line use with some additional options (combinable):
 
     >Make a smooth, parameterized model of the data, but first normalize the
         data per-channel and output a PSRCHIVE archive showing the
         reconstruction:
-          ppinterp.py -d psrfits_archive.fits -N prof -a reconstruction.fits
+          ppspline.py -d psrfits_archive.fits -N prof -a reconstruction.fits
 
     >Make a gaussian model based on averaged data archives from different
         receivers:
@@ -63,19 +63,19 @@
     >Measure TOAs & DMs from a metafile of archives, but output only a single
         (average) DM for each archive, and suppress all other output:
           pptoas.py -d metafile_with_archive_names \
-            -m model_from_ppinterp_or_ppgauss --one_DM --quiet
+            -m model_from_ppspline_or_ppgauss --one_DM --quiet
 
     >Measure only TOAs in an archive and specify an output file:
         (NB: DMs will still be 'barycentered' unless --no_bary is also used!)
-          pptoas.py -d psrfits_archive.fits -m model_from_ppinterp_or_ppgauss \
+          pptoas.py -d psrfits_archive.fits -m model_from_ppspline_or_ppgauss \
             -o my_tim_file.tim --fix_DM --no_bary
 
     >Add additonal flags (in pairs) to the output TOA lines:
-          pptoas.py -d psrfits_archive.fits -m model_from_ppinterp_or_ppgauss \
+          pptoas.py -d psrfits_archive.fits -m model_from_ppspline_or_ppgauss \
             --flags pta,pta_name,release,release_number
 
     >Use a different reduced chi-squared threshold for channel zapping, output
         paz commands to a file, which modify the original input archives that
         are read in from a metafile:
           ppzap.py -d metafile_with_archive_names \
-          -m model_from_ppinterp_or_ppgauss -t 1.3 -o paz_cmds.out --modify
+          -m model_from_ppspline_or_ppgauss -t 1.3 -o paz_cmds.out --modify

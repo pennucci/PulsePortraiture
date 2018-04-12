@@ -117,7 +117,7 @@ def align_archives(metafile, initial_guess, tscrunch=False, pscrunch=True,
         load_quiet = quiet
         aligned_port = np.zeros((npol,nchan,nbin))
         total_weights = np.zeros((nchan,nbin))
-        for ifile in xrange(len(datafiles)):
+        for ifile in range(len(datafiles)):
             try:
                 data = load_data(datafiles[ifile], dedisperse=False,
                         tscrunch=tscrunch, pscrunch=pscrunch, fscrunch=False,
@@ -202,8 +202,8 @@ def align_archives(metafile, initial_guess, tscrunch=False, pscrunch=True,
     if pscrunch: arch.pscrunch()
     arch.set_dispersion_measure(0.0)
     for subint in arch:
-        for ipol in xrange(model_data.arch.get_npol()):
-            for ichan in xrange(model_data.arch.get_nchan()):
+        for ipol in range(model_data.arch.get_npol()):
+            for ichan in range(model_data.arch.get_nchan()):
                 prof = subint.get_Profile(ipol, ichan)
                 prof.get_amps()[:] = aligned_port[ipol,ichan]
                 if total_weights[ichan].sum() == 0.0:

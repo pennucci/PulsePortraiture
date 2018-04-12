@@ -275,7 +275,7 @@ class GetTOAs:
             rcs = np.zeros(nsub, dtype="int")
             #PSRCHIVE epochs are *midpoint* of the integration
             MJDs = np.array([epochs[isub].in_days() \
-                    for isub in xrange(nsub)], dtype=np.double)
+                    for isub in range(nsub)], dtype=np.double)
             DM_stored = DM # = arch.get_dispersion_measure()
             if self.DM0 is None:
                 DM0 = DM_stored

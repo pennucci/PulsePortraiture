@@ -175,7 +175,7 @@ class DataPortrait(object):
             self.metafile = self.datafile = datafile
             self.datafiles = open(datafile, "r").readlines()
             self.datafiles = [self.datafiles[ifile][:-1] for ifile in
-                    xrange(len(self.datafiles))]
+                    range(len(self.datafiles))]
             self.njoin = len(self.datafiles)
             self.Ps = 0.0
             self.nchan = 0
@@ -391,12 +391,12 @@ class DataPortrait(object):
         Smooth portrait data using default settings from wavelet_smooth.
 
         smart=True uses smart_smooth(...).
-        Optional keyword arguments can be passed.
+        **kwargs get passed to wavelet_smooth and/or smart_smooth.
         """
         #Full portrait
         if smart:
-            self.port = smart_smooth(self.port, try_nlevels=8,
-                    errs=self.noise_stds[0,0], **kwargs)
+            self.port = smart_smooth(self.port, try_nlevels=min(8,
+                int(np.log2(self.nbin))), **kwargs)
         else:
             self.port = wavelet_smooth(self.port, **kwargs)
         for ichan in range(len(self.port)):
@@ -404,8 +404,8 @@ class DataPortrait(object):
         self.flux_prof = self.port.mean(axis=1)
         #Condensed portrait
         if smart:
-            self.portx = smart_smooth(self.portx, try_nlevels=8,
-                    errs=self.noise_stdsxs, **kwargs)
+            self.portx = smart_smooth(self.portx, try_nlevels=min(8,
+                int(np.log2(self.nbin))), **kwargs)
         else:
             self.portx = wavelet_smooth(self.portx, **kwargs)
         for ichanx in range(len(self.portx)):
@@ -491,7 +491,7 @@ class DataPortrait(object):
         header = "# archive name" + " "*32 + "-phase offset & err [rot]" + \
                 " "*2 + "-delta-DM & err [cm**-3 pc]\n"
         jf.write(header)
-        for ifile in xrange(len(self.datafiles)):
+        for ifile in range(len(self.datafiles)):
             datafile = self.datafiles[ifile]
             phase = self.join_params[ifile*2]
             dm = self.join_params[ifile*2 + 1]
@@ -767,7 +767,7 @@ def gen_gaussian_profile(params, nbin):
     """
     ngauss = (len(params) - 2) / 3
     model = np.zeros(nbin, dtype='d') + params[0]
-    for igauss in xrange(ngauss):
+    for igauss in range(ngauss):
         loc, wid, amp = params[(2 + igauss*3):(5 + igauss*3)]
         model += amp * gaussian_profile(nbin, loc, wid)
     if params[1] != 0.0:
@@ -835,7 +835,7 @@ def gen_gaussian_portrait(model_code, params, scattering_index, phases, freqs,
     #Amps
     gparams[:,4::3] = evolve_parameter(freqs, nu_ref, refparams[4::3],
             ampparams, model_code[2])
-    for ichan in xrange(nchan):
+    for ichan in range(nchan):
         #Need to contrain so values don't go negative, etc., which is currently
         #taken care of in gaussian_profile
         gport[ichan] = gen_gaussian_profile(gparams[ichan], nbin)
@@ -844,7 +844,7 @@ def gen_gaussian_portrait(model_code, params, scattering_index, phases, freqs,
                 alpha=scattering_index)
         gport = add_scattering(gport, sk, repeat=3)
     if njoin:
-        for ij in xrange(njoin):
+        for ij in range(njoin):
             join_ichan = join_ichans[ij]
             phi = join_params[0::2][ij]
             DM =  join_params[1::2][ij]
@@ -864,9 +864,13 @@ def gen_spline_portrait(mean_prof, freqs, eigvec, tck, nbin=None):
     nbin is the number of phase bins to use in the model; if different from
         len(mean_prof), a resampling function is used.
     """
-    proj_port = np.array(si.splev(freqs, tck, der=0, ext=0))
-    delta_port = np.dot(eigvec, proj_port).T
-    port = delta_port + mean_prof
+    if not eigvec.shape[1]:
+        port = np.tile(mean_prof, len(freqs)).reshape(len(freqs),
+                len(mean_prof))
+    else:
+        proj_port = np.array(si.splev(freqs, tck, der=0, ext=0))
+        delta_port = np.dot(eigvec, proj_port).T
+        port = delta_port + mean_prof
     if nbin is not None:
         if len(mean_prof) != nbin:
             shift = 0.5 * (nbin**-1 - len(mean_prof)**-1)
@@ -966,12 +970,12 @@ def powlaw_freqs(lo, hi, N, alpha, mid=False):
         nus = np.power(np.linspace(lo**(1+alpha), hi**(1+alpha), N+1),
                 (1+alpha)**-1)
         #Equivalently:
-        #for ii in xrange(N+1):
+        #for ii in range(N+1):
         #    nus[ii] = ((ii / np.float64(N)) * (hi**(1+alpha)) + (1 - (ii /
         #        np.float64(N))) * (lo**(1+alpha)))**(1 / (1+alpha))
     if mid:
         midnus = np.zeros(N)
-        for ii in xrange(N):
+        for ii in range(N):
             midnus[ii] = 0.5 * (nus[ii] + nus[ii+1])
         nus = midnus
     return nus
@@ -994,7 +998,7 @@ def scattering_kernel(tau, nu_ref, freqs, phases, P, alpha):
         ts = np.zeros([nchan, nbin])
         ts[:,0] = 1.0
     else:
-        ts = np.array([phases*P for ichan in xrange(nchan)])
+        ts = np.array([phases*P for ichan in range(nchan)])
         taus = tau * (freqs / nu_ref)**alpha
         sk = np.exp(-np.transpose(np.transpose(ts) * taus**-1.0))
     return sk
@@ -1042,7 +1046,7 @@ def add_scintillation(port, params=None, random=True, nsin=2, amax=1.0,
         return port
     elif params is not None:
         nsin = len(params)/3
-        for isin in xrange(nsin):
+        for isin in range(nsin):
             a,w,p = params[isin*3:isin*3 + 3]
             pattern += a * np.sin(np.linspace(0, w * np.pi, nchan) +
                     p*np.pi)**2
@@ -1193,7 +1197,7 @@ def fit_portrait_function(params, model=None, p_n=None, data=None, errs=None,
         D = 0.0
         freqs = np.inf * np.ones(len(model))
     else: D = Dconst * params[1] / P
-    for nn in xrange(len(freqs)):
+    for nn in range(len(freqs)):
         freq = freqs[nn]
         p = p_n[nn]
         err = errs[nn]
@@ -1215,7 +1219,7 @@ def fit_portrait_function_deriv(params, model=None, p_n=None, data=None,
     phase = params[0]
     D = Dconst * params[1] / P
     d_phi, d_DM = 0.0, 0.0
-    for nn in xrange(len(freqs)):
+    for nn in range(len(freqs)):
         freq = freqs[nn]
         p = p_n[nn]
         err = errs[nn]
@@ -1250,7 +1254,7 @@ def fit_portrait_function_2deriv(params, model=None, p_n=None, data=None,
     D = Dconst * params[1] / P
     d2_phi, d2_DM, d2_cross = 0.0, 0.0, 0.0
     W_n = np.zeros(len(freqs))
-    for nn in xrange(len(freqs)):
+    for nn in range(len(freqs)):
         freq = freqs[nn]
         p = p_n[nn]
         err = errs[nn]
@@ -1310,7 +1314,7 @@ def fit_brickwall(prof, noise):
     wf = wiener_filter(prof, noise)
     N = len(wf)
     X2 = np.zeros(N)
-    for ii in xrange(N):
+    for ii in range(N):
         X2[ii] = np.sum((wf - brickwall_filter(N, ii))**2)
     return X2.argmin()
 
@@ -1375,26 +1379,20 @@ def find_kc(pows, errs=1.0, fn='exp_dc'):
     else:
         return len(data)-1
 
-def pca(port, mean_prof=None, weights=None, ncomp=None, quiet=False):
+def pca(port, mean_prof=None, weights=None, quiet=False):
     """
-    Compute the pricinpal components of port and reconstruct port.
+    Compute the pricinpal components of port.
 
-    Returns the number ncomp, the reconstructed port projected into the space
-        of ncomp principle components, all eigenvectors, and all eigenvales.
-        The latter two are sorted by the eigenvalues.
+    Returns the eigvalues and eigenvectors sorted by the eigenvalues.  Note
+        eigenvectors are column vectors.
 
     port is an nchan x nbin array of data values; in the PCA, these dimensions
         are interpreted as nmeasurements of nvariables, respectively.
     mean_prof is an nbin array of the mean profile to be subtracted; if None,
         a weighted average is calculated using weights.
-    weights are the nchan weights passed to np.cov as 'aweights' for the
-        construction of the covariance matrix.
-    ncomp is the number of principal components to use in the reconstruction of
-        port.  If None, ncomp is the largest number of consecutive
-        eigenvectors that, after being smoothed, have a non-zero
-        autocorrelation.  ncomp=0 will return a portrait with just the mean
-        profile, while setting ncomp=port.shape[1] will return an identical
-        reconstruction.
+    weights are the nchan weights used in the mean profile calculation and are
+        also passed to np.cov as 'aweights' for the construction of the
+        covariance matrix.  Default is equal weights.
     quiet=True suppresses output.
 
     Written mostly by EF.
@@ -1402,47 +1400,89 @@ def pca(port, mean_prof=None, weights=None, ncomp=None, quiet=False):
 
     nmes,ndim = port.shape #nchan x nbin
 
-    if ncomp is not None and (ncomp < 0 or ncomp > ndim):
-        print "Bad ncomp for pca."
-        return 0
-
     if not quiet: print "Performing principal component analysis on data with %d dimensions and %d measurements..." %(ndim,nmes)
 
-    #Subtract weighted average from each set of measurements.
+    #Subtract weighted average from each set of measurements
     if mean_prof is None:
         #mean_prof = port.mean(axis=0)
         mean_prof = (port.T * weights).T.sum(axis=0) / weights.sum()
     delta_port = port - mean_prof
 
-    #Compute unbiased weighted covariance matrix.
+    #Compute unbiased weighted covariance matrix
     cov = np.cov(delta_port.T, aweights=weights, ddof=1)
 
-    #Compute eigenvalues/vectors of cov, and order them.
+    #Compute eigenvalues/vectors of cov, and order them
     eigval, eigvec = np.linalg.eigh(cov)
-    ind = (np.argsort(eigval))[::-1]
-    eigval, eigvec = eigval[ind], eigvec[:,ind]
+    isort = (np.argsort(eigval))[::-1]
+    eigval, eigvec = eigval[isort], eigvec[:,isort]
+    return eigval, eigvec
 
-    #Reconstruct port projected into space of ncomp principal components.
-    if ncomp is None:
-        ncomp = 0
-        while(1):
-            ev = smart_smooth(eigvec.T[ncomp])
-            if np.correlate(ev, ev, mode="full").sum(): ncomp += 1
-            else: break
-            if ncomp == ndim: break
-    some_eigvec = eigvec[:,:ncomp]
-    reconst_port = np.dot(some_eigvec, np.dot(some_eigvec.T, delta_port.T)).T \
-            + mean_prof
-    return ncomp, reconst_port, eigvec, eigval
+def reconstruct_portrait(port, mean_prof, eigvec):
+    """
+    Reconstruct a portrait from a mean profile and set of basis eigenvectors.
 
-def wavelet_smooth(port, wave='db8', nlevel=5, threshtype='hard', fact=1.0):
+    Returns the reconstructed portrait.
+
+    port is an nchan x nbin array of data values.
+    mean_prof is an nbin array of the mean profile.
+    eigvec is the nbin x ncomp array of basis column eigenvectors that will be
+        projected onto.
+
+    See pca(...) for details.
+
+    """
+    #Reconstruct port projected into space of eigvec
+    delta_port = port - mean_prof
+    reconst_port = np.dot(eigvec, np.dot(eigvec.T, delta_port.T)).T + mean_prof
+    return reconst_port
+
+def find_significant_eigvec(eigvec, check_max=10, return_max=10,
+        snr_cutoff=150.0, return_smooth=True, **kwargs):
+    """
+    Determine which eigenvectors are "significant" based on smoothing and S/N.
+
+    Returns the indices of significant eigenvectors and the smoothed eigvec, if
+        return_smooth is True.
+
+    eigvec is the nbin x ncomp array of eigenvectors to be examined.
+    check_max is the maximum number of consecutive eigenvectors to check for
+        significance.
+    return_max is the maximum number of eigenvectors to return as significant;
+        note that these may not be the return_max most significant.
+    snr_cutoff is the S/N ratio value above or equal to which an eigenvector is
+        deemed "significant".
+    return_smooth=True will return the array of smoothed eigenvectors so that
+        smart_smooth(...) need not be run separately.
+    **kwargs get passed to smart_smooth(...).
+    """
+    if return_smooth: smooth_eigvec = np.zeros(eigvec.shape)
+    ieig = []
+    neig = 0
+    for ivec in range(max(check_max, return_max)):
+        ev = smart_smooth(eigvec.T[ivec], **kwargs)
+        ev_noise = get_noise(eigvec.T[ivec]) * np.sqrt(len(ev) / 2.0)
+        ev_snr = np.sum(np.abs(np.fft.rfft(ev))**2) / ev_noise
+        if ev_snr >= snr_cutoff:
+            ieig.append(ivec)
+            neig += 1
+            if return_smooth: smooth_eigvec[:,ivec] = ev
+        if ivec+1 == check_max: break
+        if neig == return_max: break
+    ieig = np.array(ieig)
+    if return_smooth:
+        return ieig, smooth_eigvec
+    else:
+        return ieig
+
+def wavelet_smooth(port, wavelet='db8', nlevel=5, threshtype='hard', fact=1.0):
     """
     Compute the wavelet-denoised version of a portrait or profile.
 
     Returns the smoothed portrait or profile.
 
     port is a nchan x nbin array, or a single profile array of length nbin.
-    wave is the type of mother wavelet [default=Daubechies 8].
+    wavelet is the name of the mother wavelet or pywt.Wavelet object; see
+        PyWavelets for more [default=Daubechies 8].
     nlevel is the integer number of decomposition levels (5-6 typical).
     threshtype is the type of wavelet thresholding ('hard' or 'soft').
     fact is a fudge factor that scales the threshold value.
@@ -1464,10 +1504,10 @@ def wavelet_smooth(port, wave='db8', nlevel=5, threshtype='hard', fact=1.0):
     smooth_port = np.zeros(port.shape)
 
     #Smooth each channel
-    for ichan in xrange(nchan):
+    for ichan in range(nchan):
         prof = port[ichan]
         #Translation-invariant (stationary) wavelet transform/denoising
-        coeffs = np.array(pw.swt(prof, wave, level=nlevel, start_level=0,
+        coeffs = np.array(pw.swt(prof, wavelet, level=nlevel, start_level=0,
             axis=-1))
         #Get threshold value
         lopt = fact * (np.median(np.abs(coeffs[0])) / 0.6745) * np.sqrt(2 * \
@@ -1475,7 +1515,7 @@ def wavelet_smooth(port, wave='db8', nlevel=5, threshtype='hard', fact=1.0):
         #Do wavelet thresholding
         coeffs = pw.threshold(coeffs, lopt, mode=threshtype, substitute=0.0)
         #Reconstruct data
-        smooth_port[ichan] = pw.iswt(map(tuple, coeffs), wave)
+        smooth_port[ichan] = pw.iswt(map(tuple, coeffs), wavelet)
     
     #Return smoothed portrait
     if one_prof:
@@ -1483,22 +1523,22 @@ def wavelet_smooth(port, wave='db8', nlevel=5, threshtype='hard', fact=1.0):
     else:
         return smooth_port
 
-def smart_smooth(port, try_nlevels=8, errs=None, **kwargs):
+def smart_smooth(port, try_nlevels=None, target_rchi2=1.0, **kwargs):
     """
-    Attempt to use wavelet_smooth(...) in a smart, iterative but automated way.
+    Attempts to use wavelet_smooth(...) in a smart/iterative but automated way.
 
-    For each profile in port, and for each of try_nlevels, a smooth profile is
-        generated with wavelet_smooth(...) and a reduced chi-squared value is
-        calculated using get_red_chi2(...).  The returned profile is the one
-        with the smallest reduced chi-squared value >= 1.0.
+    For each profile in port, a "best-fit" smooth profile is found by
+        minimizing the difference abs(target_rchi2 - reduced chi2).  The
+        minimization takes place over nlevel and the coefficient
+        thresholding factor fact within wavelet_smooth(...).
 
     port is a nchan x nbin array, or a single profile array of length nbin.
-    try_nlevels is the number of levels to try in wavelet_smooth.  A value of
-        0 returns the port as is.  nlevels cannot be higher than 11 so
-        try_nlevels <= 11.
-    errs is a value or a 1-D array of '1-sigma' uncertainties on the data,
-        which is passed to get_red_chi2(...).  If None, errs is estimated using
-        get_noise(data).
+    try_nlevels is the number of levels to minimize over in
+        wavelet_smooth(...).  A value of 0 returns the port as is.  nlevel
+        cannot be higher than log2(nbin), which is the default value for
+        try_nlevels.
+    target_rchi2 is the desired value for the reduced chi2 statistic between
+        the data and smoothed profiles.
     **kwargs are passed to wavelet_smooth(...)
     """
     if try_nlevels == 0: return port
@@ -1509,27 +1549,50 @@ def smart_smooth(port, try_nlevels=8, errs=None, **kwargs):
         port = np.array([port])
         nchan,nbin = port.shape
         one_prof = True
+    if try_nlevels is None: try_nlevels = int(np.log2(port.shape[-1]))
     smooth_port = np.zeros(port.shape)
+    if kwargs.has_key('wavelet'): wavelet = kwargs['wave']
+    else: wavelet = 'db8'
+    if kwargs.has_key('nlevel'): kwargs.pop('nlevel')
+    if kwargs.has_key('threshtype'): threshtype = kwargs['threshtype']
+    else: threshtype = 'hard'
+    if kwargs.has_key('fact'): kwargs.pop('fact')
     for iprof, prof in enumerate(port):
-        nlevel = 1
-        smooth_prof = wavelet_smooth(prof, nlevel=nlevel, **kwargs)
-        old_red_chi2 = get_red_chi2(prof, smooth_prof, errs)
-        nlevel += 1
-        while (nlevel <= try_nlevels):
-            smooth_prof = wavelet_smooth(prof, nlevel=nlevel, **kwargs)
-            red_chi2 = get_red_chi2(prof, smooth_prof, errs)
-            if red_chi2 < 1.0:
-                old_red_chi2 = red_chi2
-                nlevel += 1
-            elif red_chi2 < old_red_chi2:
-                old_red_chi2 = red_chi2
-                nlevel += 1
-            else: break
-        smooth_port[iprof] = wavelet_smooth(prof, nlevel=nlevel-1, **kwargs)
+        if not np.any(prof): continue
+        fun_vals = np.zeros([try_nlevels])
+        fact_mins = np.zeros([try_nlevels])
+        for ilevel in range(try_nlevels):
+            options = {'maxiter':1000, 'disp':False}#, xatol:1e-8}
+            other_args = (prof, wavelet, ilevel+1, threshtype, target_rchi2)
+            results = opt.minimize_scalar(fit_wavelet_smooth_function,
+                    bounds=[0.0,3.0], args=other_args, method='bounded',
+                    options=options)
+            fact_mins[ilevel] = results.x
+            fun_vals[ilevel] = results.fun
+        ilevel_min = fun_vals.argmin()
+        fact_min = fact_mins[ilevel_min]
+        smooth_port[iprof] = wavelet_smooth(prof, wavelet=wavelet,
+                nlevel=ilevel_min+1, threshtype=threshtype, fact=fact_min)
     if one_prof:
         return smooth_port[0]
     else:
         return smooth_port
+
+def fit_wavelet_smooth_function(fact, prof, wavelet, nlevel, threshtype,
+        target_rchi2):
+    """
+    Calculate difference of red. chi2 and target value for smart_smooth(...).
+
+    Returns abs(target_rchi2 - reduced chi-squared).
+
+    See smart_smooth(...) and wavelet_smooth(...) for arguments.
+    """
+    smooth_prof = wavelet_smooth(prof, wavelet=wavelet, nlevel=nlevel,
+            threshtype=threshtype, fact=fact)
+    errs = get_noise(prof)
+    chi2 = np.sum(((prof - smooth_prof) / errs)**2)
+    red_chi2 = chi2 / len(prof)
+    return abs(target_rchi2 - red_chi2)
 
 def fit_powlaw(data, init_params, errs, freqs, nu_ref):
     """
@@ -1633,14 +1696,14 @@ def fit_gaussian_profile(data, init_params, errs, fit_flags=None,
     nparam = len(init_params)
     ngauss = (len(init_params) - 2) / 3
     if fit_flags is None:
-        fit_flags = [True for t in xrange(nparam)]
+        fit_flags = [True for t in range(nparam)]
         fit_flags[1] = fit_scattering
     else:
         fit_flags = [np.bool(fit_flags[0]), fit_scattering] + \
-                [np.bool(fit_flags[xx]) for xx in xrange(1, nparam-1)]
+                [np.bool(fit_flags[iflag]) for iflag in range(1, nparam-1)]
     #Generate the parameter structure
     params = lm.Parameters()
-    for ii in xrange(nparam):
+    for ii in range(nparam):
         if ii == 0:
             params.add('dc', init_params[ii], vary=fit_flags[ii], min=None,
                     max=None, expr=None)
@@ -1726,7 +1789,7 @@ def fit_gaussian_portrait(model_code, data, init_params, scattering_index,
     ngauss = (len(init_params) - 2) / 6
     #Generate the parameter structure
     params = lm.Parameters()
-    for ii in xrange(nparam):
+    for ii in range(nparam):
         if ii == 0:         #DC, not limited
             params.add('dc', init_params[ii], vary=bool(fit_flags[ii]),
                     min=None, max=None, expr=None)
@@ -1757,7 +1820,7 @@ def fit_gaussian_portrait(model_code, data, init_params, scattering_index,
     if len(join_params):
         join_ichans = join_params[0]
         njoin = len(join_ichans)
-        for ii in xrange(njoin):
+        for ii in range(njoin):
             params.add('phase%s'%str(ii+1), join_params[1][0::2][ii],
                     vary=bool(join_params[2][0::2][ii]), min=None, max=None,
                         expr=None)
@@ -2002,7 +2065,7 @@ def get_noise_PS(data, frac=4, chans=False):
     """
     if chans:
         noise = np.zeros(len(data))
-        for ichan in xrange(len(noise)):
+        for ichan in range(len(noise)):
             prof = data[ichan]
             FFT = fft.rfft(prof)
             pows = np.real(FFT * np.conj(FFT)) / len(prof)
@@ -2030,7 +2093,7 @@ def get_noise_fit(data, fact=1.1, chans=False):
     """
     if chans:
         noise = np.zeros(len(data))
-        for ichan in xrange(len(noise)):
+        for ichan in range(len(noise)):
             prof = data[ichan]
             FFT = fft.rfft(prof)
             pows = np.real(FFT * np.conj(FFT)) / len(prof)
@@ -2134,7 +2197,7 @@ def rotate_data(data, phase=0.0, DM=0.0, Ps=None, freqs=None, nu_ref=np.inf):
         othershape = np.take(shape, iaxis)
         ones = np.ones(othershape)
         order = np.take(list(idim), iaxis)
-        order = ''.join([order[xx] for xx in xrange(len(order))])
+        order = ''.join([order[iorder] for iorder in range(len(order))])
         phasor = np.exp(harmind * 2.0j * np.pi * phase)
         phasor = np.einsum(order + ',' + bdim, ones, phasor)
         dFFT *= phasor
@@ -2177,7 +2240,7 @@ def rotate_data(data, phase=0.0, DM=0.0, Ps=None, freqs=None, nu_ref=np.inf):
         phase += np.array([D[isub]*fterm[isub] for isub in range(nsub)])
         phase = np.einsum('ij,k', phase, harmind)
         phasor = np.exp(2.0j * np.pi * phase)
-        dFFT = np.array([dFFT[:,ipol,:,:]*phasor for ipol in xrange(npol)])
+        dFFT = np.array([dFFT[:,ipol,:,:]*phasor for ipol in range(npol)])
         dFFT = np.einsum('jikl', dFFT)
         if ndim == 1:
             return fft.irfft(dFFT, axis=baxis)[0,0,0]
@@ -2211,7 +2274,7 @@ def rotate_portrait(port, phase=0.0, DM=None, P=None, freqs=None,
         of DM.
     """
     pFFT = fft.rfft(port, axis=1)
-    for nn in xrange(len(pFFT)):
+    for nn in range(len(pFFT)):
         if DM is None and freqs is None:
             pFFT[nn,:] *= np.exp(np.arange(len(pFFT[nn])) * 2.0j * np.pi *
                     phase)
@@ -2284,7 +2347,7 @@ def add_DM_nu(port, phase=0.0, DM=None, P=None, freqs=None, xs=[-2.0],
         unless specified.
     """
     pFFT = fft.rfft(port, axis=1)
-    for nn in xrange(len(pFFT)):
+    for nn in range(len(pFFT)):
         if DM is None and freqs is None:
             pFFT[nn,:] *= np.exp(np.arange(len(pFFT[nn])) * 2.0j * np.pi *
                     phase)
@@ -2479,7 +2542,7 @@ def load_data(filename, dedisperse=False, dededisperse=False, tscrunch=False,
     nchan = arch.get_nchan()
     #Centers of frequency channels
     freqs = np.array([[sub.get_centre_frequency(ichan) for ichan in \
-            xrange(nchan)] for sub in arch])
+            range(nchan)] for sub in arch])
     nbin = arch.get_nbin()
     #Centers of phase bins
     phases = get_bin_centers(nbin, lo=0.0, hi=1.0)
@@ -2498,16 +2561,16 @@ def load_data(filename, dedisperse=False, dededisperse=False, tscrunch=False,
             np.ones(weights.shape))
     #Get off-pulse noise
     noise_stds = np.array([sub.baseline_stats()[1]**0.5 for sub in arch])
-    ok_isubs = np.compress(weights_norm.mean(axis=1), xrange(nsub))
-    ok_ichans = [np.compress(weights_norm[isub], xrange(nchan)) \
-            for isub in xrange(nsub)]
+    ok_isubs = np.compress(weights_norm.mean(axis=1), range(nsub))
+    ok_ichans = [np.compress(weights_norm[isub], range(nchan)) \
+            for isub in range(nsub)]
     #np.einsum is AWESOME
     masks = np.einsum('ij,k', weights_norm, np.ones(nbin))
     masks = np.einsum('j,ikl', np.ones(npol), masks)
     SNRs = np.zeros([nsub, npol, nchan])
-    for isub in xrange(nsub):
-        for ipol in xrange(npol):
-            for ichan in xrange(nchan):
+    for isub in range(nsub):
+        for ipol in range(npol):
+            for ichan in range(nchan):
                 SNRs[isub, ipol, ichan] = \
                         arch.get_Integration(
                                 isub).get_Profile(ipol, ichan).snr()
@@ -2601,7 +2664,7 @@ def write_model(filename, name, model_code, nu_ref, model_params, fit_flags,
     outfile.write("TAU    % .8f %d\n"%(model_params[1], fit_flags[1]))
     outfile.write("ALPHA  % .3f      %d\n"%(alpha, fit_alpha))
     ngauss = (len(model_params) - 2) / 6
-    for igauss in xrange(ngauss):
+    for igauss in range(ngauss):
         comp = model_params[(2 + igauss*6):(8 + igauss*6)]
         fit_comp = fit_flags[(2 + igauss*6):(8 + igauss*6)]
         line = (igauss + 1, ) + tuple(np.array(zip(comp, fit_comp)).ravel())
@@ -2665,7 +2728,7 @@ def read_model(modelfile, phases=None, freqs=None, P=None, quiet=False):
     params[1] = tau
     fit_flags[0] = fit_dc
     fit_flags[1] = fit_tau
-    for igauss in xrange(ngauss):
+    for igauss in range(ngauss):
         comp = map(np.float64, comps[igauss].split()[1::2])
         fit_comp = map(int, comps[igauss].split()[2::2])
         params[2 + igauss*6 : 8 + (igauss*6)] = comp
@@ -2774,10 +2837,10 @@ def unload_new_archive(data, arch, outfile, DM=None, dmc=0, weights=None,
         else: pass
     if DM is not None: arch.set_dispersion_measure(DM)
     nsub,npol,nchan,nbin = arch.get_data().shape
-    for isub in xrange(nsub):
+    for isub in range(nsub):
         sub = arch.get_Integration(isub)
-        for ipol in xrange(npol):
-            for ichan in xrange(nchan):
+        for ipol in range(npol):
+            for ichan in range(nchan):
                 prof = sub.get_Profile(ipol,ichan)
                 prof.get_amps()[:] = data[isub,ipol,ichan]
                 if weights is not None:
@@ -2842,8 +2905,8 @@ def write_archive(data, ephemeris, freqs, nu0=None, bw=None,
         DM = par.DM
     except ImportError:
         parfile = open(ephemeris,"r").readlines()
-        for xx in xrange(len(parfile)):
-            param = parfile[xx].split()
+        for iline in range(len(parfile)):
+            param = parfile[iline].split()
             if len(param) == 0:
                 pass
             elif param[0] == ("PSR" or "PSRJ"):
@@ -2877,7 +2940,7 @@ def write_archive(data, ephemeris, freqs, nu0=None, bw=None,
         subint.set_epoch(epoch)
         subint.set_duration(tsub)
         epoch += tsub
-        for ichan in xrange(nchan):
+        for ichan in range(nchan):
             subint.set_centre_frequency(ichan, freqs[ichan])
     #Fill in polycos
     arch.set_ephemeris(ephemeris)
@@ -2887,8 +2950,8 @@ def write_archive(data, ephemeris, freqs, nu0=None, bw=None,
     if weights is None: weights = np.ones([nsub, nchan])
     isub = 0
     for subint in arch:
-        for ipol in xrange(npol):
-            for ichan in xrange(nchan):
+        for ipol in range(npol):
+            for ichan in range(nchan):
                 subint.set_weight(ichan, weights[isub, ichan])
                 prof = subint.get_Profile(ipol, ichan)
                 prof.get_amps()[:] = data[isub, ipol, ichan]
@@ -2993,8 +3056,8 @@ def make_fake_pulsar(modelfile, ephemeris, outfile="fake_pulsar.fits", nsub=1,
         DM = par.DM
     except ImportError:
         parfile = open(ephemeris,"r").readlines()
-        for xx in xrange(len(parfile)):
-            param = parfile[xx].split()
+        for iline in range(len(parfile)):
+            param = parfile[iline].split()
             if param[0] == ("PSR" or "PSRJ"):
                 PSR = param[1]
             elif param[0] == "RAJ":
@@ -3035,7 +3098,7 @@ def make_fake_pulsar(modelfile, ephemeris, outfile="fake_pulsar.fits", nsub=1,
         subint.set_epoch(epoch)
         subint.set_duration(tsub)
         epoch += tsub
-        for ichan in xrange(nchan):
+        for ichan in range(nchan):
             subint.set_centre_frequency(ichan, freqs[ichan])
     #Fill in polycos
     arch.set_ephemeris(ephemeris)
@@ -3052,7 +3115,7 @@ def make_fake_pulsar(modelfile, ephemeris, outfile="fake_pulsar.fits", nsub=1,
             fit_scattering_index) = read_model(modelfile, quiet=True)
     for subint in arch:
         P = subint.get_folding_period()
-        for ipol in xrange(npol):
+        for ipol in range(npol):
             name, ngauss, model = read_model(modelfile, phases, freqs, P,
                     quiet=True)
             if xs is None:
@@ -3075,7 +3138,7 @@ def make_fake_pulsar(modelfile, ephemeris, outfile="fake_pulsar.fits", nsub=1,
                             amax=1.0, wmax=5.0)
                 else:
                     rotmodel = add_scintillation(rotmodel, scint)
-            for ichan in xrange(nchan):
+            for ichan in range(nchan):
                 subint.set_weight(ichan, float(weights[isub, ichan]))
                 prof = subint.get_Profile(ipol, ichan)
                 noise = noise_stds[ichan]
@@ -3388,7 +3451,7 @@ def show_profiles(model, cmap=plt.cm.Spectral, s=1, offset=None, **kwargs):
     cmap is a matplotlib.colormap instance.
     s is the marker size in squared points.
     offset=None calculates the offset between profiles.
-    **kwargs gets passed to plt.scatter(...).
+    **kwargs are passed to plt.scatter(...).
     """
     model_min = model.min()
     model_max = model.max()
@@ -3547,10 +3610,12 @@ def show_spline_curve_projections(projected_port, tck, freqs, weights=None,
     knots = np.array(si.splev(tck[0], tck, der=0, ext=0)).T
 
     size = 3 #inches per plot
-    buff = 1 #inches
-    fig1 = plt.figure(figsize=((ncoord-1)*size + buff, (ncoord-1)*size + buff))
+    buff = 2.0 #inches
+    if ncoord-1 and plot_this_coord is None:
+        fig1 = plt.figure(1, figsize=((ncoord-1)*size + buff,
+            (ncoord-1)*size + buff))
     if plot_this_coord is None:
-        fig2 = plt.figure(figsize=(2*size + buff, ncoord*size + buff))
+        fig2 = plt.figure(2, figsize=(2*size + buff, ncoord*size + buff))
         axes2 = fig2.subplots(nrows=ncoord, ncols=1, sharex=True, sharey=False,
                 squeeze=True)
     fmt = 'bo'
@@ -3576,12 +3641,13 @@ def show_spline_curve_projections(projected_port, tck, freqs, weights=None,
                 ax.plot(proj_port_interp[:,icoord], proj_port_interp[:,ocoord],
                         color='r', ls='solid', lw=2)
                 ax.plot(knots[:,icoord], knots[:,ocoord], 'k*', ms=5)
-                if ocoord == ncoord-1: ax.set_xlabel(icoord)
+                if ocoord == ncoord-1: ax.set_xlabel(icoord+1)
                 else: ax.tick_params(labelbottom=False)
-                if icoord == 0: ax.set_ylabel(ocoord)
+                if icoord == 0: ax.set_ylabel(ocoord+1)
                 else: ax.tick_params(labelleft=False)
+
         if plot_this_coord is None:
-            nuax = axes2[-icoord-1]
+            nuax = axes2[icoord]
             for iprof,prof in enumerate(projected_port):
                 nuax.plot(freqs[iprof], prof[icoord], fmt, ms=ms[iprof],
                         alpha=alpha[iprof], mew=0.0)
@@ -3590,37 +3656,129 @@ def show_spline_curve_projections(projected_port, tck, freqs, weights=None,
             nuax.plot(interp_freqs[::flip], proj_port_interp[:,icoord][::flip],
                     color='r', ls='solid', lw=2)
             nuax.plot(tck[0][::flip], knots[:,icoord][::flip], 'k*', ms=5)
-            nuax.set_ylabel("Coordinate %d"%icoord)
+            nuax.set_ylabel("Coordinate %d"%(icoord+1))
             nuax.get_yaxis().set_label_coords(-0.1, 0.5)
-            if icoord == 0: nuax.set_xlabel("Frequency [MHz]")
+            if icoord == ncoord-1: nuax.set_xlabel("Frequency [MHz]")
 
         elif plot_this_coord is not None:
             icoord = plot_this_coord
-            plt.close('all')
-            fig1 = plt.figure(figsize=(size + 2*buff, size + 2*buff))
-            ax = fig1.add_subplot(111)
+            fig2 = plt.figure(2, figsize=(size + 2*buff, size + 2*buff))
+            nuax = fig2.add_subplot(111)
             for iprof,prof in enumerate(projected_port):
-                ax.plot(freqs[iprof], prof[icoord], fmt, ms=ms[iprof],
+                nuax.plot(freqs[iprof], prof[icoord], fmt, ms=ms[iprof],
                         alpha=alpha[iprof], mew=0.0)
-            ax.plot(freqs, projected_port[:,icoord], color='k', ls='solid',
+            nuax.plot(freqs, projected_port[:,icoord], color='k', ls='solid',
                     lw=1)
-            ax.plot(interp_freqs[::flip], proj_port_interp[:,icoord][::flip],
+            nuax.plot(interp_freqs[::flip], proj_port_interp[:,icoord][::flip],
                     color='r', ls='solid', lw=2)
-            ax.plot(tck[0][::flip], knots[:,icoord][::flip], 'k*', ms=5)
-    if ncoord > 1:
-        fig1.text(0.025, 0.5, "Coordinate Index", rotation='vertical',
+            nuax.plot(tck[0][::flip], knots[:,icoord][::flip], 'k*', ms=5)
+            nuax.set_ylabel("Coordinate %d"%(plot_this_coord+1))
+            nuax.get_yaxis().set_label_coords(-0.1, 0.5)
+            nuax.set_xlabel("Frequency [MHz]")
+    if ncoord > 2:
+        fig1.text(0.025, 0.5, "Coordinate", rotation='vertical',
                 ha='center', va='center')
-        fig1.text(0.5, 0.025, "Coordinate Index", ha='center', va='center')
-    else:
-        ax.set_xlabel("Frequency [MHz]")
-        ax.set_ylabel("Coordinate %d"%plot_this_coord)
-    if title is not None: plt.suptitle(title+'\n')
-    if savefig:
-        if plot_this_coord is None:
-            fig1.savefig(savefig + "_proj.png", format='png')
-            fig2.savefig(savefig + "_freq.png", format='png')
+        fig1.text(0.5, 0.025, "Coordinate", ha='center', va='center')
+    elif ncoord == 2:
+        ax.set_xlabel("Coordinate 1")
+        ax.set_ylabel("Coordinate 2")
+    if title is not None:
+        if ncoord > 1:
+            plt.figure(1)
+            plt.suptitle(title+'\n')
+            plt.figure(2)
+            plt.suptitle(title+'\n')
         else:
-            fig1.savefig(savefig + "_freq.png", format='png')
+            plt.figure(2)
+            plt.suptitle(title+'\n')
+    if savefig:
+        if ncoord > 1:
+            fig1.savefig(savefig + ".proj.png", format='png')
+            fig2.savefig(savefig + ".freq.png", format='png')
+        else:
+            fig2.savefig(savefig + ".freq.png", format='png')
         plt.close('all')
     else:
         plt.show()
+
+def show_eigenprofiles(eigprofs=None, smooth_eigprofs=None, mean_prof=None,
+        smooth_mean_prof=None, title=None, xlim=(0.0,1.0), show_snrs=False,
+        savefig=False):
+    """
+    Show eigenprofiles and mean profile, with smoothed versions, optionally.
+
+    eigprofs is the ncomp x nbin array of eigenprofiles to be plotted, if
+        provided.
+    smooth_eigprofs is the ncomp x nbin array of smootged eigenprofiles to be
+        plotted, if provided.
+    mean_prof is the nbin mean profile to be plotted, if provided.
+    smooth_mean_prof is the nbin smoothed mean profile to be plotted, if
+        provided.
+    title is the string that will be displayed at the top of the plot.
+    xlim is the range of phases to be plotted.
+    show_snrs=True will show an estimate of the S/N ratio for the
+        eigenprofiles, if both the and the smoothed version are provided; see
+        find_significant_eigvec(...) for details.
+    savefig specifies a substring for the saved figure; will not show the
+        plot.
+    """
+    plot_eigprofs = bool(np.any(eigprofs))
+    plot_seigprofs = bool(np.any(smooth_eigprofs))
+    plot_mean = bool(np.any(mean_prof))
+    plot_smean = bool(np.any(smooth_mean_prof))
+    neig = 0
+    if plot_eigprofs:
+        neig = eigprofs.shape[0]
+    if plot_seigprofs:
+        neig = smooth_eigprofs.shape[0]
+    npanel = neig + int(bool(plot_mean + plot_smean))
+
+    size = 3 #inches per plot
+    buff = 1 #inches
+    fig = plt.figure(figsize=(4*size + buff, npanel*size + buff))
+    axes = fig.subplots(nrows=npanel, ncols=1, sharex=True, sharey=False,
+            squeeze=True)
+    if npanel == 1: axes = [axes]
+    ieig = 0
+    iseig = 0
+    if plot_eigprofs and plot_seigprofs and show_snrs:
+        ev_snrs = np.zeros(len(eigprofs))
+        for ie in range(len(eigprofs)):
+            ev = eigprofs[ie]
+            se = smooth_eigprofs[ie]
+            ev_noise = get_noise(ev) * np.sqrt(len(ev) / 2.0)
+            ev_snrs[ie] = np.sum(np.abs(np.fft.rfft(se))**2) / ev_noise
+            #print "ev_snr", ev_snrs[ie]
+    for iax,ax in enumerate(axes):
+        if plot_mean and iax == 0:
+            phases = get_bin_centers(mean_prof.shape[0])
+            ax.plot(phases, mean_prof, 'k:', ms=1, alpha=0.5)
+            ax.set_ylabel("Mean profile")
+            if title is not None: ax.set_title(title)
+            ax.set_xlim(xlim)
+        elif plot_eigprofs:
+            phases = get_bin_centers(eigprofs.shape[1])
+            ax.plot(phases, eigprofs[ieig], 'k:', ms=1, alpha=0.5)
+            ax.set_ylabel("Eigenprofile %d"%(ieig+1))
+            ax.set_xlim(xlim)
+            ieig += 1
+        if plot_smean and iax == 0:
+            phases = get_bin_centers(smooth_mean_prof.shape[0])
+            ax.plot(phases, smooth_mean_prof, 'k-', lw=2)
+            ax.set_ylabel("Mean profile")
+            if title is not None: ax.set_title(title)
+            ax.set_xlim(xlim)
+        elif plot_seigprofs:
+            phases = get_bin_centers(smooth_eigprofs.shape[1])
+            ax.plot(phases, smooth_eigprofs[iseig], 'k-', lw=2)
+            ax.set_ylabel("Eigenprofile %d"%(iseig+1))
+            ax.set_xlim(xlim)
+            if show_snrs:
+                ax.text(0.9, 0.9, "SNR = %d"%ev_snrs[iseig], ha='center',
+                        va='center', transform=ax.transAxes)
+            iseig += 1
+        ax.get_yaxis().set_label_coords(-0.1, 0.5)
+        if iax == len(axes) - 1: ax.set_xlabel("Phase [rot]")
+    if savefig:
+        plt.savefig(savefig + ".eigvec.png", format='png')
+        plt.close('all')

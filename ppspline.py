@@ -31,18 +31,22 @@ class DataPortrait(DataPortrait):
         modeling profile evolution with a B-spline curve.
     """
 
-    def make_spline_model(self, ncomp=None, smooth=True, k=3, sfac=1.0,
-            nmax=None, model_name=None, quiet=False):
+    def make_spline_model(self, max_ncomp=10, smooth=True, snr_cutoff=150.0,
+            target_rchi2=1.00, k=3, sfac=1.0, nmax=None, model_name=None,
+            quiet=False, **kwargs):
         """
         Make a model based on PCA and B-spline interpolation.
 
-        ncomp is the number of PCA components to use in the B-spline
-            parameterization; ncomp <= 10.  If None, ncomp is the largest
-            number of consecutive eigenvectors that, after being smoothed, have
-            a non-zero autocorrelation.  ncomp=0 will return a portrait with
-            just the mean profile.
+        max_ncomp is the maximum number of PCA components to use in the
+            B-spline parameterization; max_ncomp <= 10.
         smooth=True will smooth the eigenvectors and mean profile using
-            wavelet_smooth and a reduced chi-squared figure-of-merit.
+            a reduced chi-squared figure-of-merit.
+        snr_cutoff is the S/N ratio value above or equal to which an
+            eigenvector is deemed "significant".  Setting it equal to np.inf
+            would ensure only a mean profile model is returned.
+        target_rchi2 is the desired value for the reduced chi2 statistic
+            between the data and smoothed profiles, used in determining the
+            smoothness and significance of profiles.
         k is the polynomial degree of the spline; cubic splines (k=3)
             recommended; 1 <= k <= 5.  NB: polynomial order = degree + 1.
         sfac is a multiplicative smoothing factor passed to si.splprep; greater
@@ -58,6 +62,7 @@ class DataPortrait(DataPortrait):
         model_name is the name of the model; defaults to self.datafile +
             '.spl'
         quiet=True suppresses output.
+        **kwargs get passed to find_significant_eigvec(...).
         """
 
         #Definitions
@@ -68,71 +73,96 @@ class DataPortrait(DataPortrait):
         nu_lo = freqs.min()
         nu_hi = freqs.max()
         #Do principal component analysis
-        ncomp, reconst_port, eigvec, eigval = pca(port, mean_prof, pca_weights,
-                ncomp=ncomp, quiet=quiet)
-        if ncomp > 10: ncomp = 10
-        if ncomp == 0: #Will make model with constant average port
-            eigval = np.zeros(len(eigval))
-            eigvec = np.zeros(eigvec.shape)
-            ncomp = 1
-
-        if smooth:
-            smooth_mean_prof = smart_smooth(mean_prof)
-            smooth_eigvec = np.copy(eigvec)
-            smooth_eigvec[:,:ncomp] = smart_smooth(smooth_eigvec.T[:ncomp]).T
-            smooth_eigvec[:,ncomp:] = np.zeros(smooth_eigvec[:,ncomp:].shape)
-
-        delta_port = port - mean_prof #Or use smooth_mean_prof?
-
-        if smooth:
-            reconst_port = np.dot(smooth_eigvec[:,:ncomp],
-                    np.dot(smooth_eigvec[:,:ncomp].T, delta_port.T)).T \
-                            + smooth_mean_prof
-            #Find the projections of the profiles onto the basis components
-            proj_port = np.dot(smooth_eigvec[:,:ncomp].T, delta_port.T).T
+        eigval, eigvec = pca(port, mean_prof, pca_weights, quiet=quiet)
+        #Get "significant" eigenvectors
+        if max_ncomp is None:
+            return_max = 10
         else:
-            reconst_port = np.dot(eigvec[:,:ncomp], np.dot(eigvec[:,:ncomp].T,
-                delta_port.T)).T + mean_prof
-            #Find the projections of the profiles onto the basis components
-            proj_port = np.dot(eigvec[:,:ncomp].T, delta_port.T).T
+            return_max = min(max_ncomp, 10)
+        if smooth:
+            ieig, smooth_eigvec = find_significant_eigvec(eigvec, check_max=10,
+                    return_max=return_max, snr_cutoff=snr_cutoff,
+                    return_smooth=True, target_rchi2=target_rchi2, **kwargs)
+        else:
+            ieig = find_significant_eigvec(eigvec, check_max=10,
+                    return_max=return_max, snr_cutoff=snr_cutoff,
+                    return_smooth=True, target_rchi2=target_rchi2, **kwargs)
+        ncomp = len(ieig)
 
-        spl_weights = pca_weights
-        s = sfac
-        if self.bw < 0: flip = -1   #u in si.splprep has to be increasing...
-        else: flip = 1
-        #Find the B-spline curve traced by the projected vectors, parameterized
-        #by frequency
-        (tck,u), fp, ier, msg = si.splprep(proj_port[::flip].T,
-                w=spl_weights[::flip], u=freqs[::flip], ub=nu_lo, ue=nu_hi,
-                k=k, task=0, s=s, t=None, full_output=1, nest=None, per=0,
-                quiet=int(quiet))
-        if nmax is not None and len(np.unique(tck[0])) > nmax:
-            if nmax < 2:
-                print "nmax needs to be >= 2; setting nmax = 2..."
-                nmax = 2
-            if nmax == 2: s = np.inf
+        if smooth:
+            smooth_mean_prof = smart_smooth(mean_prof,
+                    target_rchi2=target_rchi2)
+
+        if ncomp == 0: #Will make model with constant average port
+            proj_port = port[:,:ncomp]
+            if smooth:
+                modelx = reconst_port = np.tile(smooth_mean_prof,
+                        len(freqs)).reshape(len(freqs), port.shape[1])
+                model = np.tile(smooth_mean_prof,
+                        len(self.freqs[0])).reshape(len(self.freqs[0]),
+                                port.shape[1])
+            else:
+                modelx = reconst_port = np.tile(mean_prof,
+                        len(freqs)).reshape(len(freqs), port.shape[1])
+                model = np.tile(mean_prof,
+                        len(self.freqs[0])).reshape(len(self.freqs[0]),
+                            port.shape[1])
+        else:
+            delta_port = port - mean_prof
+            if smooth:
+                reconst_port = reconstruct_portrait(port, mean_prof,
+                        smooth_eigvec[:,ieig])
+                #Find the projections of the profiles onto the basis components
+                proj_port = np.dot(smooth_eigvec[:,ieig].T, delta_port.T).T
+            else:
+                reconst_port = reconstruct_portrait(port, mean_prof,
+                        eigvec[:,ieig])
+                #Find the projections of the profiles onto the basis components
+                proj_port = np.dot(eigvec[:,ieig].T, delta_port.T).T
+
+        if ncomp == 0:
+            (tck,u) = [np.array([]), np.array([]), 0], np.array([])
+            fp, ier, msg = None, None, None
+        else:
+            spl_weights = pca_weights
+            s = sfac
+            if self.bw < 0: flip = -1   #u in si.splprep has to be increasing...
+            else: flip = 1
+            #Find the B-spline curve traced by the projected vectors,
+            #parameterized by frequency
             (tck,u), fp, ier, msg = si.splprep(proj_port[::flip].T,
                     w=spl_weights[::flip], u=freqs[::flip], ub=nu_lo, ue=nu_hi,
-                    k=k, task=0, s=s, t=None, full_output=1, nest=nmax+(k*2),
-                    per=0, quiet=int(quiet))
+                    k=k, task=0, s=s, t=None, full_output=1, nest=None, per=0,
+                    quiet=int(quiet))
+            if nmax is not None and len(np.unique(tck[0])) > nmax:
+                if nmax < 2:
+                    print "nmax needs to be >= 2; setting nmax = 2..."
+                    nmax = 2
+                if nmax == 2: s = np.inf
+                (tck,u), fp, ier, msg = si.splprep(proj_port[::flip].T,
+                        w=spl_weights[::flip], u=freqs[::flip], ub=nu_lo,
+                        ue=nu_hi, k=k, task=0, s=s, t=None, full_output=1,
+                        nest=nmax+(k*2), per=0, quiet=int(quiet))
 
-        if ier > 1: #Will also catch when ier == "unknown"
-            print "Something went wrong in si.splprep for %s:\n%s"%(
-                    self.source, msg)
+            if ier > 1: #Will also catch when ier == "unknown"
+                print "Something went wrong in si.splprep for %s:\n%s"%(
+                        self.source, msg)
 
         #Build model
-        if smooth:
-            modelx = gen_spline_portrait(smooth_mean_prof, freqs,
-                    smooth_eigvec[:,:ncomp], tck)
-            model = gen_spline_portrait(smooth_mean_prof, self.freqs[0],
-                    smooth_eigvec[:,:ncomp], tck)
-        else:
-            modelx = gen_spline_portrait(mean_prof, freqs, eigvec[:,:ncomp],
-                    tck)
-            model = gen_spline_portrait(mean_prof, self.freqs[0],
-                    eigvec[:,:ncomp], tck)
+        if ncomp != 0:
+            if smooth:
+                modelx = gen_spline_portrait(smooth_mean_prof, freqs,
+                        smooth_eigvec[:,ieig], tck)
+                model = gen_spline_portrait(smooth_mean_prof, self.freqs[0],
+                        smooth_eigvec[:,ieig], tck)
+            else:
+                modelx = gen_spline_portrait(mean_prof, freqs, eigvec[:,ieig],
+                        tck)
+                model = gen_spline_portrait(mean_prof, self.freqs[0],
+                        eigvec[:,ieig], tck)
 
         #Assign new attributes
+        self.ieig = ieig
         self.ncomp = ncomp
         self.eigvec = eigvec
         self.eigval = eigval
@@ -141,6 +171,7 @@ class DataPortrait(DataPortrait):
             self.smooth_mean_prof = smooth_mean_prof
             self.smooth_eigvec = smooth_eigvec
         self.proj_port = proj_port
+        self.reconst_port = reconst_port
         #tck contains the knot locations t, B-spline coefficients c, and
         #polynomial degree k -- end knots will have multiplicity k+1, interior
         #breakpoints will have multiplicity 1 for maximum continuity.  The
@@ -167,15 +198,67 @@ class DataPortrait(DataPortrait):
         """
         of = open(outfile, "wb")
         if hasattr(self, "smooth_eigvec"):
-            pickle.dump([self.model_name, self.source, self.datafile,
-                self.smooth_mean_prof, self.smooth_eigvec[:,:self.ncomp],
-                self.tck], of)
+            if len(self.ieig):
+                pickle.dump([self.model_name, self.source, self.datafile,
+                    self.smooth_mean_prof, self.smooth_eigvec[:,self.ieig],
+                    self.tck], of)
+            else:
+                pickle.dump([self.model_name, self.source, self.datafile,
+                    self.smooth_mean_prof, self.smooth_eigvec[:,[]],
+                    self.tck], of)
         else:
-            pickle.dump([self.model_name, self.source, self.datafile,
-                self.mean_prof, self.eigvec[:,:self.ncomp], self.tck], of)
+            if len(self.ieig):
+                pickle.dump([self.model_name, self.source, self.datafile,
+                    self.mean_prof, self.eigvec[:,self.ieig], self.tck], of)
+            else:
+                pickle.dump([self.model_name, self.source, self.datafile,
+                    self.mean_prof, self.eigvec[:,[]], self.tck], of)
+
         of.close()
         if not quiet:
             print "Wrote modelfile %s."%outfile
+
+    def show_eigenprofiles(self, ncomp=None, **kwargs):
+        """
+        Calls show_eigenprofiles(...) to make plots of mean/eigen profiles.
+
+        see show_eigenprofiles(...) for details.
+
+        ncomp=None plots self.ncomp PCA components, otherwise plots the number
+            of components specified.
+        **kwargs get passed to show_eigenprofiles(...).
+        """
+        if ncomp is None: ncomp = self.ncomp
+        if hasattr(self, "smooth_eigvec"):
+            if ncomp:
+                eigvec = self.eigvec[:,self.ieig[:ncomp]].T
+                seigvec = self.smooth_eigvec[:,self.ieig[:ncomp]].T
+            else:
+                eigvec = None
+                seigvec = None
+            show_eigenprofiles(eigvec, seigvec, self.mean_prof,
+                    self.smooth_mean_prof, title=self.model_name, **kwargs)
+        else:
+            if ncomp: eigvec = self.eigvec[:,self.ieig[:ncomp]].T
+            else: eigvec = None
+            show_eigenprofiles(self.eigvec[:,self.ieig[:ncomp]].T, None,
+                    self.mean_prof, None, title=self.model_name, **kwargs)
+
+    def show_spline_curve_projections(self, ncomp=None, **kwargs):
+        """
+        Calls show_spline_curve_projections(...) to make plots of the model.
+
+        see show_spline_curve_projections(...) for details.
+
+        ncomp=None plots self.ncomp PCA components, otherwise plots the number
+            of components specified.
+        **kwargs get passed to show_spline_curve_projections(...).
+        """
+        if ncomp is None: ncomp = self.ncomp
+        if ncomp:
+            show_spline_curve_projections(self.proj_port, self.tck,
+                    self.freqsxs[0], self.SNRsxs / np.sum(self.SNRsxs),
+                    ncoord=ncomp, title=self.model_name, **kwargs)
 
 
 if __name__ == "__main__":
@@ -203,19 +286,31 @@ if __name__ == "__main__":
                       help="Name for optional output PSRCHIVE archive.  Will work only if the input is a single archive.")
     parser.add_option("-N", "--norm",
                       action="store", metavar="normalization", dest="norm",
-                      default="mean",
-                      help="Normalize the input data by channel ('None', 'mean' [default], 'max' (not recommended), 'rms' (off-pulse noise), 'prof' (mean profile flux), or 'abs' (sqrt{vector modulus})).")
+                      default="prof",
+                      help="Normalize the input data by channel ('None', 'mean', 'max' (not recommended), 'rms' (off-pulse noise), 'prof' (mean profile flux) [default], or 'abs' (sqrt{vector modulus})).")
     parser.add_option("-s", "--smooth",
                       action="store_true", metavar="smooth", dest="smooth",
                       default=False,
                       help="Smooth the eigenvectors and mean profile using default wavelet_smooth options and smart_smooth.")
-    parser.add_option("-n", "--ncomp",
-                      action="store", metavar="ncomp", dest="ncomp",
-                      default=None,
-                      help="Number of principal components to use in PCA reconstruction of the data.  ncomp is limited to a maximum of 10 by the B-spline representation in scipy.interpolate.  The default automatically finds ncomp significant, smoothed eigenvectors.")
+    parser.add_option("-n", "--max_ncomp",
+                      action="store", metavar="max_ncomp", dest="max_ncomp",
+                      default=10,
+                      help="Maximum number of principal components to use in PCA reconstruction of the data.  max_ncomp is limited to a maximum of 10 by the B-spline representation in scipy.interpolate.")
+    parser.add_option("-S", "--snr",
+                      action="store", metavar="snr_cutoff", dest="snr_cutoff",
+                      default=150.0,
+                      help="S/N ratio cutoff for determining 'significant' eigenprofiles.  A value somewhere over 100.0 should be good. [default=150.0].")
+    parser.add_option("-X", "--rchi2",
+                      action="store", metavar="red_chi2", dest="target_rchi2",
+                      default=1.0,
+                      help="Tweak this between 1.0 and ~1.1 if the returned eigenprofiles are not smooth enough.")
     parser.add_option("-k", "--degree",
                       action="store", metavar="degree", dest="k", default=3,
                       help="Degree of the spline.  Cubic splines (k=3) are recommended [default]. 1 <= k <=5.")
+    parser.add_option("-f", "--sfac",
+                      action="store", metavar="smooth_factor", dest="sfac",
+                      default=1.0,
+                      help="To change the smoothness of the B-spline model, tweak this between 0.0 (interpolating spline that passes through all data points) and a large number (guarantees maximum two breakpoints = maximum smoothness).  Alternatively, use -t.")
     parser.add_option("-t", "--knots",
                       action="store", metavar="max_knots", dest="nmax",
                       default=None,
@@ -238,9 +333,11 @@ if __name__ == "__main__":
     archive = options.archive
     norm = options.norm
     smooth = options.smooth
-    if options.ncomp is not None: ncomp = int(options.ncomp)
-    else: ncomp = None
+    max_ncomp = int(options.max_ncomp)
+    snr_cutoff = float(options.snr_cutoff)
+    target_rchi2 = float(options.target_rchi2)
     k = int(options.k)
+    sfac = float(options.sfac)
     if options.nmax is not None: nmax = int(options.nmax)
     else: nmax = None
     quiet = options.quiet
@@ -250,8 +347,9 @@ if __name__ == "__main__":
     if norm in ("mean", "max", "prof", "rms", "abs"):
         dp.normalize_portrait(norm)
 
-    dp.make_spline_model(ncomp=ncomp, smooth=smooth, k=k, sfac=1.0, nmax=nmax,
-            model_name=model_name, quiet=quiet)
+    dp.make_spline_model(max_ncomp=max_ncomp, smooth=smooth,
+            snr_cutoff=snr_cutoff, target_rchi2=target_rchi2, k=k, sfac=sfac,
+            nmax=nmax, model_name=model_name, quiet=quiet)
 
     if modelfile is None: modelfile = datafile + ".spl"
     dp.write_model(modelfile, quiet=quiet)
