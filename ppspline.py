@@ -32,7 +32,7 @@ class DataPortrait(DataPortrait):
     """
 
     def make_spline_model(self, max_ncomp=10, smooth=True, snr_cutoff=150.0,
-            target_rchi2=1.00, k=3, sfac=1.0, nmax=None, model_name=None,
+            target_rchi2=1.00, k=3, sfac=1.0, max_nbreak=None, model_name=None,
             quiet=False, **kwargs):
         """
         Make a model based on PCA and B-spline interpolation.
@@ -52,13 +52,13 @@ class DataPortrait(DataPortrait):
         sfac is a multiplicative smoothing factor passed to si.splprep; greater
             values result in more smoothing.  sfac=0 will make an interpolating
             model anchored on the input data profiles.
-        nmax is the maximum number of breakpoints (unique knots) to allow.  If
-            provided, this may override sfac and enforce smoothing based on
-            nmax breakpoints.  That is, in the case the fit returns n > nmax
-            breakpoints, it will refit using maximum nmax breakpoints,
-            irrespective of the other smoothing condition.  To convert from a
-            maximum desired number of B-splines, subtract k-1.  nmax should be
-            >= 2.
+        max_nbreak is the maximum number of breakpoints (unique knots) to
+            allow.  If provided, this may override sfac and enforce smoothing
+            based on max_nbreak breakpoints.  That is, if the fit returns n >
+            max_nbreak breakpoints, it will refit using maximum max_nbreak
+            breakpoints, irrespective of the other smoothing condition.  To
+            convert from a maximum desired number of B-splines, subtract k-1.
+            max_nbreak should be >= 2.
         model_name is the name of the model; defaults to self.datafile +
             '.spl'
         quiet=True suppresses output.
@@ -134,15 +134,15 @@ class DataPortrait(DataPortrait):
                     w=spl_weights[::flip], u=freqs[::flip], ub=nu_lo, ue=nu_hi,
                     k=k, task=0, s=s, t=None, full_output=1, nest=None, per=0,
                     quiet=int(quiet))
-            if nmax is not None and len(np.unique(tck[0])) > nmax:
-                if nmax < 2:
-                    print "nmax needs to be >= 2; setting nmax = 2..."
-                    nmax = 2
-                if nmax == 2: s = np.inf
+            if max_nbreak is not None and len(np.unique(tck[0])) > max_nbreak:
+                if max_nbreak < 2:
+                    print "max_nbreak not >= 2; setting max_nbreak = 2..."
+                    max_nbreak = 2
+                if max_nbreak == 2: s = np.inf
                 (tck,u), fp, ier, msg = si.splprep(proj_port[::flip].T,
                         w=spl_weights[::flip], u=freqs[::flip], ub=nu_lo,
                         ue=nu_hi, k=k, task=0, s=s, t=None, full_output=1,
-                        nest=nmax+(k*2), per=0, quiet=int(quiet))
+                        nest=max_nbreak+(k*2), per=0, quiet=int(quiet))
 
             if ier > 1: #Will also catch when ier == "unknown"
                 print "Something went wrong in si.splprep for %s:\n%s"%(
@@ -312,7 +312,7 @@ if __name__ == "__main__":
                       default=1.0,
                       help="To change the smoothness of the B-spline model, tweak this between 0.0 (interpolating spline that passes through all data points) and a large number (guarantees maximum two breakpoints = maximum smoothness).  Alternatively, use -t.")
     parser.add_option("-t", "--knots",
-                      action="store", metavar="max_knots", dest="nmax",
+                      action="store", metavar="max_knots", dest="max_nbreak",
                       default=None,
                       help="The maximum number of unique knots.  This functions esentially as an ignorant smoothing condition in case the default settings return a fit with more than max_knots number of unique knots in the spline model.  e.g., 10 unique knots are more than usually necessary.")
     parser.add_option("--quiet",
@@ -338,8 +338,8 @@ if __name__ == "__main__":
     target_rchi2 = float(options.target_rchi2)
     k = int(options.k)
     sfac = float(options.sfac)
-    if options.nmax is not None: nmax = int(options.nmax)
-    else: nmax = None
+    if options.max_nbreak is not None: max_nbreak = int(options.max_nbreak)
+    else: max_nbreak = None
     quiet = options.quiet
 
     dp = DataPortrait(datafile)
@@ -349,7 +349,7 @@ if __name__ == "__main__":
 
     dp.make_spline_model(max_ncomp=max_ncomp, smooth=smooth,
             snr_cutoff=snr_cutoff, target_rchi2=target_rchi2, k=k, sfac=sfac,
-            nmax=nmax, model_name=model_name, quiet=quiet)
+            max_nbreak=max_nbreak, model_name=model_name, quiet=quiet)
 
     if modelfile is None: modelfile = datafile + ".spl"
     dp.write_model(modelfile, quiet=quiet)
