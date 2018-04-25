@@ -365,7 +365,7 @@ class GetTOAs:
                     nu_ref_DM = nu_ref_GM = nu_ref_tuple[0]
                     nu_ref_tau = nu_ref_tuple[-1]
                     if bary and nu_ref_tau:  # from bary to topo below
-                        nu_ref_tau *= doppler_factors[isub]
+                        nu_ref_tau /= doppler_factors[isub]
                 nu_refs[isub] = [nu_ref_DM, nu_ref_GM, nu_ref_tau]
 
                 ###################
@@ -487,8 +487,6 @@ class GetTOAs:
                 # DOPPLER CORRECTION #
                 ######################
                 if self.bary: #Default is True
-                    #NB: the 'doppler factor' retrieved from PSRCHIVE seems to
-                    #be the inverse of the convention nu_source/nu_observed
                     df = doppler_factors[isub]
                     if fit_flags[1]:
                         results.DM *= df  #NB: No longer the *fitted* value!
@@ -557,17 +555,17 @@ class GetTOAs:
                     toa_flags['gm_err'] = results.GM_err
                 if fit_flags[3]:
                     if self.log10_tau:
-                        toa_flags['scat_time'] = 10**results.tau * P * df * 1e6
+                        toa_flags['scat_time'] = 10**results.tau * P / df * 1e6
                                                  # usec, w/ df
                         toa_flags['log10_scat_time'] = results.tau + \
-                                np.log10(P * df)  # w/ df
+                                np.log10(P / df)  # w/ df
                         toa_flags['log10_scat_time_err'] = results.tau_err
                     else:
-                        toa_flags['scat_time'] = results.tau * P * df * 1e6
+                        toa_flags['scat_time'] = results.tau * P / df * 1e6
                                                  # usec, w/ df
-                        toa_flags['scat_time_err'] = results.tau_err * P * df \
+                        toa_flags['scat_time_err'] = results.tau_err * P / df \
                                 * 1e6  # usec, w/ df
-                    toa_flags['scat_ref_freq'] = results.nu_tau / df  # w/ df
+                    toa_flags['scat_ref_freq'] = results.nu_tau * df  # w/ df
                     toa_flags['scat_ind'] = results.alpha
                 if fit_flags[4]:
                     toa_flags['scat_ind_err'] = results.alpha_err
@@ -902,7 +900,7 @@ if __name__ == "__main__":
     parser.add_option("--nu_tau",
                       action="store", metavar="nu_ref_tau", dest="nu_ref_tau",
                       default=None,
-                      help="Frequency [MHz] to which the output scattering times are referenced, i.e. tau(nu) = tau * (nu/nu_ref_tau)***alpha.  If no_bary is True, this frequency is topocentric. [default=nu_zero (zero-covariance frequency, recommended)]")
+                      help="Frequency [MHz] to which the output scattering times are referenced, i.e. tau(nu) = tau * (nu/nu_ref_tau)**alpha.  If no_bary is True, this frequency is topocentric, otherwise barycentric. [default=nu_zero (zero-covariance frequency, recommended)]")
     parser.add_option("--print_phase",
                       action="store_true", dest="print_phase", default=False,
                       help="Print the fitted phase shift and its uncertainty on the TOA line with the flag -phs")

@@ -2452,22 +2452,6 @@ def guess_fit_freq(freqs, SNRs=None):
     diff = np.sum((freqs - nu0) * SNRs * freqs**-2) / np.sum(SNRs * freqs**-2)
     return nu0 + diff
 
-def doppler_correct_freqs(freqs, doppler_factor):
-    """
-    Correct frequencies for doppler motion.
-
-    Returns barycentric frequencies.  Untested.
-
-    freqs is an array of topocentric frequencies.
-    doppler_factor is the Doppler factor:
-        doppler_factor = nu_source / nu_observed = sqrt( (1+beta) / (1-beta)),
-        for beta = v/c, and v is positive for increasing source distance.
-        NB: PSRCHIVE defines doppler_factor as the inverse of the above.
-
-    Reference: Equations 13, 14, & 15 of Pennucci, Demorest, & Ransom (2014).
-    """
-    return doppler_factor * freqs
-
 def calculate_TOA(epoch, P, phi, DM=0.0, nu_ref1=np.inf, nu_ref2=np.inf):
     """
     Calculate a TOA [PSRCHIVE MJD] for given input.
@@ -2525,7 +2509,13 @@ def load_data(filename, dedisperse=False, dededisperse=False, tscrunch=False,
     nsub = arch.get_nsubint()
     #Integration length
     integration_length = arch.integration_length()
-    #Doppler factors
+    #doppler_factors are the Doppler factors:
+    #    doppler_factor = nu_source / nu_observed = sqrt( (1+beta) / (1-beta)),
+    #    for beta = v/c, and v > 0 for /increasing/ distance (redshift).
+    #    NB: It might be that PSRFITS/PSRCHIVE define v as positive for
+    #        /decreasing/ distance (blueshift), but then the signs for beta
+    #        above would be switched such that doppler_factor is still > 1 for
+    #        redshift.
     doppler_factors = np.array([arch.get_Integration( \
             int(isub)).get_doppler_factor() for isub in range(nsub)])
     #pscrunch?

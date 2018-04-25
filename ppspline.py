@@ -56,9 +56,9 @@ class DataPortrait(DataPortrait):
             allow.  If provided, this may override sfac and enforce smoothing
             based on max_nbreak breakpoints.  That is, if the fit returns n >
             max_nbreak breakpoints, it will refit using maximum max_nbreak
-            breakpoints, irrespective of the other smoothing condition.  To
-            convert from a maximum desired number of B-splines, subtract k-1.
-            max_nbreak should be >= 2.
+            breakpoints, irrespective of the other smoothing condition.  The
+            corresponding maximum number of B-splines will be max_nspline =
+            max_nbreak + k - 1.  max_nbreak should be >= 2.
         model_name is the name of the model; defaults to self.datafile +
             '.spl'
         quiet=True suppresses output.
