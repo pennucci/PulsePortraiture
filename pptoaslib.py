@@ -727,7 +727,8 @@ def get_nu_zeros(params, data_portrait_FT, model_portrait_FT, errs_FT, P,
                 data_portrait_FT, model_portrait_FT, errs_FT, P, freqs, nu_DM,
                 nu_GM, nu_tau, [1,1,0,1,1], log10_tau, option)
     else:
-        print "No zero-covariance frequencies found."
+        if np.sum(fit_flags) > 1:
+            print "No zero-covariance frequencies found."
         nu_zero_DM, nu_zero_GM, nu_zero_tau = nu_DM, nu_GM, nu_tau
     return [nu_zero_DM, nu_zero_GM, nu_zero_tau]
 
@@ -756,7 +757,7 @@ def fit_portrait_full(data_port, model_port, init_params, P, freqs,
         nu_fits=[None, None, None], nu_outs=[None, None, None], errs=None,
         fit_flags=[1,1,1,1,1], bounds=[(None, None), (None, None),
             (None, None), (None, None), (None, None)], log10_tau=True,
-        option=0, id=None, method='trust-ncg', quiet=True):
+        option=0, sub_id=None, method='trust-ncg', quiet=True):
     """
     Fit a phase offset, DM, GM, tau, & alpha between data and model portraits.
 
@@ -786,7 +787,7 @@ def fit_portrait_full(data_port, model_port, init_params, P, freqs,
     log10_tau = True fits for the log10 of the scattering timescale.
     option = 0 is for zero covariance between phi and DM, and option = 1 is for
         zero covariance between phi and GM, when appropriate.
-    id provides a label for the TOA.
+    sub_id provides a label for the subintegration being fit.
     method is the scipy.optimize.minimize method; currently can be 'TNC',
         'Newton-CG', or 'trust-cng', which are all Newton Conjugate-Gradient
         algorithms.  Only for 'TNC' are the bounds applied, and only for the
@@ -845,10 +846,10 @@ def fit_portrait_full(data_port, model_port, init_params, P, freqs,
     # If the fit fails...????  These don't seem to be great indicators of the
     # fit failing
     if results.success is not True and results.status not in [1, 2, 4]:
-        if id is not None:
-            ii = id[::-1].index("_")
-            isub = id[-ii:]
-            filename = id[:-ii-1]
+        if sub_id is not None:
+            ii = sub_id[::-1].index("_")
+            isub = sub_id[-ii:]
+            filename = sub_id[:-ii-1]
             sys.stderr.write(
                     "Fit 'failed' with return code %d: %s -- %s subint %s\n"%(
                         results.status, rcstring, filename, isub))

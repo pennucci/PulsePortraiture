@@ -209,7 +209,7 @@ class GetTOAs:
         self.log10_tau = log10_tau
         if not fit_scat:
             self.log10_tau = log10_tau = False
-        if fit_GM or fit_scat or fit_tau or fit_alpha:
+        if self.fit_GM or fit_scat or self.fit_tau or self.fit_alpha:
             print warning_message
             already_warned = True
         self.scat_guess = scat_guess
@@ -279,13 +279,11 @@ class GetTOAs:
             #PSRCHIVE epochs are *midpoint* of the integration
             MJDs = np.array([epochs[isub].in_days() \
                     for isub in range(nsub)], dtype=np.double)
-            DM_stored = DM # = arch.get_dispersion_measure()
+            DM_stored = DM # same as = arch.get_dispersion_measure()
             if self.DM0 is None:
                 DM0 = DM_stored
             else:
                 DM0 = self.DM0
-            if not fit_DM:
-                bounds[1] = (DM0, DM0)
             if self.is_FITS_model:
                 if not already_warned:
                     print warning_message
@@ -306,7 +304,7 @@ class GetTOAs:
                 print "Doing Fourier-domain least-squares fit..."
             itoa = 1
             for isub in ok_isubs:
-                id = datafile + "_%d"%isub
+                sub_id = datafile + "_%d"%isub
                 epoch = epochs[isub]
                 MJD = MJDs[isub]
                 P = Ps[isub]
@@ -438,12 +436,12 @@ class GetTOAs:
                     fit_flags = list(np.copy(self.fit_flags))
                 results = fit_portrait_full(portx, modelx, param_guesses, P,
                         freqsx, nu_fits[isub], nu_refs[isub], errs, fit_flags,
-                        bounds, self.log10_tau, option=0, id=id, method=method,
-                        quiet=quiet)
+                        bounds, self.log10_tau, option=0, sub_id=sub_id,
+                        method=method, quiet=quiet)
                 # Old code
                 #results = fit_portrait(portx, modelx,
                 #        np.array([phi_guess, DM_guess]), P, freqsx,
-                #        nu_fit_DM, nu_ref_DM, errs, bounds=bounds, id=id,
+                #        nu_fit_DM, nu_ref_DM, errs, bounds=bounds, id=sub_id,
                 #        quiet=quiet)
                 #results.phi = results.phase
                 #results.phi_err = results.phase_err
@@ -602,15 +600,19 @@ class GetTOAs:
             #The below returns the weighted mean and the sum of the weights,
             #but needs to do better in the case of small-error outliers from
             #RFI, etc.  Also, last TOA may mess things up...use median...?
+            if np.all(DM_errs[ok_isubs]):
+                DM_weights = DM_errs[ok_isubs]**-2
+            else:
+                DM_weights = np.ones(len(DM_errs[ok_isubs]))
             DeltaDM_mean, DeltaDM_var = np.average(DeltaDMs[ok_isubs],
-                    weights=DM_errs[ok_isubs]**-2, returned=True)
+                    weights=DM_weights, returned=True)
             DeltaDM_var = DeltaDM_var**-1
             if len(ok_isubs) > 1:
                 #The below multiply by the red. chi-squared to inflate the
                 #errors.
                 DeltaDM_var *= np.sum(
-                        ((DeltaDMs[ok_isubs] - DeltaDM_mean)**2) /
-                        (DM_errs[ok_isubs]**2)) / (len(DeltaDMs[ok_isubs]) - 1)
+                        ((DeltaDMs[ok_isubs] - DeltaDM_mean)**2) * DM_weights)\
+                                / (len(DeltaDMs[ok_isubs]) - 1)
             DeltaDM_err = DeltaDM_var**0.5
             self.order.append(datafile)
             self.obs.append(obs)
@@ -810,8 +812,8 @@ class GetTOAs:
             model = np.fft.irfft(scattering_portrait_FT(
                 scattering_times(tau, alpha, freqs, nu_ref_tau), data.nbin) * \
                         np.fft.rfft(model, axis=1), axis=1)
-        port = rotate_portrait_full(data.subints[isub,0], phi, DM_fitted,
-                GM_fitted, freqs, nu_ref_DM, nu_ref_GM, P)
+        port = rotate_portrait_full(data.subints[isub,0], phi, DM, GM, freqs,
+                nu_ref_DM, nu_ref_GM, P)
         if rotate:
             model = rotate_data(model, rotate)
             port = rotate_data(port, rotate)
