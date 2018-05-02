@@ -3701,7 +3701,7 @@ def show_eigenprofiles(eigprofs=None, smooth_eigprofs=None, mean_prof=None,
 
     eigprofs is the ncomp x nbin array of eigenprofiles to be plotted, if
         provided.
-    smooth_eigprofs is the ncomp x nbin array of smootged eigenprofiles to be
+    smooth_eigprofs is the ncomp x nbin array of smoothed eigenprofiles to be
         plotted, if provided.
     mean_prof is the nbin mean profile to be plotted, if provided.
     smooth_mean_prof is the nbin smoothed mean profile to be plotted, if
