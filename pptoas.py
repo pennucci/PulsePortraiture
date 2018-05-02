@@ -487,6 +487,9 @@ class GetTOAs:
                 if self.bary: #Default is True
                     df = doppler_factors[isub]
                     if fit_flags[1]:
+                        # NB: The following eqution was incorrectly reversed in
+                        #     the original paper Pennucci et al. (2014),
+                        #     printed as DM_bary = DM_topo / df.
                         results.DM *= df  #NB: No longer the *fitted* value!
                     if fit_flags[2]:
                         results.GM *= df**3  #NB: No longer the *fitted* value!
@@ -588,7 +591,8 @@ class GetTOAs:
                     toa_flags['phs_err'] = results.phi_err
                 if print_flux:
                     toa_flags['flux'] = fluxes[isub]
-                    toa_flags['flux_err'] = flux_errs[isub]
+                    #toa_flags['flux_err'] = flux_errs[isub]
+                    toa_flags['fluxe'] = flux_errs[isub]  # consistent w/ pat
                 for k,v in addtnl_toa_flags.iteritems():
                     toa_flags[k] = v
                 self.TOA_list.append(TOA(datafile, results.nu_DM, results.TOA,

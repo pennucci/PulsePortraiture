@@ -113,12 +113,12 @@ class DataPortrait(DataPortrait):
                 reconst_port = reconstruct_portrait(port, mean_prof,
                         smooth_eigvec[:,ieig])
                 #Find the projections of the profiles onto the basis components
-                proj_port = np.dot(smooth_eigvec[:,ieig].T, delta_port.T).T
+                proj_port = np.dot(delta_port, smooth_eigvec[:,ieig])
             else:
                 reconst_port = reconstruct_portrait(port, mean_prof,
                         eigvec[:,ieig])
                 #Find the projections of the profiles onto the basis components
-                proj_port = np.dot(eigvec[:,ieig].T, delta_port.T).T
+                proj_port = np.dot(delta_port, eigvec[:,ieig])
 
         if ncomp == 0:
             (tck,u) = [np.array([]), np.array([]), 0], np.array([])

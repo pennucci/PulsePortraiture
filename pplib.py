@@ -868,8 +868,8 @@ def gen_spline_portrait(mean_prof, freqs, eigvec, tck, nbin=None):
         port = np.tile(mean_prof, len(freqs)).reshape(len(freqs),
                 len(mean_prof))
     else:
-        proj_port = np.array(si.splev(freqs, tck, der=0, ext=0))
-        delta_port = np.dot(eigvec, proj_port).T
+        proj_port = np.array(si.splev(freqs, tck, der=0, ext=0)).T
+        delta_port = np.dot(proj_port, eigvec.T)
         port = delta_port + mean_prof
     if nbin is not None:
         if len(mean_prof) != nbin:
@@ -1402,6 +1402,8 @@ def pca(port, mean_prof=None, weights=None, quiet=False):
 
     if not quiet: print "Performing principal component analysis on data with %d dimensions and %d measurements..." %(ndim,nmes)
 
+    if weights is None: weights = np.ones(len(port))
+
     #Subtract weighted average from each set of measurements
     if mean_prof is None:
         #mean_prof = port.mean(axis=0)
@@ -1433,7 +1435,7 @@ def reconstruct_portrait(port, mean_prof, eigvec):
     """
     #Reconstruct port projected into space of eigvec
     delta_port = port - mean_prof
-    reconst_port = np.dot(eigvec, np.dot(eigvec.T, delta_port.T)).T + mean_prof
+    reconst_port = np.dot(np.dot(delta_port, eigvec), eigvec.T) + mean_prof
     return reconst_port
 
 def find_significant_eigvec(eigvec, check_max=10, return_max=10,

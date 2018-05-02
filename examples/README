@@ -31,6 +31,14 @@
     >Measure TOAs & DMs from an archive using a ppgauss model:
           pptoas.py -d psrfits_archive.fits -m model_from_ppgauss.gmodel
 
+    >Measure TOAs, DMs, & nu**-4 delays from an archive using a ppspline model:
+          pptoas.py -d psrfits_archive.fits -m model_from_ppspline.spl \
+            --fit_dt4
+
+    >Measure TOAs, DMs, taus, and alphas from an archive using a ppgauss model:
+          pptoas.py -d psrfits_archive.fits -m model_from_ppgauss.gmodel \
+            -fit_scat
+
     >Measure TOAs & DMs from an archive using another archive:
           pptoas.py -d psrfits_archive.fits -m similar_psrfits_archive.fits
 

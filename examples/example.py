@@ -10,7 +10,7 @@ ephemeris = "example.par"
 
 
 #Choose which modeling program to use
-model_with = "ppinterp" #"ppinterp" or "ppgauss"
+model_with = "ppspline" #"ppspline" or "ppgauss"
 
 
 #Generate some fake datafiles
@@ -73,23 +73,26 @@ if nfiles > 1:
 #Now we want to "build" our model from the data...
 if nfiles > 1: datafile = "example.port"
 else: datafile = "example-1.fits"
-norm = "prof" #Normalization method
+norm = "prof" #Normalization method (None, mean, max, prof, rms, abs)
 
-#...with ppinterp...
+#...with ppspline...
 if not model_with == "ppgauss":
-    print "Running ppinterp.py to fit a PCA/B-spline model..."
-    import ppinterp as ppi
+    print "Running ppspline.py to fit a PCA/B-spline model..."
+    import ppspline as ppi
     fitted_modelfile = "example-fit.spl"
     #Initial Class instance
     dp = ppi.DataPortrait(datafile)
     dp.normalize_portrait(norm)
     #Have a look at the data you're fitting
+    print "Have a look at the average data you're fitting..."
     dp.show_data_portrait()
-    dp.make_interp_model(ncomp=None, smooth=True, k=3, sfac=1.0,
-            model_name="example-fit", quiet=False)
-    show_spline_curve_projections(dp.proj_port, dp.tck, dp.freqsxs[0],
-            weights=dp.noise_stdsxs, ncoord=min(dp.proj_port.shape[-1], 4))
-    plt.show()
+    dp.make_spline_model(max_ncomp=3, smooth=True, snr_cutoff=150.0,
+            target_rchi2=1.00, k=3, sfac=1.0, max_nbreak=None, model_name=None,
+            quiet=False)
+    print "Have a look at the mean profile and eigenprofiles..."
+    dp.show_eigenprofiles()
+    print "Have a look at the spline curve model of profile evolution..."
+    dp.show_spline_curve_projections()
     dp.write_model(fitted_modelfile, quiet=False)
 
 #...or using ppgauss...
@@ -101,6 +104,7 @@ else:
     dp = ppg.DataPortrait(datafile)
     dp.normalize_portrait(norm)
     #Have a look at the data you're fitting
+    print "Have a look at the average data you're fitting..."
     dp.show_data_portrait()
     #Fit a model; see ppgauss.py for all options
     dp.make_gaussian_model(ref_prof=(nu0, bw/4), fixloc=True,
@@ -114,6 +118,7 @@ else:
     #dp.make_gaussian_model(modelfile, niter=niter)
     #You can check this fitted model against the "input" true model
     #example.gmodel, assuming the reference frequencies are the same.
+print "Have a look at the model portrait you've made..."
 dp.show_model_fit()
 
 #Now we would measure TOAs and DMs
@@ -129,9 +134,10 @@ gt.get_TOAs(DM0=DM0)
 #Show results from first datafile
 #gt.show_results()
 #Show typical fit
+print "Have a look at how one subintegration was fit by the model..."
 gt.show_fit()
 #Write TOAs
-write_TOAs(gt.TOA_list, format="tempo2", outfile="example.tim", append=False)
+write_TOAs(gt.TOA_list, SNR_cutoff=0.0, outfile="example.tim", append=False)
 #See fitted versus injected DMs
 #print ""
 #print "Injected DMs, mean, std:"
