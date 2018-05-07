@@ -105,7 +105,7 @@ obs_codes = {'bary':'@', '???':'0', 'gbt':'1', 'atca':'2', 'ao':'3',
 
 #Dictionary of two-character observatory codes recognized by tempo/2.
 #Taken and lowered from $TEMPO/obsys.dat
-tempo_codes = {'arecibo':'ao', 'chime':'ch', 'effelsberg':'ef', 'gbt':'gb',
+tempo_codes = {'arecibo':'ao', 'chime':'ch', 'effelsberg':'ef', 'gbt':'gbt',
                'gmrt':'gm', 'jodrell':'jb', 'lofar':'lf', 'lwa1':'lw',
                'nancay':'nc', 'parkes':'pk', 'shao':'sh', 'srt':'sr',
                'vla':'v2', 'wsrt':'wb'}
