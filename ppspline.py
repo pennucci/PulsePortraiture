@@ -187,8 +187,9 @@ class DataPortrait(DataPortrait):
 
         if not quiet:
             if proj_port.sum():
-                print "B-spline interpolation model %s uses %d basis profile components and %d breakpoints."%(self.model_name, ncomp,
-                        len(np.unique(self.tck[0])))
+                print "B-spline interpolation model %s uses %d basis profile components and %d breakpoints (%d B-splines with k=%d)."%(self.model_name, ncomp,
+                        len(np.unique(self.tck[0])),
+                        len(self.tck[0])-self.tck[2]-1, self.tck[2])
             else:
                 print "B-spline interpolation model %s uses 0 basis profile components; it returns the average profile."%(self.model_name)
 
