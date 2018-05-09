@@ -862,7 +862,7 @@ if __name__ == "__main__":
                       help="Name of output .tim file. Will append. [default=stdout]")
     parser.add_option("-T", "--tscrunch",
                       action="store_true", dest="tscrunch", default=False,
-                      help="Tscrunch archives before measurement (i.e., return only one set of measurements per archive.")
+                      help="tscrunch archives before measurement (i.e., return only one set of measurements per archive.")
     parser.add_option("-f", "--format",
                       action="store", metavar="format", dest="format",
                       help="Format of output .tim file; either 'princeton' or 'ipta'.  Default is IPTA-like format.")

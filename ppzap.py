@@ -47,14 +47,16 @@ def get_zap_channels(data, nstd=5):
         zap_channels.append(zap_ichans)
     return zap_channels
 
-def print_paz_cmds(datafiles, zap_list, modify=True, outfile=None,
-        quiet=False):
+def print_paz_cmds(datafiles, zap_list, all_subs=False, modify=True,
+        outfile=None, quiet=False):
     """
     Print paz commands given a list of datafiles and a zap list.
 
     datafiles is a list of the datafiles.
     zap_list is the list returned by get_zap_channels(...) that can be indexed
        zap_list[iarch][isub], which would return channel indices to zap.
+    all_subs=True will apply the zapping of a channel in any one subint to all
+        subints in that archive.
     modify=True would print a '-m' argument for paz, otherwise '-e zap'.
     outfile=None prints to std_out, otherwise it's a file to append to.
     quiet=True suppresses output.
@@ -78,9 +80,16 @@ def print_paz_cmds(datafiles, zap_list, modify=True, outfile=None,
                 if ii < 0: paz_outfile = datafile + ".zap"
                 else: paz_outfile = datafile[:-ii] + "zap"
                 print "paz -e zap %s"%datafile
+        last_line = ""
         for isub, bad_ichans in enumerate(zap_list[iarch]):
             for bad_ichan in bad_ichans:
-                print "paz -m -I -z %d -w %d %s"%(bad_ichan, isub, paz_outfile)
+                if not all_subs:
+                    print "paz -m -I -z %d -w %d %s"%(bad_ichan, isub,
+                            paz_outfile)
+                else:
+                    line = "paz -m -z %d %s"%(bad_ichan, paz_outfile)
+                    if line != last_line: print line
+                    last_line = line
     sys.stdout = sys.__stdout__
     if outfile is not None and not quiet:
         print "Wrote %s."%outfile
@@ -112,9 +121,12 @@ if __name__ == "__main__":
                       action="store", metavar="model", dest="modelfile",
                       default=None,
                       help="Model file from ppgauss.py, ppspline.py, or PSRCHIVE FITS file that either has same channel frequencies, nchan, & nbin as datafile(s), or is a single profile (nchan = 1, with the same nbin) to be interpreted as a constant template.")
+    parser.add_option("-T", "--tscrunch",
+                      action="store_true", dest="tscrunch", default=False,
+                      help="Examine tscrunch'ed archives and apply channel zapping to all subints.")
     parser.add_option("-t", "--threshold",
                       metavar="red_chi2", action="store", dest="threshold",
-                      default=1.5,
+                      default=1.3,
                       help="Set a reduced chi-squared threshold for flagging bad channels [default=1.5].")
     parser.add_option("-o", "--outfile",
                       action="store", metavar="outfile", dest="outfile",
@@ -142,6 +154,7 @@ if __name__ == "__main__":
     nstd = float(options.nstd)
     norm = options.norm
     modelfile = options.modelfile
+    tscrunch = options.tscrunch
     threshold = float(options.threshold)
     outfile = options.outfile
     modify = options.modify
@@ -150,11 +163,11 @@ if __name__ == "__main__":
 
     if modelfile is not None:
         gt = GetTOAs(datafiles=datafiles, modelfile=modelfile, quiet=True)
-        gt.get_TOAs(quiet=True)
+        gt.get_TOAs(tscrunch=tscrunch, quiet=True)
         gt.get_channel_red_chi2s(threshold=threshold, show=False)
         ok_datafiles = list(np.array(gt.datafiles)[gt.ok_idatafiles])
-        print_paz_cmds(ok_datafiles, gt.zap_channels, modify=modify,
-                outfile=outfile, quiet=quiet)
+        print_paz_cmds(ok_datafiles, gt.zap_channels, all_subs=tscrunch,
+                modify=modify, outfile=outfile, quiet=quiet)
 
         nchan = 0
         nzap = 0
@@ -192,7 +205,7 @@ if __name__ == "__main__":
         for datafile in all_datafiles:
             try:
                 data = load_data(datafile, dedisperse=False,
-                        dededisperse=False, tscrunch=False, pscrunch=True,
+                        dededisperse=False, tscrunch=tscrunch, pscrunch=True,
                         fscrunch=False, rm_baseline=rm_baseline,
                         flux_prof=False, refresh_arch=False, return_arch=False,
                         quiet=True)
@@ -209,8 +222,8 @@ if __name__ == "__main__":
                     data.noise_stds[isub,0] = get_noise(data.subints[isub,0],
                             chans=True)
             zap_channels.append(get_zap_channels(data, nstd=nstd))
-        print_paz_cmds(all_datafiles, zap_channels, modify=modify,
-                outfile=outfile, quiet=quiet)
+        print_paz_cmds(all_datafiles, zap_channels, all_subs=tscrunch,
+                modify=modify, outfile=outfile, quiet=quiet)
 
         nzap = 0
         for iarch in range(len(zap_channels)):
