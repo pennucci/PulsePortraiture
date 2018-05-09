@@ -675,7 +675,7 @@ class GetTOAs:
             print "Total time: %.2f sec, ~%.4f sec/TOA"%(tot_duration,
                     tot_duration / (np.array(map(len, self.ok_isubs)).sum()))
 
-    def get_channel_red_chi2s(self, threshold=1.5, show=False):
+    def get_channel_red_chi2s(self, threshold=1.3, show=False):
         """
         Calculate reduced chi-squared values for each profile fit.
 
