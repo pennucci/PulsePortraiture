@@ -135,7 +135,7 @@ class GetTOAs:
         self.TOA_list = []  # complete, single list of TOAs
         self.quiet = quiet  # be quiet?
 
-    def get_TOAs(self, datafile=None, nu_refs=None, DM0=None,
+    def get_TOAs(self, datafile=None, tscrunch=False, nu_refs=None, DM0=None,
             bary=True, fit_DM=True, fit_GM=False, fit_scat=False,
             log10_tau=True, scat_guess=None, fix_alpha=False,
             print_phase=False, print_flux=False, method='trust-ncg',
@@ -146,6 +146,8 @@ class GetTOAs:
 
         datafile defaults to self.datafiles, otherwise it is a single
             PSRCHIVE archive name
+        tscrunch=True tscrunches archive before fitting (i.e. make one set of
+            measurements per archive)
         nu_refs is a tuple containing two output reference frequencies [MHz],
             one for the TOAs, and the other for the scattering timescales;
             defaults to the zero-covariance frequency between the TOA and DM,
@@ -224,13 +226,14 @@ class GetTOAs:
             datafiles = self.datafiles
         else:
             datafiles = [datafile]
+        self.tscrunch = tscrunch
         for iarch, datafile in enumerate(datafiles):
             fit_duration = 0.0
             #Load data
             try:
                 data = load_data(datafile, dedisperse=False,
-                        dededisperse=False, tscrunch=False, pscrunch=True,
-                        fscrunch=False, rm_baseline=rm_baseline,
+                        dededisperse=False, tscrunch=tscrunch,
+                        pscrunch=True, fscrunch=False, rm_baseline=rm_baseline,
                         flux_prof=False, refresh_arch=False, return_arch=False,
                         quiet=quiet)
                 if not len(data.ok_isubs):
@@ -679,6 +682,8 @@ class GetTOAs:
         Adds attributes self.channel_red_chi2s and self.zap_channels, the
             latter based on a thresholding value.
 
+        NB: get_TOAs(...) needs to have been called first.
+
         threshold is a reduced chi-squared value which is used to flag channels
             for zapping (cf. ppzap.py).  Values above threshold are added to
             self.zap_channels.
@@ -736,7 +741,7 @@ class GetTOAs:
         ifile = list(np.array(self.datafiles)[self.ok_idatafiles]).index(
                 datafile)
         data = load_data(datafile, dedisperse=True,
-                dededisperse=False, tscrunch=False,
+                dededisperse=False, tscrunch=self.tscrunch,
                 #pscrunch=True, fscrunch=False, rm_baseline=rm_baseline,
                 pscrunch=True, fscrunch=False, rm_baseline=True,
                 flux_prof=False, refresh_arch=False, return_arch=False,
@@ -767,7 +772,7 @@ class GetTOAs:
         ifile = list(np.array(self.datafiles)[self.ok_idatafiles]).index(
                 datafile)
         data = load_data(datafile, dedisperse=False,
-                dededisperse=False, tscrunch=False,
+                dededisperse=False, tscrunch=self.tscrunch,
                 #pscrunch=True, fscrunch=False, rm_baseline=rm_baseline,
                 pscrunch=True, fscrunch=False, rm_baseline=True,
                 flux_prof=False, refresh_arch=False, return_arch=False,
@@ -855,6 +860,9 @@ if __name__ == "__main__":
                       action="store", metavar="timfile", dest="outfile",
                       default=None,
                       help="Name of output .tim file. Will append. [default=stdout]")
+    parser.add_option("-T", "--tscrunch",
+                      action="store_true", dest="tscrunch", default=False,
+                      help="Tscrunch archives before measurement (i.e., return only one set of measurements per archive.")
     parser.add_option("-f", "--format",
                       action="store", metavar="format", dest="format",
                       help="Format of output .tim file; either 'princeton' or 'ipta'.  Default is IPTA-like format.")
@@ -930,6 +938,7 @@ if __name__ == "__main__":
 
     datafiles = options.datafiles
     modelfile = options.modelfile
+    tscrunch = options.tscrunch
     nu_ref_DM = options.nu_ref_DM
     if nu_ref_DM:
         if nu_ref_DM == "inf":
@@ -970,8 +979,8 @@ if __name__ == "__main__":
     quiet = options.quiet
 
     gt = GetTOAs(datafiles=datafiles, modelfile=modelfile, quiet=quiet)
-    gt.get_TOAs(datafile=None, nu_refs=nu_refs, DM0=DM0, bary=bary,
-            fit_DM=fit_DM, fit_GM=fit_GM, fit_scat=fit_scat,
+    gt.get_TOAs(datafile=None, tscrunch=tscrunch, nu_refs=nu_refs, DM0=DM0,
+            bary=bary, fit_DM=fit_DM, fit_GM=fit_GM, fit_scat=fit_scat,
             log10_tau=log10_tau, scat_guess=scat_guess, fix_alpha=fix_alpha,
             print_phase=print_phase, print_flux=print_flux, method='trust-ncg',
             bounds=None, nu_fits=None, show_plot=show_plot,
