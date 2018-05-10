@@ -15,7 +15,7 @@
 
 from pptoas import *
 
-def get_zap_channels(data, nstd=5):
+def get_zap_channels(data, nstd=3):
     """
     Return list of proposed channels to zap using median algorithm.
 
@@ -24,7 +24,7 @@ def get_zap_channels(data, nstd=5):
         deviations away from it.  The channels are removed, and the process
         iterates until there are no more flagged channels.
 
-    data is a DataBunch object from load_data(...).
+    data is a DataBunch object from load_data(...), or a DataPortrait object.
     nstd is the number of standard deviations above the median that serves as
         the threshold for flagging bad channels.
     """
