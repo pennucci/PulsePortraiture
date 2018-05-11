@@ -32,7 +32,7 @@ class DataPortrait(DataPortrait):
     """
 
     def make_spline_model(self, max_ncomp=10, smooth=True, snr_cutoff=150.0,
-            target_rchi2=1.00, k=3, sfac=1.0, max_nbreak=None, model_name=None,
+            rchi2_tol=0.5, k=3, sfac=1.0, max_nbreak=None, model_name=None,
             quiet=False, **kwargs):
         """
         Make a model based on PCA and B-spline interpolation.
@@ -44,9 +44,8 @@ class DataPortrait(DataPortrait):
         snr_cutoff is the S/N ratio value above or equal to which an
             eigenvector is deemed "significant".  Setting it equal to np.inf
             would ensure only a mean profile model is returned.
-        target_rchi2 is the desired value for the reduced chi2 statistic
-            between the data and smoothed profiles, used in determining the
-            smoothness and significance of profiles.
+        rchi2_tol is the tolerance parameter that will allow greater deviations
+            in the smoothed profile from the input profiles' shapes.
         k is the polynomial degree of the spline; cubic splines (k=3)
             recommended; 1 <= k <= 5.  NB: polynomial order = degree + 1.
         sfac is a multiplicative smoothing factor passed to si.splprep; greater
@@ -82,16 +81,16 @@ class DataPortrait(DataPortrait):
         if smooth:
             ieig, smooth_eigvec = find_significant_eigvec(eigvec, check_max=10,
                     return_max=return_max, snr_cutoff=snr_cutoff,
-                    return_smooth=True, target_rchi2=target_rchi2, **kwargs)
+                    return_smooth=True, rchi2_tol=rchi2_tol, **kwargs)
         else:
             ieig = find_significant_eigvec(eigvec, check_max=10,
                     return_max=return_max, snr_cutoff=snr_cutoff,
-                    return_smooth=True, target_rchi2=target_rchi2, **kwargs)
+                    return_smooth=True, rchi2_tol=rchi2_tol, **kwargs)
         ncomp = len(ieig)
 
         if smooth:
             smooth_mean_prof = smart_smooth(mean_prof,
-                    target_rchi2=target_rchi2)
+                    rchi2_tol=rchi2_tol)
 
         if ncomp == 0: #Will make model with constant average port
             proj_port = port[:,:ncomp]
@@ -243,7 +242,8 @@ class DataPortrait(DataPortrait):
             if ncomp: eigvec = self.eigvec[:,self.ieig[:ncomp]].T
             else: eigvec = None
             show_eigenprofiles(self.eigvec[:,self.ieig[:ncomp]].T, None,
-                    self.mean_prof, None, title=self.model_name, **kwargs)
+                    self.mean_prof, self.smooth_mean_prof,
+                    title=self.model_name, **kwargs)
 
     def show_spline_curve_projections(self, ncomp=None, **kwargs):
         """
@@ -301,9 +301,9 @@ if __name__ == "__main__":
                       action="store", metavar="snr_cutoff", dest="snr_cutoff",
                       default=150.0,
                       help="S/N ratio cutoff for determining 'significant' eigenprofiles.  A value somewhere over 100.0 should be good. [default=150.0].")
-    parser.add_option("-X", "--rchi2",
-                      action="store", metavar="red_chi2", dest="target_rchi2",
-                      default=1.0,
+    parser.add_option("-T", "--rchi2_tol",
+                      action="store", metavar="tolerance", dest="rchi2_tol",
+                      default=0.5,
                       help="Tweak this between 1.0 and ~1.1 if the returned eigenprofiles are not smooth enough.")
     parser.add_option("-k", "--degree",
                       action="store", metavar="degree", dest="k", default=3,
@@ -336,7 +336,7 @@ if __name__ == "__main__":
     smooth = options.smooth
     max_ncomp = int(options.max_ncomp)
     snr_cutoff = float(options.snr_cutoff)
-    target_rchi2 = float(options.target_rchi2)
+    rchi2_tol = float(options.rchi2_tol)
     k = int(options.k)
     sfac = float(options.sfac)
     if options.max_nbreak is not None: max_nbreak = int(options.max_nbreak)
@@ -349,7 +349,7 @@ if __name__ == "__main__":
         dp.normalize_portrait(norm)
 
     dp.make_spline_model(max_ncomp=max_ncomp, smooth=smooth,
-            snr_cutoff=snr_cutoff, target_rchi2=target_rchi2, k=k, sfac=sfac,
+            snr_cutoff=snr_cutoff, rchi2_tol=rchi2_tol, k=k, sfac=sfac,
             max_nbreak=max_nbreak, model_name=model_name, quiet=quiet)
 
     if modelfile is None: modelfile = datafile + ".spl"

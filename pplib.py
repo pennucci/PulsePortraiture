@@ -1518,29 +1518,30 @@ def wavelet_smooth(port, wavelet='db8', nlevel=5, threshtype='hard', fact=1.0):
         coeffs = pw.threshold(coeffs, lopt, mode=threshtype, substitute=0.0)
         #Reconstruct data
         smooth_port[ichan] = pw.iswt(map(tuple, coeffs), wavelet)
-    
+
     #Return smoothed portrait
     if one_prof:
         return smooth_port[0]
     else:
         return smooth_port
 
-def smart_smooth(port, try_nlevels=None, target_rchi2=1.0, **kwargs):
+def smart_smooth(port, try_nlevels=None, rchi2_tol=0.5, **kwargs):
     """
     Attempts to use wavelet_smooth(...) in a smart/iterative but automated way.
 
     For each profile in port, a "best-fit" smooth profile is found by
-        minimizing the difference abs(target_rchi2 - reduced chi2).  The
-        minimization takes place over nlevel and the coefficient
-        thresholding factor fact within wavelet_smooth(...).
+        maximizing the signal-to-noise ratio while keeping the reduced
+        chi-squared value between the profile and the smoothed profile to
+        within rchi2_tol of 1.0.  The optimization takes place over nlevel and
+        the coefficient thresholding factor fact within wavelet_smooth(...).
 
     port is a nchan x nbin array, or a single profile array of length nbin.
     try_nlevels is the number of levels to minimize over in
         wavelet_smooth(...).  A value of 0 returns the port as is.  nlevel
         cannot be higher than log2(nbin), which is the default value for
         try_nlevels.
-    target_rchi2 is the desired value for the reduced chi2 statistic between
-        the data and smoothed profiles.
+    rchi2_tol is the tolerance parameter that will allow greater deviations in
+        the smooth profile from the input profile shape.
     **kwargs are passed to wavelet_smooth(...)
     """
     if try_nlevels == 0: return port
@@ -1565,7 +1566,7 @@ def smart_smooth(port, try_nlevels=None, target_rchi2=1.0, **kwargs):
         fact_mins = np.zeros([try_nlevels])
         for ilevel in range(try_nlevels):
             options = {'maxiter':1000, 'disp':False}#, xatol:1e-8}
-            other_args = (prof, wavelet, ilevel+1, threshtype, target_rchi2)
+            other_args = (prof, wavelet, ilevel+1, threshtype, rchi2_tol)
             results = opt.minimize_scalar(fit_wavelet_smooth_function,
                     bounds=[0.0,3.0], args=other_args, method='bounded',
                     options=options)
@@ -1575,26 +1576,41 @@ def smart_smooth(port, try_nlevels=None, target_rchi2=1.0, **kwargs):
         fact_min = fact_mins[ilevel_min]
         smooth_port[iprof] = wavelet_smooth(prof, wavelet=wavelet,
                 nlevel=ilevel_min+1, threshtype=threshtype, fact=fact_min)
+        errs = get_noise(prof)
+        chi2 = np.sum(((prof - smooth_port[iprof]) / errs)**2)
+        red_chi2 = chi2 / len(prof)
     if one_prof:
         return smooth_port[0]
     else:
         return smooth_port
 
 def fit_wavelet_smooth_function(fact, prof, wavelet, nlevel, threshtype,
-        target_rchi2):
+        rchi2_tol):
     """
-    Calculate difference of red. chi2 and target value for smart_smooth(...).
+    Calculate a S/N value for smart_smooth(...).
 
-    Returns abs(target_rchi2 - reduced chi-squared).
+    Returns the a pseudo-S/N estimate of a smoothed profile.
 
     See smart_smooth(...) and wavelet_smooth(...) for arguments.
     """
     smooth_prof = wavelet_smooth(prof, wavelet=wavelet, nlevel=nlevel,
             threshtype=threshtype, fact=fact)
+    smooth_prof_signal = np.sum(np.abs(np.fft.rfft(smooth_prof))**2)
+    if smooth_prof_signal:
+        smooth_prof_noise = get_noise(smooth_prof) * \
+                np.sqrt(len(smooth_prof) / 2.0)
+        if smooth_prof_noise:
+            smooth_prof_snr = np.sum(np.abs(np.fft.rfft(smooth_prof))**2) / \
+                    smooth_prof_noise
+        else:
+            smooth_prof_snr = np.inf
+    else:
+        smooth_prof_snr = 0.0
     errs = get_noise(prof)
     chi2 = np.sum(((prof - smooth_prof) / errs)**2)
     red_chi2 = chi2 / len(prof)
-    return abs(target_rchi2 - red_chi2)
+    if abs(red_chi2 - 1.0) > rchi2_tol: smooth_prof_snr = 0.0
+    return -smooth_prof_snr
 
 def fit_powlaw(data, init_params, errs, freqs, nu_ref):
     """
