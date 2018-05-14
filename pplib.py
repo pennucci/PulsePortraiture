@@ -1463,7 +1463,7 @@ def find_significant_eigvec(eigvec, check_max=10, return_max=10,
     for ivec in range(max(check_max, return_max)):
         ev = smart_smooth(eigvec.T[ivec], **kwargs)
         ev_noise = get_noise(eigvec.T[ivec]) * np.sqrt(len(ev) / 2.0)
-        ev_snr = np.sum(np.abs(np.fft.rfft(ev))**2) / ev_noise
+        ev_snr = np.sum(np.abs(np.fft.rfft(ev)[1:])**2) / ev_noise
         if ev_snr >= snr_cutoff:
             ieig.append(ivec)
             neig += 1
@@ -1567,18 +1567,19 @@ def smart_smooth(port, try_nlevels=None, rchi2_tol=0.5, **kwargs):
         for ilevel in range(try_nlevels):
             options = {'maxiter':1000, 'disp':False}#, xatol:1e-8}
             other_args = (prof, wavelet, ilevel+1, threshtype, rchi2_tol)
-            results = opt.minimize_scalar(fit_wavelet_smooth_function,
-                    bounds=[0.0,3.0], args=other_args, method='bounded',
-                    options=options)
-            fact_mins[ilevel] = results.x
-            fun_vals[ilevel] = results.fun
+            #results = opt.minimize_scalar(fit_wavelet_smooth_function,
+            #        bounds=[0.0,3.0], args=other_args, method='bounded',
+            #        options=options)
+            #fact_mins[ilevel] = results.x
+            #fun_vals[ilevel] = results.fun
+            results = opt.brute(fit_wavelet_smooth_function, ranges=[tuple((0.0, 3.0))], args=other_args, Ns=10, full_output=True)
+            fact_mins[ilevel] = results[0][0]
+            fun_vals[ilevel] = results[1]
         ilevel_min = fun_vals.argmin()
         fact_min = fact_mins[ilevel_min]
         smooth_port[iprof] = wavelet_smooth(prof, wavelet=wavelet,
                 nlevel=ilevel_min+1, threshtype=threshtype, fact=fact_min)
-        errs = get_noise(prof)
-        chi2 = np.sum(((prof - smooth_port[iprof]) / errs)**2)
-        red_chi2 = chi2 / len(prof)
+        red_chi2 = get_red_chi2(prof, smooth_port[iprof])
     if one_prof:
         return smooth_port[0]
     else:
@@ -1595,20 +1596,18 @@ def fit_wavelet_smooth_function(fact, prof, wavelet, nlevel, threshtype,
     """
     smooth_prof = wavelet_smooth(prof, wavelet=wavelet, nlevel=nlevel,
             threshtype=threshtype, fact=fact)
-    smooth_prof_signal = np.sum(np.abs(np.fft.rfft(smooth_prof))**2)
+    smooth_prof_signal = np.sum(np.abs(np.fft.rfft(smooth_prof)[1:])**2)
     if smooth_prof_signal:
         smooth_prof_noise = get_noise(smooth_prof) * \
                 np.sqrt(len(smooth_prof) / 2.0)
         if smooth_prof_noise:
-            smooth_prof_snr = np.sum(np.abs(np.fft.rfft(smooth_prof))**2) / \
+            smooth_prof_snr = smooth_prof_signal / \
                     smooth_prof_noise
         else:
             smooth_prof_snr = np.inf
     else:
         smooth_prof_snr = 0.0
-    errs = get_noise(prof)
-    chi2 = np.sum(((prof - smooth_prof) / errs)**2)
-    red_chi2 = chi2 / len(prof)
+    red_chi2 = get_red_chi2(prof, smooth_prof)
     if abs(red_chi2 - 1.0) > rchi2_tol: smooth_prof_snr = 0.0
     return -smooth_prof_snr
 
@@ -3755,7 +3754,7 @@ def show_eigenprofiles(eigprofs=None, smooth_eigprofs=None, mean_prof=None,
             ev = eigprofs[ie]
             se = smooth_eigprofs[ie]
             ev_noise = get_noise(ev) * np.sqrt(len(ev) / 2.0)
-            ev_snrs[ie] = np.sum(np.abs(np.fft.rfft(se))**2) / ev_noise
+            ev_snrs[ie] = np.sum(np.abs(np.fft.rfft(se)[1:])**2) / ev_noise
             #print "ev_snr", ev_snrs[ie]
     for iax,ax in enumerate(axes):
         if plot_mean and iax == 0:
