@@ -1439,7 +1439,7 @@ def reconstruct_portrait(port, mean_prof, eigvec):
     return reconst_port
 
 def find_significant_eigvec(eigvec, check_max=10, return_max=10,
-        snr_cutoff=150.0, return_smooth=True, **kwargs):
+        snr_cutoff=150.0, check_acorr=True, return_smooth=True, **kwargs):
     """
     Determine which eigenvectors are "significant" based on smoothing and S/N.
 
@@ -1453,6 +1453,8 @@ def find_significant_eigvec(eigvec, check_max=10, return_max=10,
         note that these may not be the return_max most significant.
     snr_cutoff is the S/N ratio value above or equal to which an eigenvector is
         deemed "significant".
+    check_acorr=True adds another check to weed out noisy eigenvectors that
+        still pass the snr_cutoff.
     return_smooth=True will return the array of smoothed eigenvectors so that
         smart_smooth(...) need not be run separately.
     **kwargs get passed to smart_smooth(...).
@@ -1461,10 +1463,22 @@ def find_significant_eigvec(eigvec, check_max=10, return_max=10,
     ieig = []
     neig = 0
     for ivec in range(max(check_max, return_max)):
+        add_eigvec = False
         ev = smart_smooth(eigvec.T[ivec], **kwargs)
         ev_noise = get_noise(eigvec.T[ivec]) * np.sqrt(len(ev) / 2.0)
         ev_snr = np.sum(np.abs(np.fft.rfft(ev)[1:])**2) / ev_noise
         if ev_snr >= snr_cutoff:
+            if check_acorr and ev_snr < 2*snr_cutoff:
+                acorr = np.correlate(ev, ev, 'same')
+                fwhm = acorr.argmax() - \
+                        np.where(acorr > acorr.max()/2.0)[0].min()
+                if fwhm > 5:
+                    add_eigvec = True
+                else:
+                    print "Border-case eigenvector %d failed test."%ivec
+            else:
+                add_eigvec = True
+        if add_eigvec:
             ieig.append(ivec)
             neig += 1
             if return_smooth: smooth_eigvec[:,ivec] = ev
@@ -1525,7 +1539,7 @@ def wavelet_smooth(port, wavelet='db8', nlevel=5, threshtype='hard', fact=1.0):
     else:
         return smooth_port
 
-def smart_smooth(port, try_nlevels=None, rchi2_tol=0.5, **kwargs):
+def smart_smooth(port, try_nlevels=None, rchi2_tol=0.1, **kwargs):
     """
     Attempts to use wavelet_smooth(...) in a smart/iterative but automated way.
 
@@ -1580,6 +1594,7 @@ def smart_smooth(port, try_nlevels=None, rchi2_tol=0.5, **kwargs):
         smooth_port[iprof] = wavelet_smooth(prof, wavelet=wavelet,
                 nlevel=ilevel_min+1, threshtype=threshtype, fact=fact_min)
         red_chi2 = get_red_chi2(prof, smooth_port[iprof])
+        if abs(red_chi2 - 1.0) > rchi2_tol: smooth_port[iprof] *= 0.0
     if one_prof:
         return smooth_port[0]
     else:

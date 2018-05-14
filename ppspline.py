@@ -32,7 +32,7 @@ class DataPortrait(DataPortrait):
     """
 
     def make_spline_model(self, max_ncomp=10, smooth=True, snr_cutoff=150.0,
-            rchi2_tol=0.5, k=3, sfac=1.0, max_nbreak=None, model_name=None,
+            rchi2_tol=0.1, k=3, sfac=1.0, max_nbreak=None, model_name=None,
             quiet=False, **kwargs):
         """
         Make a model based on PCA and B-spline interpolation.
@@ -303,7 +303,7 @@ if __name__ == "__main__":
                       help="S/N ratio cutoff for determining 'significant' eigenprofiles.  A value somewhere over 100.0 should be good. [default=150.0].")
     parser.add_option("-T", "--rchi2_tol",
                       action="store", metavar="tolerance", dest="rchi2_tol",
-                      default=0.5,
+                      default=0.1,
                       help="Tweak this between 1.0 and ~1.1 if the returned eigenprofiles are not smooth enough.")
     parser.add_option("-k", "--degree",
                       action="store", metavar="degree", dest="k", default=3,
