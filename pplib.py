@@ -1458,6 +1458,9 @@ def find_significant_eigvec(eigvec, check_max=10, return_max=10,
     return_smooth=True will return the array of smoothed eigenvectors so that
         smart_smooth(...) need not be run separately.
     **kwargs get passed to smart_smooth(...).
+
+    NB: an alternate scheme could involve looking at the projection of the
+        profiles onto the eigenvectors, and its e.g. autocorrelation.
     """
     if return_smooth: smooth_eigvec = np.zeros(eigvec.shape)
     ieig = []
@@ -1475,7 +1478,7 @@ def find_significant_eigvec(eigvec, check_max=10, return_max=10,
                 if fwhm > 5:
                     add_eigvec = True
                 else:
-                    print "Border-case eigenvector %d failed test."%ivec
+                    print "Borderline case eigenvector %d failed test."%ivec
             else:
                 add_eigvec = True
         if add_eigvec:
@@ -1586,7 +1589,9 @@ def smart_smooth(port, try_nlevels=None, rchi2_tol=0.1, **kwargs):
             #        options=options)
             #fact_mins[ilevel] = results.x
             #fun_vals[ilevel] = results.fun
-            results = opt.brute(fit_wavelet_smooth_function, ranges=[tuple((0.0, 3.0))], args=other_args, Ns=10, full_output=True)
+            results = opt.brute(fit_wavelet_smooth_function,
+                    ranges=[tuple((0.0, 10.0))], args=other_args, Ns=20,
+                    full_output=True)
             fact_mins[ilevel] = results[0][0]
             fun_vals[ilevel] = results[1]
         ilevel_min = fun_vals.argmin()
@@ -3744,10 +3749,11 @@ def show_eigenprofiles(eigprofs=None, smooth_eigprofs=None, mean_prof=None,
     savefig specifies a substring for the saved figure; will not show the
         plot.
     """
-    plot_eigprofs = bool(np.any(eigprofs))
-    plot_seigprofs = bool(np.any(smooth_eigprofs))
-    plot_mean = bool(np.any(mean_prof))
-    plot_smean = bool(np.any(smooth_mean_prof))
+    plot_eigprofs = plot_seigprofs = plot_mean = plot_smean = False
+    if plot_eigprofs is not None: plot_eigprofs = True
+    if plot_seigprofs is not None: plot_seigprofs = True
+    if plot_mean is not None: plot_mean = True
+    if plot_smean is not None: plot_smean = True
     neig = 0
     if plot_eigprofs:
         neig = eigprofs.shape[0]
