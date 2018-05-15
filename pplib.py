@@ -1590,7 +1590,7 @@ def smart_smooth(port, try_nlevels=None, rchi2_tol=0.1, **kwargs):
             #fact_mins[ilevel] = results.x
             #fun_vals[ilevel] = results.fun
             results = opt.brute(fit_wavelet_smooth_function,
-                    ranges=[tuple((0.0, 10.0))], args=other_args, Ns=20,
+                    ranges=[tuple((0.0, 3.0))], args=other_args, Ns=30,
                     full_output=True)
             fact_mins[ilevel] = results[0][0]
             fun_vals[ilevel] = results[1]
@@ -3750,10 +3750,10 @@ def show_eigenprofiles(eigprofs=None, smooth_eigprofs=None, mean_prof=None,
         plot.
     """
     plot_eigprofs = plot_seigprofs = plot_mean = plot_smean = False
-    if plot_eigprofs is not None: plot_eigprofs = True
-    if plot_seigprofs is not None: plot_seigprofs = True
-    if plot_mean is not None: plot_mean = True
-    if plot_smean is not None: plot_smean = True
+    if eigprofs is not None: plot_eigprofs = True
+    if smooth_eigprofs is not None: plot_seigprofs = True
+    if mean_prof is not None: plot_mean = True
+    if smooth_mean_prof is not None: plot_smean = True
     neig = 0
     if plot_eigprofs:
         neig = eigprofs.shape[0]
