@@ -138,8 +138,8 @@ class GetTOAs:
     def get_TOAs(self, datafile=None, tscrunch=False, nu_refs=None, DM0=None,
             bary=True, fit_DM=True, fit_GM=False, fit_scat=False,
             log10_tau=True, scat_guess=None, fix_alpha=False,
-            print_phase=False, print_flux=False, method='trust-ncg',
-            bounds=None, nu_fits=None, show_plot=False, addtnl_toa_flags={},
+            print_phase=False, print_flux=False, addtnl_toa_flags={},
+            method='trust-ncg', bounds=None, nu_fits=None, show_plot=False,
             quiet=None):
         """
         Measure TOAs from wideband data accounting for numerous ISM effects.
@@ -177,6 +177,8 @@ class GetTOAs:
             uncertainty on the TOA line with the flags -phs and -phs_err.
         print_flux=True will print an estimate of the overall flux density and
             its uncertainty on the TOA line.
+        addtnl_toa_flags are pairs making up TOA flags to be written uniformly
+            to all IPTA-formatted TOAs. e.g. ('pta','NANOGrav','version',0.1)
         method is the scipy.optimize.minimize method; currently can be 'TNC',
             'Newton-CG', or 'trust-cng', which are all Newton
             Conjugate-Gradient algorithms.
@@ -188,8 +190,6 @@ class GetTOAs:
             zero-covariance frequency based on signal-to-noise ratios.
         show_plot=True will show a plot of the fitted model, data, and
             residuals at the end of the fitting.
-        addtnl_toa_flags are pairs making up TOA flags to be written uniformly
-            to all IPTA-formatted TOAs. e.g. ('pta','NANOGrav','version',0.1)
         quiet=True suppresses output.
         """
         if quiet is None: quiet = self.quiet
@@ -860,16 +860,16 @@ if __name__ == "__main__":
                       action="store", metavar="timfile", dest="outfile",
                       default=None,
                       help="Name of output .tim file. Will append. [default=stdout]")
+    parser.add_option("--errfile",
+                      action="store", metavar="errfile", dest="errfile",
+                      default=None,
+                      help="If specified, will write the fitted DM errors to errfile (desirable if using 'Princeton'-like formatted TOAs). Will append.")
     parser.add_option("-T", "--tscrunch",
                       action="store_true", dest="tscrunch", default=False,
                       help="tscrunch archives before measurement (i.e., return only one set of measurements per archive.")
     parser.add_option("-f", "--format",
                       action="store", metavar="format", dest="format",
                       help="Format of output .tim file; either 'princeton' or 'ipta'.  Default is IPTA-like format.")
-    parser.add_option("--flags",
-                      action="store", metavar="flags", dest="toa_flags",
-                      default="",
-                      help="Pairs making up TOA flags to be written uniformly to all IPTA-formatted TOAs.  e.g. ('pta','NANOGrav','version',0.1)")
     parser.add_option("--nu_ref",
                       action="store", metavar="nu_ref", dest="nu_ref_DM",
                       default=None,
@@ -883,14 +883,6 @@ if __name__ == "__main__":
     parser.add_option("--one_DM",
                       action="store_true", dest="one_DM", default=False,
                       help="Returns single DM value in output .tim file for all subints in the epoch instead of a fitted DM per subint.")
-    parser.add_option("--snr_cut",
-                      metavar="SNR", action="store", dest="snr_cutoff",
-                      default=0.0,
-                      help="Set a SNR cutoff for TOAs written.")
-    parser.add_option("--errfile",
-                      action="store", metavar="errfile", dest="errfile",
-                      default=None,
-                      help="If specified, will write the fitted DM errors to errfile (desirable if using non-IPTA formatted TOAs). Will append.")
     parser.add_option("--fix_DM",
                       action="store_false", dest="fit_DM", default=True,
                       help="Do not fit for DM. NB: the parfile DM will still be 'barycentered' in the TOA lines unless --no_bary is used!")
@@ -921,6 +913,14 @@ if __name__ == "__main__":
     parser.add_option("--print_flux",
                       action="store_true", dest="print_flux", default=False,
                       help="Print an estimate of the overall mean flux density and its uncertainty on the TOA line.")
+    parser.add_option("--flags",
+                      action="store", metavar="flags", dest="toa_flags",
+                      default="",
+                      help="Pairs making up TOA flags to be written uniformly to all IPTA-formatted TOAs.  e.g. ('pta','NANOGrav','version',0.1)")
+    parser.add_option("--snr_cut",
+                      metavar="SNR", action="store", dest="snr_cutoff",
+                      default=0.0,
+                      help="Set a SNR cutoff for TOAs written.")
     parser.add_option("--showplot",
                       action="store_true", dest="show_plot", default=False,
                       help="Show a plot of fitted data/model/residuals for each subint.  Good for diagnostic purposes only.")
@@ -938,7 +938,10 @@ if __name__ == "__main__":
 
     datafiles = options.datafiles
     modelfile = options.modelfile
+    outfile = options.outfile
+    errfile = options.errfile
     tscrunch = options.tscrunch
+    format = options.format
     nu_ref_DM = options.nu_ref_DM
     if nu_ref_DM:
         if nu_ref_DM == "inf":
@@ -969,12 +972,9 @@ if __name__ == "__main__":
             nu_refs = (None, nu_ref_tau)
     print_phase = options.print_phase
     print_flux = options.print_flux
-    outfile = options.outfile
-    format = options.format
     k,v = options.toa_flags.split(',')[::2],options.toa_flags.split(',')[1::2]
     addtnl_toa_flags = dict(zip(k,v))
     snr_cutoff = float(options.snr_cutoff)
-    errfile = options.errfile
     show_plot = options.show_plot
     quiet = options.quiet
 
@@ -982,9 +982,9 @@ if __name__ == "__main__":
     gt.get_TOAs(datafile=None, tscrunch=tscrunch, nu_refs=nu_refs, DM0=DM0,
             bary=bary, fit_DM=fit_DM, fit_GM=fit_GM, fit_scat=fit_scat,
             log10_tau=log10_tau, scat_guess=scat_guess, fix_alpha=fix_alpha,
-            print_phase=print_phase, print_flux=print_flux, method='trust-ncg',
-            bounds=None, nu_fits=None, show_plot=show_plot,
-            addtnl_toa_flags=addtnl_toa_flags, quiet=quiet)
+            print_phase=print_phase, print_flux=print_flux,
+            addtnl_toa_flags=addtnl_toa_flags,method='trust-ncg', bounds=None,
+            nu_fits=None, show_plot=show_plot, quiet=quiet)
     if format == "princeton":
         gt.write_princeton_TOAs(outfile=outfile, one_DM=one_DM,
             dmerrfile=errfile)
