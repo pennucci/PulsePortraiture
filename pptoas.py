@@ -343,12 +343,13 @@ class GetTOAs:
                 ##THESE FREQUENCIES WILL BE OFF IF AVERAGED CHANNELS##
                 #    print model_data.freqs[0, ok_ichans[isub]] - \
                 #            freqs[isub,ok_ichans[isub]]
+                weights = weights[isub, ok_ichans[isub]]
                 freqsx = freqs[isub,ok_ichans[isub]]
-                portx = subints[isub,0,ok_ichans[isub]]
+                portx = (subints[isub,0,ok_ichans[isub]].T * weights).T
                 modelx = model[ok_ichans[isub]]
                 SNRsx = SNRs[isub,0,ok_ichans[isub]]
                 #NB: Time-domain uncertainties below
-                errs = noise_stds[isub,0,ok_ichans[isub]]
+                errs = noise_stds[isub,0,ok_ichans[isub]] * weights
                 #nu_fit is the reference frequency for parameters in the fit
                 nu_mean = freqsx.mean()
                 if nu_fit_tuple is None:
