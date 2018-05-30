@@ -175,7 +175,8 @@ def align_archives(metafile, initial_guess, tscrunch=False, pscrunch=True,
                     results.DM = data.DM
                     results.nu_ref = freqs[0]
                     results.scales = np.array([results.scale])
-                weights = np.outer(results.scales / errs**2, np.ones(nbin))
+                #weights = np.outer(results.scales / errs**2, np.ones(nbin))
+                weights = np.ones(port.shape)
                 for ipol in range(npol):
                     aligned_port[ipol, model_ichans] += weights * \
                             rotate_data(data.subints[isub,ipol,ichans],
@@ -308,7 +309,9 @@ if __name__ == "__main__":
         psradd_archives(metafile, outfile=tmp_file, palign=palign)
         initial_guess = tmp_file
         rm = True
-    if check_if_Stokes(metafile) or pscrunch:
+    if not pscrunch: all_Stokes = check_if_Stokes(metafile)
+    else: all_Stokes = False
+    if all_Stokes or pscrunch:
         align_archives(metafile, initial_guess=initial_guess,
                 tscrunch=tscrunch, pscrunch=pscrunch, SNR_cutoff=SNR_cutoff,
                 outfile=outfile, norm=norm, rot_phase=rot_phase, place=place,
