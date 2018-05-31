@@ -76,9 +76,9 @@ def align_archives(metafile, initial_guess, tscrunch=False, pscrunch=True,
 
     Each archive is fitted for a phase, a DM, and channel amplitudes against
     initial_guess.  The average is weighted by the fitted channel amplitudes
-    and channel S/N.  The average becomes the new initial alignment template
-    for additional iterations.  The output archive will have a 0 DM value and
-    dmc=0.
+    and channel noise level.  The average becomes the new initial alignment
+    template for additional iterations.  The output archive will have a 0 DM
+    value and dmc=0.
 
     metafile is a file containing PSRFITS archive names to be averaged.
     initial_guess is the PSRFITS archive providing the initial alignment guess.
@@ -151,15 +151,13 @@ def align_archives(metafile, initial_guess, tscrunch=False, pscrunch=True,
                         imin = np.argmin(abs(model_data.freqs[isub]-data_freq))
                         model_ichans.append(imin)
                     model_ichans = np.array(model_ichans)
-                data_weights = data.weights[isub,ichans]
                 port = data.subints[isub,0,ichans]
-                port = (port.T * data_weights).T  #Use weights
                 freqs = data.freqs[isub,ichans]  #Use data freqs
                 #freqs = model_data.freqs[isub,model_ichans]  #Use model freqs
                 model = model_port[model_ichans]
                 P = data.Ps[isub]
                 SNRs = data.SNRs[isub,0,ichans]
-                errs = data.noise_stds[isub,0,ichans] * data_weights
+                errs = data.noise_stds[isub,0,ichans]
                 nu_fit = guess_fit_freq(freqs, SNRs)
                 rot_port = rotate_data(port, 0.0, DM_guess, P, freqs,
                         nu_fit)
@@ -175,8 +173,7 @@ def align_archives(metafile, initial_guess, tscrunch=False, pscrunch=True,
                     results.DM = data.DM
                     results.nu_ref = freqs[0]
                     results.scales = np.array([results.scale])
-                #weights = np.outer(results.scales / errs**2, np.ones(nbin))
-                weights = np.ones(port.shape)
+                weights = np.outer(results.scales / errs**2, np.ones(nbin))
                 for ipol in range(npol):
                     aligned_port[ipol, model_ichans] += weights * \
                             rotate_data(data.subints[isub,ipol,ichans],
