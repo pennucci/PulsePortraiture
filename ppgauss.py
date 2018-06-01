@@ -132,6 +132,7 @@ class DataPortrait(DataPortrait):
                 #The below profile average gives a slightly different set of
                 #values for the profile than self.profile, if given the full
                 #band and center frequency.  Unsure why; shouldn't matter.
+                #The following is an unweighted profile.
                 profile = np.take(self.port, okinds, axis=0).mean(axis=0)
                 self.fit_profile(profile, tau=tau, fixscat=fixscat,
                         auto_gauss=auto_gauss, profile_fit_flags=None,
@@ -301,7 +302,7 @@ class DataPortrait(DataPortrait):
             portx = np.copy(self.portx)
             modelx = np.copy(self.modelx)
         #Currently, fit_phase_shift returns an unbounded phase
-        phase_guess = fit_phase_shift(portx.mean(axis=0),
+        phase_guess = fit_phase_shift(portx.mean(axis=0),  #Unweighted mean
                 modelx.mean(axis=0)).phase
         phase_guess %= 1
         if phase_guess >= 0.5:

@@ -161,8 +161,9 @@ def align_archives(metafile, initial_guess, tscrunch=False, pscrunch=True,
                 nu_fit = guess_fit_freq(freqs, SNRs)
                 rot_port = rotate_data(port, 0.0, DM_guess, P, freqs,
                         nu_fit)
-                phase_guess = fit_phase_shift(rot_port.mean(axis=0),
-                        model.mean(axis=0), Ns=nbin).phase
+                phase_guess = fit_phase_shift(np.average(rot_port, axis=0,
+                    weights=data.weights[isub,ichans]), model.mean(axis=0),
+                    Ns=nbin).phase
                 if len(freqs) > 1:
                     results = fit_portrait(port, model,
                             np.array([phase_guess, DM_guess]), P, freqs,
@@ -189,11 +190,12 @@ def align_archives(metafile, initial_guess, tscrunch=False, pscrunch=True,
         count += 1
     if norm in ("mean", "max", "prof", "rms", "abs"):
         for ipol in range(npol):
-            aligned_port[ipol] = normalize_portrait(aligned_port[ipol], norm)
+            aligned_port[ipol] = normalize_portrait(aligned_port[ipol], norm,
+                    weights=None)
     if rot_phase:
         aligned_port = rotate_data(aligned_port, rot_phase)
     if place is not None:
-        prof = aligned_port[0].mean(axis=0)
+        prof = np.average(aligned_port[0], axis=0, weights=None)
         delta = prof.max() * gaussian_profile(len(prof), place, 0.0001)
         phase = fit_phase_shift(prof, delta, Ns=nbin).phase
         aligned_port = rotate_data(aligned_port, phase)

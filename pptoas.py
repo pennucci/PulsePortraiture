@@ -344,6 +344,7 @@ class GetTOAs:
                 #    print model_data.freqs[0, ok_ichans[isub]] - \
                 #            freqs[isub,ok_ichans[isub]]
                 freqsx = freqs[isub,ok_ichans[isub]]
+                weightsx = weights[isub,ok_ichans[isub]]
                 portx = subints[isub,0,ok_ichans[isub]]
                 modelx = model[ok_ichans[isub]]
                 SNRsx = SNRs[isub,0,ok_ichans[isub]]
@@ -375,7 +376,7 @@ class GetTOAs:
                 DM_guess = DM_stored
                 rot_port = rotate_data(portx, 0.0, DM_guess, P, freqsx,
                         nu_mean)
-                rot_prof = rot_port.mean(axis=0)
+                rot_prof = np.average(rot_port, axis=0, weights=weightsx)
                 GM_guess = 0.0
                 tau_guess = 0.0
                 alpha_guess = 0.0
@@ -661,8 +662,8 @@ class GetTOAs:
                 print "--------------------------"
                 print datafile
                 print "~%.4f sec/TOA"%(fit_duration / len(ok_isubs))
-                print "Avg. TOA error is %.3f us"%(phi_errs[ok_isubs].mean() *
-                        Ps.mean() * 1e6)
+                print "Med. TOA error is %.3f us"%(np.median(
+                    phi_errs[ok_isubs]) * Ps.mean() * 1e6)
             if show_plot:
                 stop = time.time()
                 tot_duration += stop - start

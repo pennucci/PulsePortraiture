@@ -218,7 +218,7 @@ if __name__ == "__main__":
                 for isub in data.ok_isubs:
                     data.subints[isub,0] = normalize_portrait(
                             data.subints[isub,0], method=norm,
-                            return_norms=False)
+                            weights=data.weights[isub], return_norms=False)
                     data.noise_stds[isub,0] = get_noise(data.subints[isub,0],
                             chans=True)
             zap_channels.append(get_zap_channels(data, nstd=nstd))

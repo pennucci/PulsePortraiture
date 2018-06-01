@@ -353,20 +353,25 @@ class DataPortrait(object):
     def normalize_portrait(self, method="rms"):
         """
         Normalize each channel's profile using normalize_portrait(...).
+
+        NB: currently only works properly when nsub = 1.
         """
         if method not in ("mean", "max", "prof", "rms", "abs"):
             print "Unknown method for normalize_portrait(...), '%s'."%method
         else:
+            if method == "prof":
+                weights = self.weights[0]
+                weightsx = self.weights[0, self.ok_ichans[0]]
             #Full portrait
             self.unnorm_noise_stds = np.copy(self.noise_stds)
             self.port, self.norm_values = normalize_portrait(self.port, method,
-                    return_norms=True)
+                    weights=weights, return_norms=True)
             self.noise_stds[0,0] = get_noise(self.port, chans=True)
             self.flux_prof = self.port.mean(axis=1)
             #Condensed portrait
             self.unnorm_noise_stdsxs = np.copy(self.noise_stdsxs)
             self.portx = normalize_portrait(self.portx, method,
-                    return_norms=False)
+                    weights=weightsx, return_norms=False)
             self.noise_stdsxs = get_noise(self.portx, chans=True)
             self.flux_profx = self.portx.mean(axis=1)
 
@@ -531,6 +536,10 @@ class DataPortrait(object):
             self.portx[ichanxs] = rotate_portrait(self.portx[ichanxs], phase,
                     DM, P, freqsxs, nu_ref)
             self.prof = rotate_portrait([self.prof], phase)[0]
+            if hasattr(self, 'mean_prof'):
+                self.mean_prof = rotate_portrait([self.mean_prof], phase)[0]
+            if hasattr(self, 'eigvec'):
+                self.eigvec = rotate_portrait(self.eigvec.T, phase).T
 
         if model and hasattr(self, 'model'):
             self.model[ichans] = rotate_portrait(self.model[ichans], phase, DM,
@@ -539,6 +548,12 @@ class DataPortrait(object):
                     DM, P, freqsxs, nu_ref)
             self.model_masked[ichans] = rotate_portrait(
                     self.model_masked[ichans], phase, DM, P, freqs, nu_ref)
+            if hasattr(self, 'smooth_mean_prof'):
+                self.smooth_mean_prof = rotate_portrait(
+                        [self.smooth_mean_prof], phase)[0]
+            if hasattr(self, 'smooth_eigvec'):
+                self.smooth_eigvec = rotate_portrait(self.smooth_eigvec.T,
+                        phase).T
 
     def write_archive(self, outfile, quiet=False):
         """
@@ -1406,7 +1421,6 @@ def pca(port, mean_prof=None, weights=None, quiet=False):
 
     #Subtract weighted average from each set of measurements
     if mean_prof is None:
-        #mean_prof = port.mean(axis=0)
         mean_prof = (port.T * weights).T.sum(axis=0) / weights.sum()
     delta_port = port - mean_prof
 
@@ -2323,7 +2337,7 @@ def rotate_portrait(port, phase=0.0, DM=None, P=None, freqs=None,
             pFFT[nn,:] *= phasor
     return fft.irfft(pFFT)
 
-def normalize_portrait(port, method='rms', return_norms=False):
+def normalize_portrait(port, method='rms', weights=None, return_norms=False):
     """
     Normalize each profile in a portrait.
 
@@ -2335,6 +2349,8 @@ def normalize_portrait(port, method='rms', return_norms=False):
             get_noise(profile) = 1.
         if "abs", then normalize such that each profile would have the same
             'length' in an nbin vector space.
+    weights=None assumes equal weights for all profiles in port when using
+        method "prof"; otherwise specifies an array of nchan weights.
     return_norms=True returns an array of the normalization values.
     """
     if method not in ("mean", "max", "prof", "rms", "abs"):
@@ -2344,7 +2360,11 @@ def normalize_portrait(port, method='rms', return_norms=False):
         norm_vals = np.ones(len(port))
         if method == "prof":
             good_ichans = np.where(port.sum(axis=1) != 0.0)[0]
-            mean_prof = port[good_ichans].mean(axis=0)
+            if weights is None:
+                weights = np.ones(len(good_ichans))
+            else:
+                weights = weights[good_ichans]
+            mean_prof = np.average(port[good_ichans], axis=0, weights=weights)
         for ichan in range(len(port)):
             if port[ichan].any():
                 if method == "mean":
@@ -3349,7 +3369,7 @@ def show_portrait(port, phases=None, freqs=None, title=None, prof=True,
         weights = port.mean(axis=1)
     if prof:
         portx = np.compress(weights, port, axis=0)
-        prof = portx.mean(axis=0)
+        prof = portx.mean(axis=0)  #NB: this is unweighted mean
         pi = 1
     if fluxprof:
         fluxprof = port.mean(axis=1)
