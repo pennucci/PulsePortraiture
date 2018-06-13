@@ -356,4 +356,4 @@ if __name__ == "__main__":
     dp.write_model(modelfile, quiet=quiet)
 
     if archive is not None and len(dp.datafiles) == 1:
-        dp.write_archive(archive, quiet=quiet)
+        dp.write_model_archive(archive, quiet=quiet)

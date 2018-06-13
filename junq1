@@ -562,39 +562,13 @@ class DataPortrait(object):
                 self.smooth_eigvec = rotate_portrait(self.smooth_eigvec.T,
                         phase).T
 
-    def unload_archive(self, outfile=None, quiet=False):
-        """
-        Unload a PSRCHIVE archive to outfile containing the same data.
-
-        outfile=None overwrites the input archive.
-        quiet=True suppresses output.
-
-        Only works if input datafile is a PSRCHIVE archive.  The written
-            archive will have the same weighted channels as the input datafile.
-        """
-        if hasattr(self, 'arch'):
-            if outfile is None: outfile = self.datafile
-            shape = self.arch.get_data().shape
-            nsub,npol,nchan,nbin = shape
-            data = np.zeros(shape)
-            for isub in range(nsub):
-                for ipol in range(npol):
-                    data[isub,ipol] = self.port
-            unload_new_archive(data, self.arch, outfile,
-                    DM=self.arch.get_dispersion_measure(),
-                    dmc=int(self.arch.get_dedispersed()), weights=self.weights,
-                    quiet=quiet)
-
-
-    def write_model_archive(self, outfile, quiet=False):
+    def write_archive(self, outfile, quiet=False):
         """
         Write a PSRCHIVE archive to outfile containing the model.
 
-        outfile is the name of the written archive.
-        quiet=True suppresses output.
-
         Only works if input datafile is a PSRCHIVE archive.  The written
-            archive will have the same weighted channels as the input datafile.
+            archive will have the same zero-weighted channels as the input
+            datafile.
         """
         if hasattr(self, 'model') and hasattr(self, 'arch'):
             shape = self.arch.get_data().shape

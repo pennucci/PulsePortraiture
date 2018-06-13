@@ -15,7 +15,7 @@
 ###########
 
 #Unfortunately, this has to come first in the event nodes = True
-nodes = False  #Used when needing parallelized operation
+nodes = True  #Used when needing parallelized operation
 if nodes:
     import matplotlib
     matplotlib.use('Agg')
@@ -193,8 +193,6 @@ class DataPortrait(object):
             self.noise_stdsxs = []
             self.SNRs = []
             self.SNRsxs = []
-            self.weights = []
-            self.weightsxs = []
             self.masks = []
             for ifile in range(len(self.datafiles)):
                 datafile = self.datafiles[ifile]
@@ -242,8 +240,6 @@ class DataPortrait(object):
                         data.noise_stds[0,0][data.ok_ichans[0]])
                 self.SNRs.extend(data.SNRs[0,0])
                 self.SNRsxs.extend(data.SNRs[0,0][data.ok_ichans[0]])
-                self.weights.extend(data.weights[0])
-                self.weightsxs.extend(data.weights[0,data.ok_ichans[0]])
             self.Ps /= len(self.datafiles)
             self.Ps = [self.Ps] #This line is a toy
             self.bw = self.hifreq - self.lofreq
@@ -272,8 +268,6 @@ class DataPortrait(object):
             self.noise_stdsxs = np.array(self.noise_stdsxs)[self.isortx]
             self.SNRs = np.array(self.SNRs)[self.isort]
             self.SNRsxs = np.array(self.SNRsxs)[self.isortx]
-            self.weights = np.array([np.array(self.weights)[self.isort]])
-            self.weightsxs = np.array([np.array(self.weightsxs)[self.isortx]])
             self.freqs.sort()
             self.freqsxs.sort()
             self.freqs = np.array([self.freqs])
@@ -367,7 +361,7 @@ class DataPortrait(object):
         else:
             if method == "prof":
                 weights = self.weights[0]
-                weightsx = self.weights[self.weights > 0]
+                weightsx = self.weights[0, self.ok_ichans[0]]
             #Full portrait
             self.unnorm_noise_stds = np.copy(self.noise_stds)
             self.port, self.norm_values = normalize_portrait(self.port, method,
@@ -541,8 +535,7 @@ class DataPortrait(object):
                     P, freqs, nu_ref)
             self.portx[ichanxs] = rotate_portrait(self.portx[ichanxs], phase,
                     DM, P, freqsxs, nu_ref)
-            if hasattr(self, 'prof'):
-                self.prof = rotate_portrait([self.prof], phase)[0]
+            self.prof = rotate_portrait([self.prof], phase)[0]
             if hasattr(self, 'mean_prof'):
                 self.mean_prof = rotate_portrait([self.mean_prof], phase)[0]
             if hasattr(self, 'eigvec'):
@@ -562,39 +555,13 @@ class DataPortrait(object):
                 self.smooth_eigvec = rotate_portrait(self.smooth_eigvec.T,
                         phase).T
 
-    def unload_archive(self, outfile=None, quiet=False):
-        """
-        Unload a PSRCHIVE archive to outfile containing the same data.
-
-        outfile=None overwrites the input archive.
-        quiet=True suppresses output.
-
-        Only works if input datafile is a PSRCHIVE archive.  The written
-            archive will have the same weighted channels as the input datafile.
-        """
-        if hasattr(self, 'arch'):
-            if outfile is None: outfile = self.datafile
-            shape = self.arch.get_data().shape
-            nsub,npol,nchan,nbin = shape
-            data = np.zeros(shape)
-            for isub in range(nsub):
-                for ipol in range(npol):
-                    data[isub,ipol] = self.port
-            unload_new_archive(data, self.arch, outfile,
-                    DM=self.arch.get_dispersion_measure(),
-                    dmc=int(self.arch.get_dedispersed()), weights=self.weights,
-                    quiet=quiet)
-
-
-    def write_model_archive(self, outfile, quiet=False):
+    def write_archive(self, outfile, quiet=False):
         """
         Write a PSRCHIVE archive to outfile containing the model.
 
-        outfile is the name of the written archive.
-        quiet=True suppresses output.
-
         Only works if input datafile is a PSRCHIVE archive.  The written
-            archive will have the same weighted channels as the input datafile.
+            archive will have the same zero-weighted channels as the input
+            datafile.
         """
         if hasattr(self, 'model') and hasattr(self, 'arch'):
             shape = self.arch.get_data().shape
