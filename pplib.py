@@ -3698,7 +3698,8 @@ def show_spline_curve_projections(projected_port, tck, freqs, weights=None,
         fig2 = plt.figure(2, figsize=(2*size + buff, ncoord*size + buff))
         axes2 = fig2.subplots(nrows=ncoord, ncols=1, sharex=True, sharey=False,
                 squeeze=True)
-    fmt = 'bo'
+    marker = 'o'
+    color = 'purple'
     if weights is None:
         ms = np.ones(len(projected_port)) + 3.0
     else:
@@ -3714,13 +3715,14 @@ def show_spline_curve_projections(projected_port, tck, freqs, weights=None,
                 plot_number = ((ncoord-1) * iplot) + (icoord + 1)
                 ax = fig1.add_subplot(ncoord-1, ncoord-1, plot_number)
                 for iprof,prof in enumerate(projected_port):
-                    ax.plot(prof[icoord], prof[ocoord], fmt, ms=ms[iprof],
-                            alpha=alpha[iprof], mew=0.0)
+                    ax.plot(prof[icoord], prof[ocoord], marker=marker,
+                            color=color, ms=ms[iprof], alpha=alpha[iprof],
+                            mew=0.0)
                 ax.plot(projected_port[:,icoord], projected_port[:,ocoord],
                         color='k', ls='solid', lw=1)
                 ax.plot(proj_port_interp[:,icoord], proj_port_interp[:,ocoord],
-                        color='r', ls='solid', lw=2)
-                ax.plot(knots[:,icoord], knots[:,ocoord], 'k*', ms=5)
+                        color='green', ls='solid', lw=2)
+                ax.plot(knots[:,icoord], knots[:,ocoord], 'k*', ms=10)
                 if ocoord == ncoord-1: ax.set_xlabel(icoord+1)
                 else: ax.tick_params(labelbottom=False)
                 if icoord == 0: ax.set_ylabel(ocoord+1)
@@ -3729,13 +3731,13 @@ def show_spline_curve_projections(projected_port, tck, freqs, weights=None,
         if plot_this_coord is None:
             nuax = axes2[icoord]
             for iprof,prof in enumerate(projected_port):
-                nuax.plot(freqs[iprof], prof[icoord], fmt, ms=ms[iprof],
-                        alpha=alpha[iprof], mew=0.0)
+                nuax.plot(freqs[iprof], prof[icoord], marker=marker,
+                        color=color, ms=ms[iprof], alpha=alpha[iprof], mew=0.0)
             nuax.plot(freqs, projected_port[:,icoord], color='k', ls='solid',
                     lw=1)
             nuax.plot(interp_freqs[::flip], proj_port_interp[:,icoord][::flip],
-                    color='r', ls='solid', lw=2)
-            nuax.plot(tck[0][::flip], knots[:,icoord][::flip], 'k*', ms=5)
+                    color='green', ls='solid', lw=2)
+            nuax.plot(tck[0][::flip], knots[:,icoord][::flip], 'k*', ms=10)
             nuax.set_ylabel("Coordinate %d"%(icoord+1))
             nuax.get_yaxis().set_label_coords(-0.1, 0.5)
             if icoord == ncoord-1: nuax.set_xlabel("Frequency [MHz]")
@@ -3745,13 +3747,13 @@ def show_spline_curve_projections(projected_port, tck, freqs, weights=None,
             fig2 = plt.figure(2, figsize=(size + 2*buff, size + 2*buff))
             nuax = fig2.add_subplot(111)
             for iprof,prof in enumerate(projected_port):
-                nuax.plot(freqs[iprof], prof[icoord], fmt, ms=ms[iprof],
-                        alpha=alpha[iprof], mew=0.0)
+                nuax.plot(freqs[iprof], prof[icoord], marker=marker,
+                        color=color, ms=ms[iprof], alpha=alpha[iprof], mew=0.0)
             nuax.plot(freqs, projected_port[:,icoord], color='k', ls='solid',
                     lw=1)
             nuax.plot(interp_freqs[::flip], proj_port_interp[:,icoord][::flip],
-                    color='r', ls='solid', lw=2)
-            nuax.plot(tck[0][::flip], knots[:,icoord][::flip], 'k*', ms=5)
+                    color='green', ls='solid', lw=2)
+            nuax.plot(tck[0][::flip], knots[:,icoord][::flip], 'k*', ms=10)
             nuax.set_ylabel("Coordinate %d"%(plot_this_coord+1))
             nuax.get_yaxis().set_label_coords(-0.1, 0.5)
             nuax.set_xlabel("Frequency [MHz]")
