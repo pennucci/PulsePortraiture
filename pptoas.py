@@ -126,6 +126,7 @@ class GetTOAs:
         self.profile_flux_errs = []  # their uncertainties
         self.fluxes = []  # estimated overall fluxes
         self.flux_errs = []  # their uncertainties
+        self.flux_freqs = []  # their reference frequencies
         self.red_chi2s = []  # reduced chi2 values of the fit
         self.covariances = []  # full covariance matrices
         self.nfevals = []  # number of likelihood function evaluations
@@ -274,6 +275,7 @@ class GetTOAs:
             profile_flux_errs = np.zeros([nsub, nchan], dtype=np.float64)
             fluxes = np.zeros(nsub, dtype=np.float64)
             flux_errs = np.zeros(nsub, dtype=np.float64)
+            flux_freqs = np.zeros(nsub, dtype=np.float64)
             red_chi2s = np.zeros(nsub, dtype=np.float64)
             covariances = np.zeros([nsub, self.nfit, self.nfit],
                     dtype=np.float64)
@@ -521,8 +523,11 @@ class GetTOAs:
                     flux, flux_err = weighted_mean(profile_fluxes[isub,
                         ok_ichans[isub]], profile_flux_errs[isub,
                             ok_ichans[isub]])
+                    flux_freq, flux_freq_err = weighted_mean(freqsx,
+                            profile_flux_errs[isub, ok_ichans[isub]])
                     fluxes[isub] = flux
                     flux_errs[isub] = flux_err
+                    flux_freqs[isub] = flux_freq
 
                 nu_refs[isub] = [results.nu_DM, results.nu_GM, results.nu_tau]
                 phis[isub] = results.phi
@@ -597,6 +602,7 @@ class GetTOAs:
                     toa_flags['flux'] = fluxes[isub]
                     #toa_flags['flux_err'] = flux_errs[isub]
                     toa_flags['fluxe'] = flux_errs[isub]  # consistent w/ pat
+                    toa_flags['flux_ref_freq'] = flux_freqs[isub]
                 for k,v in addtnl_toa_flags.iteritems():
                     toa_flags[k] = v
                 self.TOA_list.append(TOA(datafile, results.nu_DM, results.TOA,
@@ -653,6 +659,7 @@ class GetTOAs:
             self.profile_flux_errs.append(profile_flux_errs)
             self.fluxes.append(fluxes)
             self.flux_errs.append(flux_errs)
+            self.flux_freqs.append(flux_freqs)
             self.covariances.append(covariances)
             self.red_chi2s.append(red_chi2s)
             self.nfevals.append(nfevals)
