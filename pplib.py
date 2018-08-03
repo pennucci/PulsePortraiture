@@ -368,6 +368,8 @@ class DataPortrait(object):
             if method == "prof":
                 weights = self.weights[0]
                 weightsx = self.weights[self.weights > 0]
+            else:
+                weights = weightsx = None
             #Full portrait
             self.unnorm_noise_stds = np.copy(self.noise_stds)
             self.port, self.norm_values = normalize_portrait(self.port, method,
