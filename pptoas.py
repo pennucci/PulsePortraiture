@@ -299,10 +299,13 @@ class GetTOAs:
                     #fscrunch=False, rm_baseline=False, flux_prof=False,
                     refresh_arch=False, return_arch=False, quiet=True)
                 model = (model_data.masks * model_data.subints)[0,0]
+                if model.shape[-1] != nbin:
+                    print "Model nbin %d != data nbin %d for %s; skipping it."\
+                            %(model.shape[-1], nbin, datafile)
+                    continue
                 if model_data.nchan == 1:
                     model = np.tile(model[0], len(freqs[isub])).reshape(
                             len(freqs[isub]), nbin)
-                    print model.shape
             if not quiet:
                 print "\nEach of the %d TOAs is approximately %.2f s"%(
                         len(ok_isubs), integration_length / nsub)
