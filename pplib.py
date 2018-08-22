@@ -3525,11 +3525,14 @@ def show_stacked_profiles(data_profiles, model_profiles=None, phases=None,
     else:
         plt.show()
 
-def show_profiles(model, cmap=plt.cm.Spectral, s=1, offset=None, **kwargs):
+def show_profiles(model, phases=None, cmap=plt.cm.Spectral, s=1, offset=None,
+        **kwargs):
     """
     Show stacked profiles colored by amplitude; good for displaying models.
 
     model is an nchan x nbin array of profiles to display.
+    phases=None assumes the end phases are 0.0 and 1.0; otherwise are an nbin
+        array of phase values to plot against.
     cmap is a matplotlib.colormap instance.
     s is the marker size in squared points.
     offset=None calculates the offset between profiles.
@@ -3538,7 +3541,8 @@ def show_profiles(model, cmap=plt.cm.Spectral, s=1, offset=None, **kwargs):
     model_min = model.min()
     model_max = model.max()
     model_range = model_max - model_min
-    phases = get_bin_centers(len(model[0]))
+    if phases is None:
+        phases = get_bin_centers(len(model[0]))
     if offset is None: offset = model_range / float(len(model))
     for iprof,prof in enumerate(model):
         norm_prof = (prof - model_min) / model_range

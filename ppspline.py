@@ -218,7 +218,7 @@ class DataPortrait(DataPortrait):
         if not quiet:
             print "Wrote modelfile %s."%outfile
 
-    def show_eigenprofiles(self, ncomp=None, **kwargs):
+    def show_eigenprofiles(self, ncomp=None, title=None, **kwargs):
         """
         Calls show_eigenprofiles(...) to make plots of mean/eigen profiles.
 
@@ -237,15 +237,15 @@ class DataPortrait(DataPortrait):
                 eigvec = None
                 seigvec = None
             show_eigenprofiles(eigvec, seigvec, self.mean_prof,
-                    self.smooth_mean_prof, title=self.model_name, **kwargs)
+                    self.smooth_mean_prof, title=title, **kwargs)
         else:
             if ncomp: eigvec = self.eigvec[:,self.ieig[:ncomp]].T
             else: eigvec = None
             show_eigenprofiles(self.eigvec[:,self.ieig[:ncomp]].T, None,
                     self.mean_prof, self.smooth_mean_prof,
-                    title=self.model_name, **kwargs)
+                    title=title, **kwargs)
 
-    def show_spline_curve_projections(self, ncomp=None, **kwargs):
+    def show_spline_curve_projections(self, ncomp=None, title=None, **kwargs):
         """
         Calls show_spline_curve_projections(...) to make plots of the model.
 
@@ -259,7 +259,7 @@ class DataPortrait(DataPortrait):
         if ncomp:
             show_spline_curve_projections(self.proj_port, self.tck,
                     self.freqsxs[0], self.SNRsxs / np.sum(self.SNRsxs),
-                    ncoord=ncomp, title=self.model_name, **kwargs)
+                    ncoord=ncomp, title=title, **kwargs)
 
 
 if __name__ == "__main__":
