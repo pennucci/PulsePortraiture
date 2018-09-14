@@ -929,9 +929,9 @@ if __name__ == "__main__":
                       default="",
                       help="Pairs making up TOA flags to be written uniformly to all IPTA-formatted TOAs.  e.g. ('pta','NANOGrav','version',0.1)")
     parser.add_option("--snr_cut",
-                      metavar="SNR", action="store", dest="snr_cutoff",
+                      metavar="S/N", action="store", dest="snr_cutoff",
                       default=0.0,
-                      help="Set a SNR cutoff for TOAs written.")
+                      help="Set a S/N cutoff for TOAs written.")
     parser.add_option("--showplot",
                       action="store_true", dest="show_plot", default=False,
                       help="Show a plot of fitted data/model/residuals for each subint.  Good for diagnostic purposes only.")

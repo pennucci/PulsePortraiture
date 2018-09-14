@@ -107,8 +107,8 @@ obs_codes = {'bary':'@', '???':'0', 'gbt':'1', 'atca':'2', 'ao':'3',
 #Taken and lowered from $TEMPO/obsys.dat
 tempo_codes = {'arecibo':'ao', 'chime':'ch', 'effelsberg':'ef', 'gbt':'gbt',
                'gmrt':'gm', 'jodrell':'jb', 'lofar':'lf', 'lwa1':'lw',
-               'nancay':'nc', 'parkes':'pk', 'shao':'sh', 'srt':'sr',
-               'vla':'v2', 'wsrt':'wb'}
+               'meerkat':'meerkat', 'nancay':'nc', 'parkes':'pk', 'shao':'sh',
+               'srt':'sr', 'vla':'v2', 'wsrt':'wb'}
 
 #RCSTRINGS dictionary, for the return codes given by scipy.optimize.fmin_tnc.
 #These are only needed for debugging.
@@ -3863,7 +3863,7 @@ def show_eigenprofiles(eigprofs=None, smooth_eigprofs=None, mean_prof=None,
             ax.set_ylabel("Eigenprofile %d"%(iseig+1))
             ax.set_xlim(xlim)
             if show_snrs:
-                ax.text(0.9, 0.9, "SNR = %d"%ev_snrs[iseig], ha='center',
+                ax.text(0.9, 0.9, "S/N = %d"%ev_snrs[iseig], ha='center',
                         va='center', transform=ax.transAxes)
             iseig += 1
         ax.get_yaxis().set_label_coords(-0.1, 0.5)
