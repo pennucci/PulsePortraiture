@@ -50,8 +50,11 @@ Dconst = Dconst_trad
 #Power-law index for scattering law
 scattering_alpha = -4.0
 
+#Use get_noise and default_noise_method for noise levels instead of PSRCHIVE;
+# see load_data.
+use_get_noise = True
+
 #Default get_noise method (see functions get_noise_*).
-#However, PSRCHIVE's baseline_stats is used in most cases (see load_data). 
 #_To_be_improved_.
 default_noise_method = 'PS'
 
@@ -107,7 +110,7 @@ obs_codes = {'bary':'@', '???':'0', 'gbt':'1', 'atca':'2', 'ao':'3',
 #Taken and lowered from $TEMPO/obsys.dat
 tempo_codes = {'arecibo':'ao', 'chime':'ch', 'effelsberg':'ef', 'gbt':'gbt',
                'gmrt':'gm', 'jodrell':'jb', 'lofar':'lf', 'lwa1':'lw',
-               'meerkat':'meerkat', 'nancay':'nc', 'parkes':'pk', 'shao':'sh',
+               'meerkat':'mk', 'nancay':'nc', 'parkes':'pk', 'shao':'sh',
                'srt':'sr', 'vla':'v2', 'wsrt':'wb'}
 
 #RCSTRINGS dictionary, for the return codes given by scipy.optimize.fmin_tnc.
@@ -2642,7 +2645,14 @@ def load_data(filename, dedisperse=False, dededisperse=False, tscrunch=False,
     weights_norm = np.where(weights == 0.0, np.zeros(weights.shape),
             np.ones(weights.shape))
     #Get off-pulse noise
-    noise_stds = np.array([sub.baseline_stats()[1]**0.5 for sub in arch])
+    if not use_get_noise:
+        noise_stds = np.array([sub.baseline_stats()[1]**0.5 for sub in arch])
+    else:
+        noise_stds = np.zeros([nsub,npol,nchan])
+        for isub in range(nsub):
+            for ipol in range(npol):
+                noise_stds[isub,ipol] = get_noise(subints[isub,ipol],
+                        chans=True)
     ok_isubs = np.compress(weights_norm.mean(axis=1), range(nsub))
     ok_ichans = [np.compress(weights_norm[isub], range(nchan)) \
             for isub in range(nsub)]
