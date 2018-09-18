@@ -2073,7 +2073,8 @@ def fit_portrait(data, model, init_params, P, freqs, nu_fit=None, nu_out=None,
     #Someimes a failure code is returned because xtol is too stringent, or
     # the initial phase_guess is 'bad'
     #if not quiet and results.success is not True and results.status != 4:
-    if not quiet and results.success is not True:
+    if not quiet and results.success is not True and \
+            results.status not in [1, 2, 4]:
         if id is not None:
             ii = id[::-1].index("_")
             isub = id[-ii:]
