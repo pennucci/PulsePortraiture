@@ -3721,8 +3721,8 @@ def show_spline_curve_projections(projected_port, tck, freqs, weights=None,
         ms = np.ones(len(projected_port)) + 3.0
     else:
         ms = (weights - weights.min())
-        ms /= (ms.max() / 9.0)
-        ms += 1.0 + 3.0
+        ms /= (ms.max() / 10.0)
+        ms += 1.0 + 4.0  #this should map all weights to ms on [5, 15]
     alpha = np.linspace(0.25,1.0,nprof)
     for icoord in range(ncoord):
         nplot = (ncoord - icoord - 1) #number of plots in the column for icoord
