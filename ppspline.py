@@ -85,7 +85,7 @@ class DataPortrait(DataPortrait):
         else:
             ieig = find_significant_eigvec(eigvec, check_max=10,
                     return_max=return_max, snr_cutoff=snr_cutoff,
-                    return_smooth=True, rchi2_tol=rchi2_tol, **kwargs)
+                    return_smooth=False, rchi2_tol=rchi2_tol, **kwargs)
         ncomp = len(ieig)
 
         if smooth:

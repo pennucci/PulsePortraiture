@@ -667,6 +667,10 @@ def set_colormap(colormap):
 def get_bin_centers(nbin, lo=0.0, hi=1.0):
     """
     Return nbin bin centers with extremities at lo and hi.
+
+    nbin is the number of bins to return the centers of.
+    lo is the value of the ``left-edge'' of the first bin.
+    hi is the value of the ``right-edge'' of the last bin.
     """
     lo = np.double(lo)
     hi = np.double(hi)
@@ -674,6 +678,16 @@ def get_bin_centers(nbin, lo=0.0, hi=1.0):
     bin_centers = np.linspace(lo + diff/(nbin*2), hi - diff/(nbin*2), nbin)
     bin_centers = np.double(bin_centers)
     return bin_centers
+
+def count_crossings(x, x0):
+    """
+    Return number of crossings in the 1-d array x across threshold x0.
+
+    x is the 1-D array of values.
+    x0 is the threshold across which to count crossings.
+    """
+    ncross = (np.diff(np.sign(x-x0)) != 0).sum() - ((x-x0) == 0).sum()
+    return ncross
 
 def weighted_mean(data, errs=1.0):
     """
@@ -1491,12 +1505,13 @@ def reconstruct_portrait(port, mean_prof, eigvec):
     return reconst_port
 
 def find_significant_eigvec(eigvec, check_max=10, return_max=10,
-        snr_cutoff=150.0, check_acorr=True, return_smooth=True, **kwargs):
+        snr_cutoff=150.0, check_crossings=True, check_acorr=True,
+        return_smooth=True, **kwargs):
     """
     Determine which eigenvectors are "significant" based on smoothing and S/N.
 
-    Returns the indices of significant eigenvectors and the smoothed eigvec, if
-        return_smooth is True.
+    Returns the indices of significant eigenvectors (and the smoothed eigvec,
+        if return_smooth is True).
 
     eigvec is the nbin x ncomp array of eigenvectors to be examined.
     check_max is the maximum number of consecutive eigenvectors to check for
@@ -1505,8 +1520,9 @@ def find_significant_eigvec(eigvec, check_max=10, return_max=10,
         note that these may not be the return_max most significant.
     snr_cutoff is the S/N ratio value above or equal to which an eigenvector is
         deemed "significant".
-    check_acorr=True adds another check to weed out noisy eigenvectors that
-        still pass the snr_cutoff.
+    check_crossings=True adds another check to weed out noisy/RFI eigenvectors
+        that still pass based on snr_cutoff.
+    check_acorr=True adds another check...
     return_smooth=True will return the array of smoothed eigenvectors so that
         smart_smooth(...) need not be run separately.
     **kwargs get passed to smart_smooth(...).
@@ -1520,16 +1536,25 @@ def find_significant_eigvec(eigvec, check_max=10, return_max=10,
     for ivec in range(max(check_max, return_max)):
         add_eigvec = False
         ev = smart_smooth(eigvec.T[ivec], **kwargs)
+        # Get Fourier-domain noise
         ev_noise = get_noise(eigvec.T[ivec]) * np.sqrt(len(ev) / 2.0)
+        # Get Fourier-domain signal, and calculate S/N
         ev_snr = np.sum(np.abs(np.fft.rfft(ev)[1:])**2) / ev_noise
         if ev_snr >= snr_cutoff:
-            if check_acorr and ev_snr < 2*snr_cutoff:
+            #Only check if close
+            if check_crossings and ev_snr < 3*snr_cutoff:
+                ncross = count_crossings(abs(ev), 0.1*abs(ev).max())
+                if ncross < int(0.02*len(ev)):
+                    add_eigvec = True
+            #Only check if close
+            elif check_acorr and ev_snr < 3*snr_cutoff and add_eigvec:
                 acorr = np.correlate(ev, ev, 'same')
                 fwhm = acorr.argmax() - \
                         np.where(acorr > acorr.max()/2.0)[0].min()
                 if fwhm > 5:
                     add_eigvec = True
                 else:
+                    add_eigvec = False
                     print "Borderline case eigenvector %d failed test."%ivec
             else:
                 add_eigvec = True
