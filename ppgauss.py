@@ -778,9 +778,11 @@ if __name__ == "__main__":
     quiet = options.quiet
 
     dp = DataPortrait(datafile=datafile, joinfile=joinfile, quiet=quiet)
-    if normalize is not None:
-        retval = dp.normalize_portrait(normalize)
-        if retval: sys.exit()
+    if normalize in ("mean", "max", "prof", "rms", "abs"):
+        dp.normalize_portrait(normalize)
+    elif normalize is not None:
+        print "Unknown normalization choice, '%s'."%normalize
+        sys.exit()
     #if not quiet: dp.show_data_portrait()
     if modelfile is not None:
         dp.make_gaussian_model(modelfile = modelfile, fixalpha=fixalpha,

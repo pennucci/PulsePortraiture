@@ -299,7 +299,6 @@ class DataPortrait(object):
                         self.join_params[ijoin*2+1] = DM
                 except:
                     print "Bad join file."
-                    sys.exit()
             self.all_join_params = [self.join_ichanxs, self.join_params,
                     self.join_fit_flags]
             if len(self.datafiles) == 1:
@@ -1835,7 +1834,7 @@ def fit_gaussian_profile(data, init_params, errs, fit_flags=None,
                     vary=fit_flags[ii], min=0.0, max=None, expr=None)
         else:
             print "Undefined index %d."%ii
-            sys.exit()
+            return DataBunch()
     other_args = {'data':data, 'errs':errs}
     #Now fit it
     results = lm.minimize(fit_gaussian_profile_function, params,
@@ -1930,7 +1929,7 @@ def fit_gaussian_portrait(model_code, data, init_params, scattering_index,
                     vary=bool(fit_flags[ii]), min=None, max=None, expr=None)
         else:
             print "Undefined index %d."%ii
-            sys.exit()
+            return DataBunch()
     if len(join_params):
         join_ichans = join_params[0]
         njoin = len(join_ichans)
@@ -2331,12 +2330,12 @@ def rotate_data(data, phase=0.0, DM=0.0, Ps=None, freqs=None, nu_ref=np.inf):
         D = Dconst * DM / (np.ones(nsub)*Ps)
         if len(D) != nsub:
             print "Wrong shape for array of periods."
-            sys.exit()
+            return 0
         try:
             test = float(nu_ref)
         except TypeError:
             print "Only one nu_ref permitted."
-            sys.exit()
+            return 0
         if not hasattr(freqs, 'ndim'):
             freqs = np.ones(nchan)*freqs
         if freqs.ndim == 0:
@@ -2344,14 +2343,14 @@ def rotate_data(data, phase=0.0, DM=0.0, Ps=None, freqs=None, nu_ref=np.inf):
         if freqs.ndim == 1:
             if nchan != len(freqs):
                 print "Wrong number of frequencies."
-                sys.exit()
+                return 0
             fterm = np.tile(freqs, nsub).reshape(nsub, nchan)**-2.0 - \
                     nu_ref**-2.0
         else:
             fterm = freqs**-2.0 - nu_ref**-2.0
         if fterm.shape[1] != nchan or fterm.shape[0] != nsub:
             print "Wrong shape for frequency array."
-            sys.exit()
+            return 0
         phase += np.array([D[isub]*fterm[isub] for isub in range(nsub)])
         phase = np.einsum('ij,k', phase, harmind)
         phasor = np.exp(2.0j * np.pi * phase)
@@ -2365,7 +2364,7 @@ def rotate_data(data, phase=0.0, DM=0.0, Ps=None, freqs=None, nu_ref=np.inf):
             return fft.irfft(dFFT, axis=baxis)
         else:
             print "Wrong number of dimensions."
-            sys.exit()
+            return 0
 
 def rotate_portrait(port, phase=0.0, DM=None, P=None, freqs=None,
         nu_ref=np.inf):

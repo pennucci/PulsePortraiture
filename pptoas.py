@@ -380,7 +380,7 @@ class GetTOAs:
                 ###################
                 DM_guess = DM_stored
                 rot_port = rotate_data(portx, 0.0, DM_guess, P, freqsx,
-                        nu_mean)
+                        nu_mean)  # why not nu_fit?
                 rot_prof = np.average(rot_port, axis=0, weights=weightsx)
                 GM_guess = 0.0
                 tau_guess = 0.0
