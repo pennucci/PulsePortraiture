@@ -100,7 +100,7 @@ class DataPortrait(DataPortrait):
             if outfile is None:
                 outfile = modelfile
             if errfile is None:
-                errfile = outfile + "_err"
+                errfile = outfile + "_errs"
             (self.model_name, self.model_code, self.nu_ref, self.ngauss,
                     self.init_model_params, self.fit_flags,
                     self.scattering_index, self.fitalpha) = read_model(
@@ -114,7 +114,7 @@ class DataPortrait(DataPortrait):
             self.fixalpha = fixalpha
             self.fitalpha = int(not self.fixalpha)
             if errfile is None and outfile is not None:
-                errfile = outfile + "_err"
+                errfile = outfile + "_errs"
             if model_name is None:
                 self.model_name = self.source
             else:
