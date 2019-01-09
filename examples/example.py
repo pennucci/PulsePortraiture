@@ -15,7 +15,7 @@ model_routine = "ppspline" #"ppspline" or "ppgauss"
 
 #Generate some fake datafiles
 #These files will be homogenous, even though they don't need to be
-nfiles = 2       #Number of datafiles/epochs
+nfiles = 5       #Number of datafiles/epochs
 MJD0 = 50000.00  #Start day [MJD]
 days = 20.0      #Days between epochs
 nsub = 10        #Number of subintegrations
@@ -87,7 +87,7 @@ if not model_routine == "ppgauss":
     print "Have a look at the average data you're fitting..."
     dp.show_data_portrait()
     dp.make_spline_model(max_ncomp=3, smooth=True, snr_cutoff=150.0,
-            target_rchi2=1.00, k=3, sfac=1.0, max_nbreak=None, model_name=None,
+            rchi2_tol=0.1, k=3, sfac=1.0, max_nbreak=None, model_name=None,
             quiet=False)
     print "Have a look at the mean profile and eigenprofiles..."
     dp.show_eigenprofiles()

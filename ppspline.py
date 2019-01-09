@@ -291,7 +291,7 @@ if __name__ == "__main__":
     parser.add_option("-s", "--smooth",
                       action="store_true", metavar="smooth", dest="smooth",
                       default=False,
-                      help="Smooth the eigenvectors and mean profile using default wavelet_smooth options and smart_smooth.")
+                      help="Smooth the eigenvectors and mean profile [recommended] using default wavelet_smooth options and smart_smooth.")
     parser.add_option("-n", "--max_ncomp",
                       action="store", metavar="max_ncomp", dest="max_ncomp",
                       default=10,
@@ -303,7 +303,7 @@ if __name__ == "__main__":
     parser.add_option("-T", "--rchi2_tol",
                       action="store", metavar="tolerance", dest="rchi2_tol",
                       default=0.1,
-                      help="Tweak this between 0.0 and 0.1 if the returned eigenprofiles are not smooth enough.")
+                      help="Tweak this between 0.0 and 0.1 [default] if the returned eigenprofiles are not smooth enough.")
     parser.add_option("-k", "--degree",
                       action="store", metavar="degree", dest="k", default=3,
                       help="Degree of the spline.  Cubic splines (k=3) are recommended [default]. 1 <= k <=5.")

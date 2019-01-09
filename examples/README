@@ -12,6 +12,8 @@
 
 --For a more involved example, run/examine example.py.
 
+--For a walk-through of basic ppalign, ppspline, and pptoas usage, try the
+    notebook, example_make_model_and_TOAs.ipynb.
 
 --Simplest command-line use with minimum arguments:
 

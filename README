@@ -26,7 +26,8 @@ How (the technical description of this work and its related papers are):
         !!! NB: Equation 13 of the paper was written incorrectly; it should be
                 the reverse; DM_bary = DM_topo / doppler_factor.
     -Pennucci (2015), "Wideband Observations of Radio Pulsars", PhDT, UVa.
-    -Pennucci et al. (forthcoming x 2).
+    -Pennucci (2019, in press, ApJ)
+    -Pennucci et al. (in prep).
 
 Requirements:
     -psrchive (PSRCHIVE), compiled with the python-interface enabled,
@@ -53,6 +54,7 @@ In short:
         flexibility of use.
     -***See examples/README for simple command-line use.***
     -Run and examine examples/example.py for a more in-depth demonstration.
+    -Try the notebook example_make_model_and_TOAs.ipynb for a walk-through.
 
 License:
     -Released under GPLv2, sans "or later" clause.
