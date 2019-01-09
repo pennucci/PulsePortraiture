@@ -41,7 +41,7 @@ import matplotlib.pyplot as plt
 #Exact dispersion constant (e**2/(2*pi*m_e*c)) (used by PRESTO).
 Dconst_exact = 4.148808e3  #[MHz**2 cm**3 pc**-1 s]
 
-#"Traditional" dispersion constant (used by PSRCHIVE).
+#"Traditional" dispersion constant (used by PSRCHIVE,TEMPO,PINT).
 Dconst_trad = 0.000241**-1 #[MHz**2 cm**3 pc**-1 s]
 
 #Fitted DM values will depend on this choice.  Choose wisely.
@@ -2910,6 +2910,32 @@ def read_spline_model(modelfile, freqs=None, nbin=None, quiet=False):
     else:
         return (modelname,
                 gen_spline_portrait(mean_prof, freqs, eigvec, tck, nbin))
+
+def get_spline_model_coords(modelfile, nfreq=1000, lo_freq=None, hi_freq=None,
+        write_pick=False):
+    """
+    Returns the spline model coordinates and the frequencies evaluated.
+
+    modelfile is the name of the make_spline_model(...)-type of model file.
+    nfreq is the number of frequencies at which to evaluate the spline.
+    lo_freq=None uses the lowest frequency knot endpoint; otherwise in MHz.
+    hi_freq=None uses the highest frequency knot endpoint; otherwise in MHz.
+    write_pick=True writes a pickle file containing the frequencies and spline
+        model coordinates.
+    """
+    modelname, source, datafile, mean_prof, eigvec, tck = \
+            read_spline_model(modelfile, quiet=True)
+    if lo_freq is None: lo_freq = tck[0].min()
+    if hi_freq is None: hi_freq = tck[0].max()
+    model_freqs = np.linspace(lo_freq, hi_freq, nfreq)
+    proj_port = np.array(si.splev(model_freqs, tck, der=0, ext=0)).T
+    if write_pick:
+        outfile = modelfile + "_coords.pick"
+        print "Unloading %s..."%outfile
+        of = open(outfile, 'wb')
+        pickle.dump([model_freqs, proj_port], of)
+        of.close()
+    return model_freqs, proj_port
 
 def file_is_type(filename, filetype="ASCII"):
     """

@@ -242,8 +242,7 @@ class DataPortrait(DataPortrait):
             if ncomp: eigvec = self.eigvec[:,self.ieig[:ncomp]].T
             else: eigvec = None
             show_eigenprofiles(self.eigvec[:,self.ieig[:ncomp]].T, None,
-                    self.mean_prof, self.smooth_mean_prof,
-                    title=title, **kwargs)
+                    self.mean_prof, None, title=title, **kwargs)
 
     def show_spline_curve_projections(self, ncomp=None, title=None, **kwargs):
         """

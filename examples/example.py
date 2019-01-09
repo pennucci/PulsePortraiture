@@ -10,7 +10,7 @@ ephemeris = "example.par"
 
 
 #Choose which modeling program to use
-model_with = "ppspline" #"ppspline" or "ppgauss"
+model_routine = "ppspline" #"ppspline" or "ppgauss"
 
 
 #Generate some fake datafiles
@@ -76,7 +76,7 @@ else: datafile = "example-1.fits"
 norm = "prof" #Normalization method (None, mean, max, prof, rms, abs)
 
 #...with ppspline...
-if not model_with == "ppgauss":
+if not model_routine == "ppgauss":
     print "Running ppspline.py to fit a PCA/B-spline model..."
     import ppspline as ppi
     fitted_modelfile = "example-fit.spl"
