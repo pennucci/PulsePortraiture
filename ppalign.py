@@ -202,6 +202,7 @@ def align_archives(metafile, initial_guess, tscrunch=False, pscrunch=True,
     arch = model_data.arch
     arch.tscrunch()
     if pscrunch: arch.pscrunch()
+    else: arch.set_state("Stokes")
     arch.set_dispersion_measure(0.0)
     for subint in arch:
         for ipol in range(model_data.arch.get_npol()):
