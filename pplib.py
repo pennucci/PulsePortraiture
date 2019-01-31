@@ -212,6 +212,8 @@ class DataPortrait(object):
                     self.join_params.append(0.0)
                     self.join_fit_flags.append(0)
                     self.join_params.append(data.DM*0.0)
+                    #Change the below to 0 to not fit for first DM
+                    #Also see fit_gaussian_portrait(...) to fit for single DM
                     self.join_fit_flags.append(1)
                     self.nbin = data.nbin
                     self.phases = data.phases
@@ -222,7 +224,8 @@ class DataPortrait(object):
                     self.join_nchanxs.append(self.nchanx)
                     prof = data.prof
                     phi = -fit_phase_shift(prof, refprof, Ns=self.nbin).phase
-                    self.join_params.append(phi)
+                    self.join_params.append(phi)  # Multiply by 0 to fix phase
+                    #Change the below to 0 to not fit for phase
                     self.join_fit_flags.append(1)
                     self.join_params.append(data.DM*0.0)
                     self.join_fit_flags.append(1)
