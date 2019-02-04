@@ -2638,6 +2638,9 @@ def load_data(filename, dedisperse=False, dededisperse=False, tscrunch=False,
     #        redshift.
     doppler_factors = np.array([arch.get_Integration( \
             int(isub)).get_doppler_factor() for isub in range(nsub)])
+    arch.execute('fix pointing')  # PSRCHIVE hack
+    parallactic_angles = np.array([arch.get_Integration( \
+            int(isub)).get_parallactic_angle() for isub in range(nsub)])
     #pscrunch?
     if pscrunch: arch.pscrunch()
     state = arch.get_state()
@@ -2678,6 +2681,12 @@ def load_data(filename, dedisperse=False, dededisperse=False, tscrunch=False,
             for ipol in range(npol):
                 noise_stds[isub,ipol] = get_noise(subints[isub,ipol],
                         chans=True)
+    #Temporary hack -- needed for some data with non-zero constant channels
+    #for isub in range(nsub):
+    #    for ipol in range(npol):
+    #        for ibad_chan in np.where(noise_stds[isub,ipol] == 0.0)[0]:
+    #            weights_norm[isub,ibad_chan] *= 0.0
+    #            weights[isub,ibad_chan] *= 0.0
     ok_isubs = np.compress(weights_norm.mean(axis=1), range(nsub))
     ok_ichans = [np.compress(weights_norm[isub], range(nchan)) \
             for isub in range(nsub)]
@@ -2732,10 +2741,11 @@ def load_data(filename, dedisperse=False, dededisperse=False, tscrunch=False,
             frontend=frontend, integration_length=integration_length,
             masks=masks, nbin=nbin, nchan=nchan, noise_stds=noise_stds,
             npol=npol, nsub=nsub, nu0=nu0, ok_ichans=ok_ichans,
-            ok_isubs=ok_isubs, phases=phases, prof=prof, prof_noise=prof_noise,
-            prof_SNR=prof_SNR, Ps=Ps, SNRs=SNRs, source=source, state=state,
-            subints=subints, subtimes=subtimes, telescope=telescope,
-            tempo_code=tempo_code, weights=weights)
+            ok_isubs=ok_isubs, parallactic_angles=parallactic_angles,
+            phases=phases, prof=prof, prof_noise=prof_noise, prof_SNR=prof_SNR,
+            Ps=Ps, SNRs=SNRs, source=source, state=state, subints=subints,
+            subtimes=subtimes, telescope=telescope, tempo_code=tempo_code,
+            weights=weights)
     return data
 
 def unpack_dict(data):

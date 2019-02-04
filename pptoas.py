@@ -139,9 +139,9 @@ class GetTOAs:
     def get_TOAs(self, datafile=None, tscrunch=False, nu_refs=None, DM0=None,
             bary=True, fit_DM=True, fit_GM=False, fit_scat=False,
             log10_tau=True, scat_guess=None, fix_alpha=False,
-            print_phase=False, print_flux=False, addtnl_toa_flags={},
-            method='trust-ncg', bounds=None, nu_fits=None, show_plot=False,
-            quiet=None):
+            print_phase=False, print_flux=False, print_parangle=False,
+            addtnl_toa_flags={}, method='trust-ncg', bounds=None, nu_fits=None,
+            show_plot=False, quiet=None):
         """
         Measure TOAs from wideband data accounting for numerous ISM effects.
 
@@ -178,6 +178,7 @@ class GetTOAs:
             uncertainty on the TOA line with the flags -phs and -phs_err.
         print_flux=True will print an estimate of the overall flux density and
             its uncertainty on the TOA line.
+        print_parangle=True will print the parallactic angle on the TOA line.
         addtnl_toa_flags are pairs making up TOA flags to be written uniformly
             to all IPTA-formatted TOAs. e.g. ('pta','NANOGrav','version',0.1)
         method is the scipy.optimize.minimize method; currently can be 'TNC',
@@ -606,6 +607,8 @@ class GetTOAs:
                     #toa_flags['flux_err'] = flux_errs[isub]
                     toa_flags['fluxe'] = flux_errs[isub]  # consistent w/ pat
                     toa_flags['flux_ref_freq'] = flux_freqs[isub]
+                if print_parangle:
+                    toa_flags['par_angle'] = parallactic_angles[isub]
                 for k,v in addtnl_toa_flags.iteritems():
                     toa_flags[k] = v
                 self.TOA_list.append(TOA(datafile, results.nu_DM, results.TOA,
@@ -924,6 +927,10 @@ if __name__ == "__main__":
     parser.add_option("--print_flux",
                       action="store_true", dest="print_flux", default=False,
                       help="Print an estimate of the overall mean flux density and its uncertainty on the TOA line.")
+    parser.add_option("--print_parangle",
+                      action="store_true", dest="print_parangle",
+                      default=False,
+                      help="Print the parallactic angle of each subintegration on the TOA line.")
     parser.add_option("--flags",
                       action="store", metavar="flags", dest="toa_flags",
                       default="",
@@ -983,6 +990,7 @@ if __name__ == "__main__":
             nu_refs = (None, nu_ref_tau)
     print_phase = options.print_phase
     print_flux = options.print_flux
+    print_parangle = options.print_parangle
     k,v = options.toa_flags.split(',')[::2],options.toa_flags.split(',')[1::2]
     addtnl_toa_flags = dict(zip(k,v))
     snr_cutoff = float(options.snr_cutoff)
@@ -994,8 +1002,9 @@ if __name__ == "__main__":
             bary=bary, fit_DM=fit_DM, fit_GM=fit_GM, fit_scat=fit_scat,
             log10_tau=log10_tau, scat_guess=scat_guess, fix_alpha=fix_alpha,
             print_phase=print_phase, print_flux=print_flux,
-            addtnl_toa_flags=addtnl_toa_flags,method='trust-ncg', bounds=None,
-            nu_fits=None, show_plot=show_plot, quiet=quiet)
+            print_parangle=print_parangle, addtnl_toa_flags=addtnl_toa_flags,
+            method='trust-ncg', bounds=None, nu_fits=None, show_plot=show_plot,
+            quiet=quiet)
     if format == "princeton":
         gt.write_princeton_TOAs(outfile=outfile, one_DM=one_DM,
             dmerrfile=errfile)
