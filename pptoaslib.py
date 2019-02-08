@@ -20,7 +20,7 @@ def gaussian_profile_FT(nbin, loc, wid, amp):
     nbin is the number of phase bins in the profile.
     loc is the pulse phase location (0-1) [rot].
     wid is the Gaussian pulse's full width at half-max (FWHM) [rot].
-    amp is the Gaussian amplitude
+    amp is the Gaussian amplitude.
 
     Makes use of the Fourier shift theorem and the fact that the FT of a
         Gaussian is also a Gaussian.  Accounts for windowing by using an
@@ -33,13 +33,14 @@ def gaussian_profile_FT(nbin, loc, wid, amp):
     Reference: http://herschel.esac.esa.int/hcss-doc-12.0/load/hcss_urm/html \\
                /herschel.ia.numeric.toolbox.fit.SincGaussModel.html
     """
+    nharm = nbin/2 + 1
     if wid <= 0.0:
-        return np.zeros(nbin/2 + 1,'d')
+        return np.zeros(nharm,'d')
     sigma = wid / (2 * np.sqrt(2 * np.log(2)))
     amp *= (2 * np.pi * sigma**2)**0.5
     sigma *= 2*np.pi
     sigma = 1/sigma
-    harmind = np.arange(nbin/2 + 1)
+    harmind = np.arange(nharm)
     snc = 1.0/np.pi #Distance between first two zero crossings of sinc / 2pi
     a = sigma / (snc * 2**0.5)
     b = harmind / (sigma * 2**0.5)
@@ -109,6 +110,75 @@ def DMc_from_GM(GM, D, a_perp):
     c = 3e10 / 3.1e21  # speed of light [cm/s / cm/kpc]
     DMc = (GM * (2.0 * a_perp * (4.8e-9)**2) / (c * D))**0.5
     return DMc
+
+def instrumental_response_FT(nbin, wid=0.0, irf_type='rect'):
+    """
+    Return the Fourier transform of the instrumental response.
+
+    The choice of width and function type should reflect the combined effect of
+        e.g., dispersive smearing from incoherent / incorrect dedispersion,
+        profile binning, back-end time averaging, and additional postdetection
+        time averaging.  See Bhat et al. (2003).
+
+    nbin is the number of phase bins in the profile.
+    wid is the width [rot] of the time-domain response; it is the width of the
+        rectangle if type='rect' or the FWHM if type='gauss'.
+    irf_type is the instrumental response shape, either 'rect' (rectangular) or
+        'gauss' (Gaussian).
+
+    Default (wid=0.0) is that the combined effects are negligible and this
+        function will have no effect.
+    """
+    nharm = nbin/2 + 1
+    if wid == 0.0:
+        inst_resp_FT = np.ones(nharm)
+    else:
+        if irf_type == 'rect':
+            return np.sinc(np.arange(nharm) * wid)
+        elif irf_type == 'gauss':
+            gp_FT = gaussian_profile_FT(nbin, 0.0, wid, 1.0)
+            gp_FT /= gp_FT[0]
+            return gp_FT
+        else:
+            print "Unrecognized instrumental response function type '%s'." \
+                    %irf_type
+            return 0
+
+def instrumental_response_port_FT(nbin, freqs, DM=0.0, P=1.0, wids=[],
+        irf_types=[]):
+    """
+    Return the Fourier transform of the combined instrumental responses.
+
+    nbin is the number of phase bins in the profile.
+    freqs in the array of frequencies [MHz] with length nchan.
+    DM is the estimate of the dispersion measure [cm**-3 pc] contributing to
+        smearing due to incoherent / incorrect dedispersion.
+    P is the period [sec].
+    wids is a list of widths [rot] of constant time-domain responses; it is the
+        width of a rectangle function if type='rect' or the FWHM of a Gaussian
+        if type='gauss'.
+    irf_types is a list of instrumental response shapes; each entry is either
+        'rect' (rectangular) or 'gauss' (Gaussian).
+
+    Default is that the combined effects are negligible and this function will
+        have no effect.
+    """
+    nharm = nbin/2 + 1
+    nchan = len(freqs)
+    if DM == len(wids) == 0.0:
+        return np.ones([nchan, nharm])
+    else:
+        inst_resp_port_FT = np.ones([nchan, nharm], dtype='complex_')
+        for wid,irf_type in zip(wids,irf_types):
+            inst_resp_port_FT *= np.tile(instrumental_response_FT(nbin, wid,
+                irf_type), nchan).reshape(nchan,nharm)
+        if DM:
+            chan_bw = abs(freqs[1] - freqs[0])
+            for ichan,freq in enumerate(freqs):
+                wid = 8.3e-6 * chan_bw / (freq/1e3)**3 / P
+                inst_resp_port_FT[ichan] *= instrumental_response_FT(nbin, wid,
+                        'rect')
+        return inst_resp_port_FT
 
 def phase_shifts(phi, DM, GM, freqs, nu_DM=np.inf, nu_GM=np.inf,
         P=None, mod=False):
@@ -288,8 +358,8 @@ def scattering_portrait_FT_2deriv(scattering_times, scattering_times_deriv,
     return hessian
 
 def abs_scattering_portrait_FT(scattering_portrait_FT):
-    ""
-    ""
+    """
+    """
     scat_port_FT = scattering_portrait_FT
     abs_scat_port_FT = np.abs(scat_port_FT)**2
     return abs_scat_port_FT
@@ -757,7 +827,7 @@ def fit_portrait_full(data_port, model_port, init_params, P, freqs,
         nu_fits=[None, None, None], nu_outs=[None, None, None], errs=None,
         fit_flags=[1,1,1,1,1], bounds=[(None, None), (None, None),
             (None, None), (None, None), (None, None)], log10_tau=True,
-        option=0, sub_id=None, method='trust-ncg', quiet=True):
+        option=0, sub_id=None, method='trust-ncg', is_toa=True, quiet=True):
     """
     Fit a phase offset, DM, GM, tau, & alpha between data and model portraits.
 
@@ -793,6 +863,8 @@ def fit_portrait_full(data_port, model_port, init_params, P, freqs,
         algorithms.  Only for 'TNC' are the bounds applied, and only for the
         other two is the second derivative function used in the fit.  Old
         pptoas used 'TNC', but 'trust-cng' seems fastest.
+    is_toa=True makes sure the phi parameter corresponds to a phase shift at
+        some specific frequency.
     quiet = False produces more diagnostic output.
     """
     ifit = np.where(fit_flags)[0] # which parameters are fit
@@ -871,6 +943,9 @@ def fit_portrait_full(data_port, model_port, init_params, P, freqs,
         if nu_out_DM is None: nu_out_DM = nu_zero_DM
         if nu_out_GM is None: nu_out_GM = nu_zero_GM
         if nu_out_tau is None: nu_out_tau = nu_zero_tau
+    if is_toa:  # Necesssary for phi to be interpreted as TOA if both DM&GM fit
+        if fit_flags[1]: nu_out_GM = nu_out_DM
+        elif fit_flags[2]: nu_out_DM = nu_out_GM
 
     phi_inf = phase_shifts(phi_fit, DM_fit, GM_fit, np.inf, nu_fit_DM,
             nu_fit_GM, P, False)

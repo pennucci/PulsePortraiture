@@ -134,14 +134,18 @@ class GetTOAs:
         self.fit_durations = []  # durations of the fit
         self.order = []  # order that datafiles are examined (deprecated)
         self.TOA_list = []  # complete, single list of TOAs
+        # dictionary of instrumental response characteristics
+        self.instrumental_response_dict = self.ird = \
+                {'DM':0.0, 'wids':[], 'irf_types':[]}
         self.quiet = quiet  # be quiet?
 
     def get_TOAs(self, datafile=None, tscrunch=False, nu_refs=None, DM0=None,
             bary=True, fit_DM=True, fit_GM=False, fit_scat=False,
             log10_tau=True, scat_guess=None, fix_alpha=False,
             print_phase=False, print_flux=False, print_parangle=False,
-            addtnl_toa_flags={}, method='trust-ncg', bounds=None, nu_fits=None,
-            show_plot=False, quiet=None):
+            add_instrumental_response=False, addtnl_toa_flags={},
+            method='trust-ncg', bounds=None, nu_fits=None, show_plot=False,
+            quiet=None):
         """
         Measure TOAs from wideband data accounting for numerous ISM effects.
 
@@ -179,6 +183,8 @@ class GetTOAs:
         print_flux=True will print an estimate of the overall flux density and
             its uncertainty on the TOA line.
         print_parangle=True will print the parallactic angle on the TOA line.
+        add_instrumental_response=True will account for the instrumental
+            response according to the dictionary instrumental_response_dict.
         addtnl_toa_flags are pairs making up TOA flags to be written uniformly
             to all IPTA-formatted TOAs. e.g. ('pta','NANOGrav','version',0.1)
         method is the scipy.optimize.minimize method; currently can be 'TNC',
@@ -229,6 +235,7 @@ class GetTOAs:
         else:
             datafiles = [datafile]
         self.tscrunch = tscrunch
+        self.add_instrumental_response = add_instrumental_response
         for iarch, datafile in enumerate(datafiles):
             fit_duration = 0.0
             #Load data
@@ -353,6 +360,13 @@ class GetTOAs:
                 weightsx = weights[isub,ok_ichans[isub]]
                 portx = subints[isub,0,ok_ichans[isub]]
                 modelx = model[ok_ichans[isub]]
+                if add_instrumental_response and \
+                        (self.ird['DM'] or len(self.ird['wids'])):
+                            inst_resp_port_FT = instrumental_response_port_FT(
+                                    nbin, freqsx, self.ird['DM'], P,
+                                    self.ird['wids'], self.ird['irf_types'])
+                            modelx = fft.irfft(inst_resp_port_FT * \
+                                    fft.rfft(modelx, axis=-1), axis=-1)
                 SNRsx = SNRs[isub,0,ok_ichans[isub]]
                 #NB: Time-domain uncertainties below
                 errs = noise_stds[isub,0,ok_ichans[isub]]
@@ -400,9 +414,9 @@ class GetTOAs:
                         else:
                             tau_guess = 0.0  # nbin**-1?
                             #tau_guess = guess_tau(...)
-                    model_prof_scat = np.fft.irfft(scattering_portrait_FT(
+                    model_prof_scat = fft.irfft(scattering_portrait_FT(
                         np.array([scattering_times(tau_guess, alpha_guess,
-                            nu_fit_tau, nu_fit_tau)]), nbin)[0] * np.fft.rfft(
+                            nu_fit_tau, nu_fit_tau)]), nbin)[0] * fft.rfft(
                                 modelx.mean(axis=0)))
                     phi_guess = fit_phase_shift(rot_prof,
                             model_prof_scat, Ns=100).phase
@@ -447,7 +461,7 @@ class GetTOAs:
                 results = fit_portrait_full(portx, modelx, param_guesses, P,
                         freqsx, nu_fits[isub], nu_refs[isub], errs, fit_flags,
                         bounds, self.log10_tau, option=0, sub_id=sub_id,
-                        method=method, quiet=quiet)
+                        method=method, is_toa=True, quiet=quiet)
                 # Old code
                 #results = fit_portrait(portx, modelx,
                 #        np.array([phi_guess, DM_guess]), P, freqsx,
@@ -514,10 +528,10 @@ class GetTOAs:
                         if self.log10_tau: tau = 10**results.tau
                         else: tau = results.tau
                         alpha = results.alpha
-                        scat_model = np.fft.irfft(scattering_portrait_FT(
+                        scat_model = fft.irfft(scattering_portrait_FT(
                             scattering_times(tau, alpha, freqsx,
-                                results.nu_tau), data.nbin) *
-                            np.fft.rfft(modelx, axis=1), axis=1)
+                                results.nu_tau), data.nbin) * \
+                                        fft.rfft(modelx, axis=1), axis=1)
                     else: scat_model = np.copy(modelx)
                     scat_model_means = scat_model.mean(axis=1)
                     profile_fluxes[isub, ok_ichans[isub]] = scat_model_means *\
@@ -828,13 +842,20 @@ class GetTOAs:
             except:
                 model_name, model = read_spline_model(self.modelfile,
                         freqs, data.nbin, quiet=True) #quiet=bool(quiet+(itoa-1)))
+        if self.add_instrumental_response and \
+                (self.ird['DM'] or len(self.ird['wids'])):
+                    inst_resp_port_FT = instrumental_response_port_FT(
+                            data.nbin, freqs, self.ird['DM'], P,
+                            self.ird['wids'], self.ird['irf_types'])
+                    model = fft.irfft(inst_resp_port_FT * fft.rfft(model),
+                            axis=-1)
         if self.taus[ifile][isub] != 0.0:
             tau = self.taus[ifile][isub]
             if self.log10_tau: tau = 10**tau
             alpha = self.alphas[ifile][isub]
-            model = np.fft.irfft(scattering_portrait_FT(
+            model = fft.irfft(scattering_portrait_FT(
                 scattering_times(tau, alpha, freqs, nu_ref_tau), data.nbin) * \
-                        np.fft.rfft(model, axis=1), axis=1)
+                        fft.rfft(model, axis=1), axis=1)
         port = rotate_portrait_full(data.subints[isub,0], phi, DM, GM, freqs,
                 nu_ref_DM, nu_ref_GM, P)
         if rotate:
