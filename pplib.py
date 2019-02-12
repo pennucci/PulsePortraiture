@@ -110,7 +110,7 @@ obs_codes = {'bary':'@', '???':'0', 'gbt':'1', 'atca':'2', 'ao':'3',
 #Taken and lowered from $TEMPO/obsys.dat
 tempo_codes = {'arecibo':'ao', 'chime':'ch', 'effelsberg':'ef', 'gbt':'gbt',
                'gmrt':'gm', 'jodrell':'jb', 'lofar':'lf', 'lwa1':'lw',
-               'meerkat':'mk', 'nancay':'nc', 'parkes':'pk', 'shao':'sh',
+               'meerkat':'mk', 'nancay':'nc', 'parkes':'pks', 'shao':'sh',
                'srt':'sr', 'vla':'v2', 'wsrt':'wb'}
 
 #RCSTRINGS dictionary, for the return codes given by scipy.optimize.fmin_tnc.
