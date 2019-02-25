@@ -2684,10 +2684,11 @@ def load_data(filename, dedisperse=False, dededisperse=False, tscrunch=False,
             for ipol in range(npol):
                 noise_stds[isub,ipol] = get_noise(subints[isub,ipol],
                         chans=True)
-    #Temporary hack -- needed for some data with non-zero constant channels
+    #Temporary hack -- needed for some data with non-zero near-constant chans
     #for isub in range(nsub):
     #    for ipol in range(npol):
-    #        for ibad_chan in np.where(noise_stds[isub,ipol] == 0.0)[0]:
+    #        #for ibad_chan in np.where(noise_stds[isub,ipol] == 0.0)[0]:
+    #        for ibad_chan in np.where(noise_stds[isub,ipol] < 1e-8)[0]:
     #            weights_norm[isub,ibad_chan] *= 0.0
     #            weights[isub,ibad_chan] *= 0.0
     ok_isubs = np.compress(weights_norm.mean(axis=1), range(nsub))
