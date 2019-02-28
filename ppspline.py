@@ -315,6 +315,9 @@ if __name__ == "__main__":
                       action="store", metavar="max_knots", dest="max_nbreak",
                       default=None,
                       help="The maximum number of unique knots.  This functions esentially as an ignorant smoothing condition in case the default settings return a fit with more than max_knots number of unique knots in the spline model.  e.g., 10 unique knots are more than usually necessary.")
+    parser.add_option("--plots",
+                      action="store_true", dest="make_plots", default=False,
+                      help="Save some plots related to the model with basename model_name (-l).")
     parser.add_option("--quiet",
                       action="store_true", dest="quiet", default=False,
                       help="Suppresses output.")
@@ -340,6 +343,7 @@ if __name__ == "__main__":
     sfac = float(options.sfac)
     if options.max_nbreak is not None: max_nbreak = int(options.max_nbreak)
     else: max_nbreak = None
+    make_plots = options.make_plots
     quiet = options.quiet
 
     dp = DataPortrait(datafile)
@@ -356,3 +360,9 @@ if __name__ == "__main__":
 
     if archive is not None and len(dp.datafiles) == 1:
         dp.write_model_archive(archive, quiet=quiet)
+
+    if make_plots:
+        dp.show_eigenprofiles(title=dp.model_name, savefig=dp.model_name)
+        dp.show_spline_curve_projections(title=dp.model_name,
+                savefig=dp.model_name)
+        dp.show_model_fit(savefig=dp.model_name+'.resids.png')

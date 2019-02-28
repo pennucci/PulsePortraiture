@@ -3671,6 +3671,7 @@ def show_residual_plot(port, model, resids=None, phases=None, freqs=None,
         model = model[::-1]
     if extent is None:
         extent = (phases[0], phases[-1], freqs[0], freqs[-1])
+    fig = plt.figure(figsize=(8.5,6.67))
     ax1 = plt.subplot(grid[:mm, :mm])
     im = ax1.imshow(port, aspect=aspect, origin=origin, extent=extent,
             interpolation=interpolation, **kwargs)
@@ -3718,7 +3719,6 @@ def show_residual_plot(port, model, resids=None, phases=None, freqs=None,
     ax4.set_xticks(())
     ax4.set_yticklabels(())
     ax4.set_yticks(())
-    #plt.tight_layout(pad=1.0, h_pad=-10.0, w_pad=-10.0)
     if savefig:
         plt.savefig(savefig, format='png')
         plt.close()
@@ -3773,8 +3773,8 @@ def show_spline_curve_projections(projected_port, tck, freqs, weights=None,
     size = 3 #inches per plot
     buff = 2.0 #inches
     if ncoord-1 and plot_this_coord is None:
-        fig1 = plt.figure(1, figsize=((ncoord-1)*size + buff,
-            (ncoord-1)*size + buff))
+        fig1 = plt.figure(1, figsize=((ncoord-1)*size + buff*1.5,
+            (ncoord-1)*size + buff*1.5))
     if plot_this_coord is None:
         fig2 = plt.figure(2, figsize=(2*size + buff, ncoord*size + buff))
         axes2 = fig2.subplots(nrows=ncoord, ncols=1, sharex=True, sharey=False,
