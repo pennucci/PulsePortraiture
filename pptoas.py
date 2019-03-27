@@ -101,6 +101,7 @@ class GetTOAs:
         self.nu0s = []  # PSRCHIVE center frequency
         self.nu_fits = []  # reference frequencies for the fit
         self.nu_refs = []  # reference frequencies for the output
+        self.ok_idatafiles = [] # list of indices for good/examined datafiles
         self.ok_isubs = [] # list of indices for the good subintegrations
         self.epochs = []  # PSRCHIVE midpoints of the subintegrations
         self.MJDs = []  # same as epochs, in days
@@ -227,7 +228,6 @@ class GetTOAs:
         nu_fit_tuple = nu_fits
         self.DM0 = DM0
         self.bary = bary
-        self.ok_idatafiles = []
         start = time.time()
         tot_duration = 0.0
         if datafile is None:
@@ -781,7 +781,7 @@ class GetTOAs:
                 title=title, prof=True, fluxprof=True, rvrsd=bool(data.bw < 0))
 
     def show_fit(self, datafile=None, isub=0, rotate=0.0, show=True,
-            return_fit=False, quiet=None):
+            return_fit=False, savefig=False, quiet=None):
         """
         Plot the fit results from a subintegration.
 
@@ -869,7 +869,7 @@ class GetTOAs:
             show_residual_plot(port=port, model=model_scaled, resids=None,
                     phases=phases, freqs=freqs,
                     noise_stds=data.noise_stds[isub,0], nfit=2, titles=titles,
-                    rvrsd=bool(data.bw < 0))
+                    rvrsd=bool(data.bw < 0), savefig=savefig)
         if return_fit:
             return (port, model_scaled, data.ok_ichans[isub], freqs,
                     data.noise_stds[isub,0])
