@@ -644,7 +644,8 @@ class DataPortrait(object):
         resids = self.port - self.model_masked
         titles = ("%s"%self.datafile, "%s"%self.model_name, "Residuals")
         show_residual_plot(self.port, self.model, resids, self.phases,
-                self.freqs[0], titles, bool(self.bw < 0), **kwargs)
+                self.freqs[0], self.noise_stds[0,0], 0, titles,
+                bool(self.bw < 0), **kwargs)
 
 
 #############
@@ -3626,9 +3627,9 @@ def show_profiles(model, phases=None, cmap=plt.cm.Spectral, s=1, offset=None,
                 **kwargs)
 
 def show_residual_plot(port, model, resids=None, phases=None, freqs=None,
-        titles=(None,None,None), rvrsd=False, colorbar=True, savefig=False,
-        aspect="auto", interpolation="none", origin="lower", extent=None,
-        **kwargs):
+        noise_stds=None, nfit=0, titles=(None,None,None), rvrsd=False,
+        colorbar=True, savefig=False, aspect="auto", interpolation="none",
+        origin="lower", extent=None, **kwargs):
     """
     Show a portrait, model, and residuals in a single plot.
 
@@ -3641,6 +3642,10 @@ def show_residual_plot(port, model, resids=None, phases=None, freqs=None,
         phase-bin indices.
     freqs is the nchan array with frequency-channel centers [MHz]. Defaults to
         frequency-channel indices.
+    noise_stds is the noise level for calculation of channel red. chi2 values;
+        if None, will use default from get_noise(...).
+    nfit is the number of dof to subtract from nbin in the calculation of the
+        reduced chi2 (i.e., on a per-channel basis).
     titles is a three-element tuple for the titles on each plot.
     rvrsd=True flips the frequency axis.
     colorbar=True adds the color bar.
@@ -3669,6 +3674,7 @@ def show_residual_plot(port, model, resids=None, phases=None, freqs=None,
         freqs = freqs[::-1]
         port = port[::-1]
         model = model[::-1]
+        noise_stds = noise_stds[::-1]
     if extent is None:
         extent = (phases[0], phases[-1], freqs[0], freqs[-1])
     fig = plt.figure(figsize=(8.5,6.67))
@@ -3710,15 +3716,33 @@ def show_residual_plot(port, model, resids=None, phases=None, freqs=None,
     ax4 = plt.subplot(grid[-mm:, -mm:])
     weights = port.mean(axis=1)
     portx = np.compress(weights, port, axis=0)
+    modelx = np.compress(weights, model, axis=0)
     residsx = np.compress(weights, resids, axis=0)
-    text =  "Residuals mean ~ %.2e\nResiduals std ~ %.2e\nData noise ~ %.2e"%(
-            residsx.mean(), residsx.std(), np.median(get_noise(portx,
-                chans=True)))
-    ax4.text(0.5, 0.5, text, ha="center", va="center")
-    ax4.set_xticklabels(())
-    ax4.set_xticks(())
-    ax4.set_yticklabels(())
-    ax4.set_yticks(())
+    if noise_stds is None:
+        noise_stdsxs = get_noise(portx, chans=True)
+    else:
+        noise_stdsxs = np.compress(weights, noise_stds, axis=0)
+    channel_red_chi2s = np.empty(len(portx))
+    for ichnx in range(len(portx)):
+        channel_red_chi2s[ichnx] = get_red_chi2(portx[ichnx], modelx[ichnx],
+                errs=noise_stdsxs[ichnx], dof=len(portx[ichnx])-nfit)
+    bins = list(np.linspace(0.0, 2.0, 21)) + list(np.linspace(3.0, 10.0, 8)) +\
+            list(np.linspace(30.0, 100.0, 8)) + list(np.linspace(300.0, 1000.0,
+                8)) + [np.inf]
+    ax4.hist(channel_red_chi2s, bins=bins, histtype='step', color='k')
+    rchi2_min = min(channel_red_chi2s)
+    rchi2_max = max(channel_red_chi2s)
+    if np.log10(rchi2_max) - np.log10(rchi2_min) > 2:
+        log = True
+    else:
+        log = False
+    ax4.set_xlabel(r"Red. $\chi^2$")
+    ax4.set_ylabel("# chans. (total = %d)"%len(portx))
+    ax4.set_title(r"Channel Reduced $\chi^2$")
+    if log: ax4.semilogx()
+    xlim = ax4.get_xlim()
+    ax4.set_xlim(0.9*rchi2_min, 1.1*rchi2_max)
+    ax4.set_xticklabels((), minor=True)
     if savefig:
         plt.savefig(savefig, format='png')
         plt.close()

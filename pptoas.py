@@ -733,7 +733,7 @@ class GetTOAs:
                 for ichan in ok_ichans:
                     channel_red_chi2 = get_red_chi2(port[ichan],
                             model[ichan], errs=noise_stds[ichan],
-                            dof=len(port[ichan])-0) #Not sure about exact dof
+                            dof=len(port[ichan])-2) #Not sure about exact dof
                     red_chi2s.append(channel_red_chi2)
                     if channel_red_chi2 > threshold: bad_ichans.append(ichan)
                     elif np.isnan(channel_red_chi2): bad_ichans.append(ichan)
@@ -867,7 +867,8 @@ class GetTOAs:
                 "Fitted Model %s"%(model_name), "Residuals")
         if show:
             show_residual_plot(port=port, model=model_scaled, resids=None,
-                    phases=phases, freqs=freqs, titles=titles,
+                    phases=phases, freqs=freqs,
+                    noise_stds=data.noise_stds[isub,0], nfit=2, titles=titles,
                     rvrsd=bool(data.bw < 0))
         if return_fit:
             return (port, model_scaled, data.ok_ichans[isub], freqs,

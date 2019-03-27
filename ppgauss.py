@@ -234,8 +234,8 @@ class DataPortrait(DataPortrait):
             resids = self.port - self.model_masked
             titles = ("%s"%self.datafile, "%s"%self.model_name, "Residuals")
             show_residual_plot(self.port, self.model, resids, self.phases,
-                    self.freqs[0], titles, bool(self.bw < 0),
-                    savefig=residplot)
+                    self.freqs[0], self.noise_stds[0,0], 0, titles,
+                    bool(self.bw < 0), savefig=residplot)
 
     def model_iteration(self, quiet=False):
         """
