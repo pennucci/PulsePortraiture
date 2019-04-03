@@ -148,7 +148,7 @@ def align_archives(metafile, initial_guess, tscrunch=False, pscrunch=True,
                     model_ichans = []
                     for ichan in ichans:
                         data_freq = data.freqs[isub,ichan]
-                        imin = np.argmin(abs(model_data.freqs[isub]-data_freq))
+                        imin = np.argmin(abs(model_data.freqs[0]-data_freq))
                         model_ichans.append(imin)
                     model_ichans = np.array(model_ichans)
                 port = data.subints[isub,0,ichans]
