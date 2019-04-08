@@ -312,8 +312,8 @@ class GetTOAs:
                             %(model.shape[-1], nbin, datafile)
                     continue
                 if model_data.nchan == 1:
-                    model = np.tile(model[0], len(freqs[isub])).reshape(
-                            len(freqs[isub]), nbin)
+                    model = np.tile(model[0], len(freqs[0])).reshape(
+                            len(freqs[0]), nbin)
             if not quiet:
                 print "\nEach of the %d TOAs is approximately %.2f s"%(
                         len(ok_isubs), integration_length / nsub)
