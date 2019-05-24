@@ -577,9 +577,11 @@ def fit_portrait_full_function_deriv(params, data_portrait_FT,
 
 def fit_portrait_full_function_2deriv(params, data_portrait_FT,
         model_portrait_FT, errs_FT, P, freqs, nu_DM, nu_GM, nu_tau,
-        fit_flags, log10_tau, per_channel=False):
+        fit_flags, log10_tau, per_channel=False, with_scales=False,
+        return_covariance_matrix=False, return_scales=False):
     """
     """
+    returns = []
     phi, DM, GM, tau, alpha = params
     if log10_tau: tau = 10**tau
     data_port_FT = data_portrait_FT
@@ -616,6 +618,7 @@ def fit_portrait_full_function_2deriv(params, data_portrait_FT,
     d2C = Cdbp_2deriv(data_port_FT, model_port_FT, scat_port_FT_deriv,
             scat_port_FT_2deriv, phsr, phis_deriv, phis_2deriv, dCdphi,
             d2Cdphi, errs_FT)
+    scales = C / S
     hessian = np.zeros([5,5,len(freqs)])
     for iparam in range(hessian.shape[0]):
         for jparam in range(hessian.shape[1]):
@@ -623,10 +626,45 @@ def fit_portrait_full_function_2deriv(params, data_portrait_FT,
                     (0.5*d2S[iparam,jparam]/S) + (dC[iparam]*dC[jparam]/C**2) \
                     + (dS[iparam]*dS[jparam]/S**2) - \
                     ((dC[iparam]*dS[jparam]) + (dS[iparam]*dC[jparam]))/(C*S)))
-            hessian[iparam,jparam] = Hij_n * \
-                    fit_flags[iparam] * fit_flags[jparam] # not sure about this
+            hessian[iparam,jparam] = Hij_n #* \
+                    #fit_flags[iparam] * fit_flags[jparam] # not necessary...
     if not per_channel: hessian = hessian.sum(axis=-1)
-    return hessian
+    if with_scales:
+        if return_covariance_matrix:
+            ifit = np.where(fit_flags)[0] # which parameters are fit
+            A = hessian[ifit].T[ifit].T
+        scales_hess = np.identity(len(scales)) * S
+        cross_hess = dC - scales*dS
+        hessian = np.append(hessian, cross_hess, 1)
+        hessian = np.append(hessian, np.append(cross_hess.T, scales_hess, 1),0)
+        returns.append(hessian)
+        # see Woodbury Matrix Identity for below
+        if return_covariance_matrix: # use block-wise inversion via LDU decomp.
+            C_inv = np.identity(len(scales)) * S**-1
+            U = cross_hess[ifit]
+            V = U.T
+            X_inv = np.linalg.inv(A - np.dot(np.dot(U,C_inv), V))
+            UL = X_inv
+            UR = -np.dot(np.dot(X_inv,U), C_inv)
+            LL = -np.dot(np.dot(C_inv,V), X_inv)
+            LR = -np.dot(np.dot(LL, U), C_inv) + C_inv
+            covariance_matrix = np.append(np.append(UL, UR,1),
+                    np.append(LL, LR, 1), 0)
+            covariance_matrix *= 2.0 # (0.5 * hessian)**-1
+            returns.append(covariance_matrix)
+    else:
+        returns.append(hessian)
+        if return_covariance_matrix:
+            ifit = np.where(fit_flags)[0] # which parameters are fit
+            hessian = hessian[ifit].T[ifit].T
+            covariance_matrix = np.linalg.inv(0.5*hessian)
+            returns.append(covariance_matrix)
+    if return_scales:
+        returns.append(scales)
+    if len(returns) == 1:
+        return returns[0]
+    else:
+        return tuple(returns)
 
 def get_nu_zeros(params, data_portrait_FT, model_portrait_FT, errs_FT, P,
         freqs, nu_DM, nu_GM, nu_tau, fit_flags, log10_tau, option=0):
@@ -636,7 +674,8 @@ def get_nu_zeros(params, data_portrait_FT, model_portrait_FT, errs_FT, P,
     if log10_tau: tau = 10**tau
     Hij_n = fit_portrait_full_function_2deriv(params, data_portrait_FT,
         model_portrait_FT, errs_FT, P, freqs, nu_DM, nu_GM, nu_tau,
-        fit_flags, log10_tau, per_channel=True)
+        fit_flags, log10_tau, per_channel=True, with_scales=False,
+        return_covariance_matrix=False, return_scales=False)
     phis_deriv = phase_shifts_deriv(freqs, nu_DM, nu_GM, P)
     taus = scattering_times(tau, alpha, freqs, nu_tau)
     taus_deriv = scattering_times_deriv(tau, freqs, nu_tau, log10_tau, taus)
@@ -805,7 +844,7 @@ def get_nu_zeros(params, data_portrait_FT, model_portrait_FT, errs_FT, P,
 def get_scales_full(params, data_portrait_FT, model_portrait_FT, errs_FT, P,
         freqs, nu_DM, nu_GM, nu_tau, log10_tau):
     """
-    Return the best-fit, per-channel scaling amplitudes and their errors.
+    Return the maximum-likelihood, per-channel scaling amplitudes.
     """
     phi, DM, GM, tau, alpha = params
     if log10_tau: tau = 10**tau
@@ -820,8 +859,7 @@ def get_scales_full(params, data_portrait_FT, model_portrait_FT, errs_FT, P,
     S = Sbp(scat_port_FT, model_port_FT, errs_FT)
     C = Cdbp(data_port_FT, model_port_FT, scat_port_FT, phsr, errs_FT)
     scales = C / S
-    scale_errs = S**-0.5
-    return scales, scale_errs
+    return scales
 
 def fit_portrait_full(data_port, model_port, init_params, P, freqs,
         nu_fits=[None, None, None], nu_outs=[None, None, None], errs=None,
@@ -868,8 +906,8 @@ def fit_portrait_full(data_port, model_port, init_params, P, freqs,
     quiet = False produces more diagnostic output.
     """
     ifit = np.where(fit_flags)[0] # which parameters are fit
-    nfit = len(ifit)
-    dof = len(data_port.ravel()) - (len(freqs) + nfit)
+    nfit = len(ifit) # not including the scale parameters a_n
+    dof = len(data_port.ravel()) - (nfit + len(freqs))
     nbin = data_port.shape[-1]
     data_port_FT = fft.rfft(data_port, axis=-1)
     data_port_FT[:, 0] *= F0_fact
@@ -964,16 +1002,20 @@ def fit_portrait_full(data_port, model_port, init_params, P, freqs,
     params = [phi_out, DM_fit, GM_fit, tau_out, alpha_fit]
     param_errs = np.zeros(len(params))
     # Calculate Hessian
-    Hij = fit_portrait_full_function_2deriv(params, data_port_FT,
-            model_port_FT, errs_FT, P, freqs, nu_out_DM, nu_out_GM,
-            nu_out_tau, fit_flags, log10_tau, False)
-    hessian = Hij[ifit].T[ifit].T
-    covariance_matrix = np.linalg.inv(0.5*hessian)
-    param_errs[ifit] = np.diag(covariance_matrix)**0.5
-    param_errs = list(param_errs)
-    # Calculate scales
-    scales, scale_errs = get_scales_full(params, data_port_FT, model_port_FT,
-            errs_FT, P, freqs, nu_out_DM, nu_out_GM, nu_out_tau, log10_tau)
+    Hij, covariance_matrix, scales = fit_portrait_full_function_2deriv(params,
+            data_port_FT, model_port_FT, errs_FT, P, freqs, nu_out_DM,
+            nu_out_GM, nu_out_tau, fit_flags, log10_tau, per_channel=False,
+            with_scales=True, return_covariance_matrix=True,
+            return_scales=True)
+    #iscales = np.arange(5,5+len(scales))
+    #ifit_all = np.array(list(ifit)+list(iscales))
+    #hessian = Hij[ifit_all].T[ifit_all].T
+    #old_covariance_matrix = np.linalg.inv(0.5*hessian)  # Maybe don't return full?
+    #old_param_errs = np.diag(old_covariance_matrix)**0.5
+    #print covariance_matrix, old_covariance_matrix
+    all_param_errs = np.diag(covariance_matrix)**0.5
+    param_errs[ifit], scale_errs = all_param_errs[:nfit], all_param_errs[nfit:]
+    covariance_matrix = covariance_matrix[ifit].T[ifit].T
     # SNR of the fit, based on PDB's notes
     scat_port_FT = scattering_portrait_FT(taus, nbin, binshift=binshift)
     S = Sbp(scat_port_FT, model_port_FT, errs_FT)
