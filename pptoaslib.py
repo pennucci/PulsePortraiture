@@ -641,7 +641,7 @@ def fit_portrait_full_function_2deriv(params, data_portrait_FT,
         returns.append(hessian)
         # see Woodbury Matrix Identity for below
         if return_covariance_matrix: # use block-wise inversion via LDU decomp.
-            C_inv = np.identity(len(scales)) * S**-1
+            C_inv = np.identity(len(scales)) * (2*S)**-1
             U = cross_hess[ifit]
             V = U.T
             X_inv = np.linalg.inv(A - np.dot(np.dot(U,C_inv), V))
