@@ -638,6 +638,8 @@ def fit_portrait_full_function_2deriv(params, data_portrait_FT,
         cross_hess = -2*(dC - scales*dS)
         hessian = np.append(hessian, cross_hess, 1)
         hessian = np.append(hessian, np.append(cross_hess.T, scales_hess, 1),0)
+        hessian[:5] = (hessian[:5].T * np.array(fit_flags)).T
+        hessian[:,:5] = hessian[:,:5] * np.array(fit_flags)
         returns.append(hessian)
         # see Woodbury Matrix Identity for below
         if return_covariance_matrix: # use block-wise inversion via LDU decomp.
@@ -1015,6 +1017,7 @@ def fit_portrait_full(data_port, model_port, init_params, P, freqs,
     #old_param_errs = np.diag(old_covariance_matrix)**0.5
     #print covariance_matrix, old_covariance_matrix
     all_param_errs = np.diag(covariance_matrix)**0.5
+    #print covariance_matrix / np.outer(all_param_errs, all_param_errs)
     param_errs[ifit], scale_errs = all_param_errs[:nfit], all_param_errs[nfit:]
     covariance_matrix = covariance_matrix[ifit].T[ifit].T
     # SNR of the fit, based on PDB's notes
