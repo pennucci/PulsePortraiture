@@ -626,8 +626,9 @@ def fit_portrait_full_function_2deriv(params, data_portrait_FT,
                     (0.5*d2S[iparam,jparam]/S) + (dC[iparam]*dC[jparam]/C**2) \
                     + (dS[iparam]*dS[jparam]/S**2) - \
                     ((dC[iparam]*dS[jparam]) + (dS[iparam]*dC[jparam]))/(C*S)))
-            hessian[iparam,jparam] = Hij_n #* \
-                    #fit_flags[iparam] * fit_flags[jparam] # not necessary...
+            # Need to zero out entries for per_channel calculations
+            hessian[iparam,jparam] = Hij_n * \
+                    fit_flags[iparam] * fit_flags[jparam]
     if not per_channel: hessian = hessian.sum(axis=-1)
     if with_scales:
         if return_covariance_matrix:
