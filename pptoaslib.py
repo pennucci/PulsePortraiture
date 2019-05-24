@@ -634,7 +634,7 @@ def fit_portrait_full_function_2deriv(params, data_portrait_FT,
         if return_covariance_matrix:
             ifit = np.where(fit_flags)[0] # which parameters are fit
             A = hessian[ifit].T[ifit].T
-        scales_hess = np.identity(len(scales)) * S
+        scales_hess = np.identity(len(scales)) * 2S
         cross_hess = dC - scales*dS
         hessian = np.append(hessian, cross_hess, 1)
         hessian = np.append(hessian, np.append(cross_hess.T, scales_hess, 1),0)
