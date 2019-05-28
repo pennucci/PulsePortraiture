@@ -842,9 +842,11 @@ def gen_gaussian_profile(params, nbin):
         model += amp * gaussian_profile(nbin, loc, wid)
     if params[1] != 0.0:
         bins = np.arange(nbin)
-        sk = scattering_kernel(params[1], 1.0, np.array([1.0]), bins, P=1.0,
-                alpha=scattering_alpha)[0]  #alpha here does not matter
-        model = add_scattering(model, sk, repeat=3)
+        #sk = scattering_kernel(params[1], 1.0, np.array([1.0]), bins, P=1.0,
+        #        alpha=scattering_alpha)[0]  #alpha here does not matter
+        #model = add_scattering(model, sk, repeat=3)
+        sp_FT = scattering_profile_FT(float(params[1])/nbin, nbin)
+        model = np.fft.irfft(sp_FT* np.fft.rfft(model))
     return model
 
 def gen_gaussian_portrait(model_code, params, scattering_index, phases, freqs,
@@ -910,9 +912,13 @@ def gen_gaussian_portrait(model_code, params, scattering_index, phases, freqs,
         #taken care of in gaussian_profile
         gport[ichan] = gen_gaussian_profile(gparams[ichan], nbin)
     if tau != 0.0:
-        sk = scattering_kernel(tau, nu_ref, freqs, np.arange(nbin), 1.0,
-                alpha=scattering_index)
-        gport = add_scattering(gport, sk, repeat=3)
+        #sk = scattering_kernel(tau, nu_ref, freqs, np.arange(nbin), 1.0,
+        #        alpha=scattering_index)
+        #gport = add_scattering(gport, sk, repeat=3)
+        taus = scattering_times(float(tau)/nbin, scattering_index, freqs,
+                nu_ref)
+        sp_FT = scattering_portrait_FT(taus, nbin)
+        gport = np.fft.irfft(sp_FT * np.fft.rfft(gport, axis=-1), axis=-1)
     if njoin:
         for ij in range(njoin):
             join_ichan = join_ichans[ij]
@@ -3287,9 +3293,13 @@ def make_fake_pulsar(modelfile, ephemeris, outfile="fake_pulsar.fits", nsub=1,
                         nu_DM)
             #rotmodel = model
             if t_scat and not params[1]:    #modelfile overrides
-                sk = scattering_kernel(t_scat, nu0, freqs, phases, P,
-                        alpha=alpha)
-                rotmodel = add_scattering(rotmodel, sk, repeat=3)
+                #sk = scattering_kernel(t_scat, nu0, freqs, phases, P,
+                #        alpha=alpha)
+                #rotmodel = add_scattering(rotmodel, sk, repeat=3)
+                taus = scattering_times(t_scat/P, alpha, freqs, nu0)
+                sp_FT = scattering_portrait_FT(taus, nbin)
+                rotmodel = np.fft.irfft(sp_FT * \
+                        np.fft.rfft(rotmodel, axis=-1), axis=-1)
             if scint is not False:
                 if scint is True:
                     rotmodel = add_scintillation(rotmodel, random=True, nsin=3,
@@ -3970,3 +3980,6 @@ def show_eigenprofiles(eigprofs=None, smooth_eigprofs=None, mean_prof=None,
     if savefig:
         plt.savefig(savefig + ".eigvec.png", format='png')
         plt.close('all')
+
+from pptoaslib import scattering_times, scattering_profile_FT, \
+        scattering_portrait_FT  #To be better integrated

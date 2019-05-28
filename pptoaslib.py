@@ -314,7 +314,7 @@ def scattering_portrait_FT(taus, nbin, binshift=binshift):
                     binshift)
     # Not sure this is needed;
     # probably has no effect since it is multiplied with other ports w/ 0 mean
-    #scat_port_FT[:,0] *= F0_fact
+    #scat_port_FT[:, 0] *= F0_fact
     return scat_port_FT
 
 def scattering_portrait_FT_deriv(scattering_times, scattering_times_deriv,

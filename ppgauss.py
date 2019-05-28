@@ -413,7 +413,7 @@ class GaussianSelector:
         self.tauguess = tau #in bins
         self.fit_scattering = not fixscat
         if self.fit_scattering and self.tauguess == 0.0:
-            self.tauguess = 0.5 #seems to break otherwise
+            self.tauguess = 0.1 #seems to break otherwise
         self.profile_fit_flags = profile_fit_flags
         self.visible = True
         self.DCguess = sorted(profile)[len(profile)/10 + 1]
@@ -785,7 +785,7 @@ if __name__ == "__main__":
         sys.exit()
     #if not quiet: dp.show_data_portrait()
     if modelfile is not None:
-        dp.make_gaussian_model(modelfile = modelfile, fixalpha=fixalpha,
+        dp.make_gaussian_model(modelfile=modelfile, fixalpha=fixalpha,
                 model_code=model_code, niter=niter, writemodel=True,
                 outfile=outfile, writeerrfile=True, errfile=errfile,
                 model_name=model_name, residplot=figure, quiet=quiet)
