@@ -75,6 +75,10 @@ wid_max = 0.25
 #functions will be used.  This will eventually be overhauled...!!!
 default_model = '000'
 
+# binshift is a fudge factor for scattering portrait functions; was -1;
+# currently not used.
+binshift = 1.0
+
 ###########
 # display #
 ###########
@@ -3981,5 +3985,50 @@ def show_eigenprofiles(eigprofs=None, smooth_eigprofs=None, mean_prof=None,
         plt.savefig(savefig + ".eigvec.png", format='png')
         plt.close('all')
 
-from pptoaslib import scattering_times, scattering_profile_FT, \
-        scattering_portrait_FT  #To be better integrated
+def scattering_times(tau, alpha, freqs, nu_tau):
+    """
+    """
+    taus = tau * (freqs/nu_tau)**alpha
+    return taus
+
+def scattering_profile_FT(tau, nbin, binshift=binshift):
+    """
+    Return the Fourier transform of the scattering_profile() function.
+
+    tau is the scattering timescale [rot].
+    nbin is the number of phase bins in the profile.
+    binshift is a fudge-factor; currently has no effect.
+
+    Makes use of the analytic formulation of the FT of a one-sided exponential
+        function.  There is no windowing, since the whole scattering kernel is
+        convolved with the pulse profile.
+
+    Note that the function returns the analytic FT sampled nbin/2 + 1 times.
+    """
+    nharm = nbin/2 + 1
+    if tau == 0.0:
+        scat_prof_FT = np.ones(nharm)
+    else:
+        harmind = np.arange(nharm)
+        #harmind = np.arange(-(nharm-1), (nharm-1))
+        #scat_prof_FT = tau**-1 * (tau**-1 + 2*np.pi*1.0j*harmind)**-1
+        scat_prof_FT = (1.0 + 2*np.pi*1.0j*harmind*tau)**-1
+        #scat_prof_FT *= np.exp(-harmind * 2.0j * np.pi * binshift / nbin)
+    return scat_prof_FT
+
+def scattering_portrait_FT(taus, nbin, binshift=binshift):
+    """
+    """
+    nchan = len(taus)
+    nharm = nbin/2 + 1
+    if not np.any(taus):
+        scat_port_FT = np.ones([nchan, nharm])
+    else:
+        scat_port_FT = np.zeros([nchan, nharm], dtype='complex_')
+        for ichan in range(nchan):
+            scat_port_FT[ichan] = scattering_profile_FT(taus[ichan], nbin,
+                    binshift)
+    # Not sure this is needed;
+    # probably has no effect since it is multiplied with other ports w/ 0 mean
+    #scat_port_FT[:, 0] *= F0_fact
+    return scat_port_FT
