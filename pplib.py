@@ -1600,6 +1600,8 @@ def wavelet_smooth(port, wavelet='db8', nlevel=5, threshtype='hard', fact=1.0):
 
     Written mostly by EF.
     """
+    if 'pywt' not in sys.modules:
+        raise ImportError("You failed to import pywt and need PyWavelets to use wavelet_smooth!")
     try:
         nchan,nbin = port.shape
         one_prof = False
@@ -1735,6 +1737,8 @@ def fit_powlaw(data, init_params, errs, freqs, nu_ref):
     freqs is an nchan array of frequencies.
     nu_ref is the frequency at which the amplitude is referenced.
     """
+    if 'lmfit' not in sys.modules:
+        raise ImportError("You failed to import lmfit and need it to use fit_powlaw!")
     #Generate the parameter structure
     params = lm.Parameters()
     params.add('amp', init_params[0], vary=True, min=None, max=None)
@@ -1818,6 +1822,8 @@ def fit_gaussian_profile(data, init_params, errs, fit_flags=None,
         with a one-sided exponential function.
     quiet=True suppresses output.
     """
+    if 'lmfit' not in sys.modules:
+        raise ImportError("You failed to import lmfit and need it to use fit_gaussian_profile!")
     nparam = len(init_params)
     ngauss = (len(init_params) - 2) / 3
     if fit_flags is None:
@@ -1910,6 +1916,8 @@ def fit_gaussian_portrait(model_code, data, init_params, scattering_index,
     P is the pulse period [sec].
     quiet=True suppresses output.
     """
+    if 'lmfit' not in sys.modules:
+        raise ImportError("You failed to import lmfit and need it to use fit_gaussian_portrait!")
     nparam = len(init_params)
     ngauss = (len(init_params) - 2) / 6
     #Generate the parameter structure

@@ -79,6 +79,8 @@ class DataPortrait(DataPortrait):
         else:
             return_max = min(max_ncomp, 10)
         if smooth:
+            if 'pywt' not in sys.modules:
+                raise ImportError("You failed to import pywt and need PyWavelets to use smooth=True!")
             ieig, smooth_eigvec = find_significant_eigvec(eigvec, check_max=10,
                     return_max=return_max, snr_cutoff=snr_cutoff,
                     return_smooth=True, rchi2_tol=rchi2_tol, **kwargs)
