@@ -28,8 +28,10 @@ import numpy.fft as fft
 import scipy.interpolate as si
 import scipy.optimize as opt
 import scipy.signal as ss
-import lmfit as lm
-#import pywt as pw
+try: import lmfit as lm
+except ImportError: print "No lmfit found.  You will not be able to use ppgauss.py or fit_powlaw()."
+try: import pywt as pw
+except ImportError: print "No pywt found.  You will not be able to use wavelet_smooth() and will have limited, no-smoothing functionality in ppspline.py."
 import psrchive as pr
 import matplotlib.gridspec as gs
 import matplotlib.pyplot as plt
@@ -1598,10 +1600,6 @@ def wavelet_smooth(port, wavelet='db8', nlevel=5, threshtype='hard', fact=1.0):
 
     Written mostly by EF.
     """
-    try: import pywt as pw
-    except ImportError:
-        print "You need the pywt (PyWavelets) package to use this function."
-        return 0
     try:
         nchan,nbin = port.shape
         one_prof = False
