@@ -80,7 +80,8 @@ def align_archives(metafile, initial_guess, tscrunch=False, pscrunch=True,
     template for additional iterations.  The output archive will have a 0 DM
     value and dmc=0.
 
-    metafile is a file containing PSRFITS archive names to be averaged.
+    metafile is a file containing PSRFITS archive names to be averaged, or it
+        can be a python list of archive names.
     initial_guess is the PSRFITS archive providing the initial alignment guess.
     tscrunch=True will pre-average the subintegrations; recommended unless
         there is a reason to keep the invidual subints for looping over.
@@ -99,9 +100,13 @@ def align_archives(metafile, initial_guess, tscrunch=False, pscrunch=True,
     quiet=True suppresses output.
 
     """
-    datafiles = [datafile[:-1] for datafile in open(metafile, "r").readlines()]
-    if outfile is None:
-        outfile = metafile + ".algnd.fits"
+    if type(metafile) == str:  # this was the old default
+        datafiles = \
+                [datafile[:-1] for datafile in open(metafile, "r").readlines()]
+        if outfile is None:
+            outfile = metafile + ".algnd.fits"
+    else: # assume metafile is list or array already; to be updated
+        datafiles = metafile
     vap_cmd = "vap -c nchan,nbin %s"%initial_guess
     nchan,nbin = map(int, sub.Popen(shlex.split(vap_cmd), stdout=sub.PIPE
             ).stdout.readlines()[1].split()[-2:])
