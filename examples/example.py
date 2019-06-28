@@ -16,7 +16,7 @@ model_routine = "ppspline" #"ppspline" or "ppgauss"
 #Generate some fake datafiles
 #These files will be homogenous, even though they don't need to be
 nfiles = 5       #Number of datafiles/epochs
-MJD0 = 50000.00  #Start day [MJD]
+MJD0 = 57202.00  #Start day [MJD]
 days = 20.0      #Days between epochs
 nsub = 10        #Number of subintegrations
 npol = 1         #Number of polarization (can be 4, but will only use total I)

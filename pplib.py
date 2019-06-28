@@ -960,6 +960,43 @@ def gen_spline_portrait(mean_prof, freqs, eigvec, tck, nbin=None):
             port = rotate_portrait(port, shift) #ss.resample introduces shift!
     return port
 
+def make_constant_portrait(archive, outfile, profile=None, DM=0.0, dmc=False,
+        weights=None, quiet=False):
+    """
+    Fill an archive with one profile.
+
+    archive is the name of the dummy PSRCHIVE archive that will be filled with
+        profile.
+    outfile is the name of the unloaded, output archive, which will have the
+        same nsub, npol, nchan, nbin, frequencies, etc., as archive.
+    profile is the array containing the profile to be used; it must have the
+        same number of phase bins nbin as archive.  If None, archive will be
+        T-, P-, and F-scrunched and the resulting average profile will be used.
+    DM is the header DM to store in the unloaded archive.
+    dmc=False stores the unloaded archive in the dispersed state.
+    weights is an nsub x nchan array of channel weights; if None, ones are used
+        as weights.
+    quiet=True suppresses output.
+    """
+    arch = pr.Archive_load(archive)
+    nsub,npol,nchan,nbin = arch.get_data().shape
+    if profile is None:
+        arch.tscrunch()
+        arch.pscrunch()
+        arch.fscrunch()
+        profile = arch.get_data()[0,0,0]
+    nbin_check_output = "len(profile) != number of bins in dummy archive"
+    assert (len(profile) == nbin), nbin_check_output
+    if weights is None:
+        weights = np.ones([nsub,nchan])
+    data = np.zeros([nsub,npol,nchan,nbin])
+    for isub in range(nsub):
+        for ipol in range(npol):
+            for ichan in range(nchan):
+                data[isub,ipol,ichan] = profile
+    unload_new_archive(data, arch, outfile, DM=DM, dmc=dmc, weights=weights,
+            quiet=quiet)
+
 def power_law_evolution(freqs, nu_ref, parameter, index):
     """
     Evolve the parameter over freqs by a power-law with index = index.
@@ -2993,7 +3030,7 @@ def unload_new_archive(data, arch, outfile, DM=None, dmc=0, weights=None,
 
     data is the nsub x npol x nchan x nbin array of amplitudes to be stored,
         which has the same shape as arch.get_data().shape.
-    arch is the PSRCHIVE archive to be otherwise copied.
+    arch is the PSRCHIVE archive instance to be otherwise copied.
     outfile is the name of the new written archive.
     DM is the DM value [cm**-3 pc] to be stored in the archive; if None,
         nothing is changed.
@@ -3990,6 +4027,8 @@ def show_eigenprofiles(eigprofs=None, smooth_eigprofs=None, mean_prof=None,
     if savefig:
         plt.savefig(savefig + ".eigvec.png", format='png')
         plt.close('all')
+
+# the below scattering functions were originally defined in pptoaslib.py
 
 def scattering_times(tau, alpha, freqs, nu_tau):
     """

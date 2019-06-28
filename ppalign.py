@@ -240,6 +240,10 @@ if __name__ == "__main__":
                       action="store", metavar="initial_guess",
                       dest="initial_guess",
                       help="Archive containing initial alignment guess.  psradd is used if -I is not used.")
+    parser.add_option("-g", "--width",
+                      default=None,
+                      action="store", metavar="fwhm", dest="fwhm",
+                      help="Use a single Gaussian component of given FWHM to align archives.  Overides -I.")
     parser.add_option("-T", "--tscr",
                       default=False,
                       action="store_true", dest="tscrunch",
@@ -293,6 +297,7 @@ if __name__ == "__main__":
 
     metafile = options.metafile
     initial_guess = options.initial_guess
+    fwhm = options.fwhm
     tscrunch = options.tscrunch
     pscrunch = options.pscrunch
     SNR_cutoff = float(options.SNR_cutoff)
@@ -309,11 +314,33 @@ if __name__ == "__main__":
     quiet = options.quiet
 
     rm = False
-    if initial_guess is None:
+    if initial_guess is None and fwhm is None:  # use psradd :(
         tmp_file = "ppalign.tmp.fits"
         psradd_archives(metafile, outfile=tmp_file, palign=palign)
         initial_guess = tmp_file
         rm = True
+    elif fwhm:  # use fixed Gaussian component
+        tmp_file = "ppalign.tmp.fits"
+        archive = open(metafile,'r').readlines()[0][:-1]  # use first archive
+        vap_cmd = "vap -n -c nbin %s"%archive
+        nbin = int(sub.Popen(shlex.split(vap_cmd), stdout=sub.PIPE
+            ).stdout.readlines()[0].split()[-1])
+        profile = gaussian_profile(nbin, 0.5, float(fwhm))
+        make_constant_portrait(archive, tmp_file, profile=profile, DM=0.0,
+                dmc=False, weights=None, quiet=quiet)
+        initial_guess = tmp_file
+        rm = True
+    else:  # use initial archive provided
+        vap_cmd = "vap -n -c nchan %s"%initial_guess
+        nchan = int(sub.Popen(shlex.split(vap_cmd), stdout=sub.PIPE
+            ).stdout.readlines()[0].split()[-1])
+        if nchan == 1:  # used constant average profile
+            tmp_file = "ppalign.tmp.fits"
+            archive = open(metafile,'r').readlines()[0][:-1]  # use first arch
+            make_constant_portrait(archive, tmp_file, profile=None, DM=0.0,
+                    dmc=False, weights=None, quiet=quiet)
+            initial_guess = tmp_file
+            rm = True
     if not pscrunch: all_Stokes = check_if_Stokes(metafile)
     else: all_Stokes = False
     if all_Stokes or pscrunch:

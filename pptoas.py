@@ -508,6 +508,9 @@ class GetTOAs:
                 ######################
                 # DOPPLER CORRECTION #
                 ######################
+                # This correction should fix Doppler-induced annual variations
+                # to DM(t), but will not fix Doppler-induced /orbital/
+                # variations to DM(t).
                 if self.bary: #Default is True
                     df = doppler_factors[isub]
                     if fit_flags[1]:
