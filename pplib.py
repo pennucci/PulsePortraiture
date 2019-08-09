@@ -3784,8 +3784,8 @@ def show_residual_plot(port, model, resids=None, phases=None, freqs=None,
         channel_red_chi2s[ichnx] = get_red_chi2(portx[ichnx], modelx[ichnx],
                 errs=noise_stdsxs[ichnx], dof=len(portx[ichnx])-nfit)
     bins = list(np.linspace(0.0, 2.0, 21)) + list(np.linspace(3.0, 10.0, 8)) +\
-            list(np.linspace(30.0, 100.0, 8)) + list(np.linspace(300.0, 1000.0,
-                8)) + [np.inf]
+            list(np.linspace(20.0, 100.0, 9)) + list(np.linspace(200.0, 1000.0,
+                9)) + [np.inf]
     ax4.hist(channel_red_chi2s, bins=bins, histtype='step', color='k')
     rchi2_min = min(channel_red_chi2s)
     rchi2_max = max(channel_red_chi2s)
