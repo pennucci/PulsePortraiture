@@ -3433,10 +3433,13 @@ def write_princeton_TOA(TOA_MJDi, TOA_MJDf, TOA_err, nu_ref, dDM, obs='@',
     #else:
     #    print obs + " %13s %8.3f %s %8.3f"%(name, nu_ref, TOA, TOA_err)
 
-def write_TOAs(TOAs, SNR_cutoff=0.0, outfile=None, append=True):
+def write_TOAs(TOAs, inf_is_zero=True, SNR_cutoff=0.0, outfile=None,
+        append=True):
     """
     Write loosely-IPTA formatted TOAs to file.
 
+    inf_is_zero=True follows the TEMPO/2 convention of writing 0.0 MHz as the
+        frequency for infinite-frequency TOAs.
     TOAs is a single TOA of the TOA class from pptoas, or a list of them.
     SNR_cutoff is a value specifying which TOAs are written based on the snr
         flag
@@ -3451,10 +3454,14 @@ def write_TOAs(TOAs, SNR_cutoff=0.0, outfile=None, append=True):
         else: mode = 'w'
         of = open(outfile, mode)
     for toa in toas:
-        toa_string = "%s %.8f %d"%(toa.archive, toa.frequency,
-                toa.MJD.intday()) + ("%.15f   %.3f  %s"%(toa.MJD.fracday(),
-                        toa.TOA_error,
-                        tempo_codes[toa.telescope.lower()]))[1:]
+        if toa.frequency == np.inf and inf_is_zero:
+            toa_string = "%s %.8f %d"%(toa.archive, 0.0,
+                    toa.MJD.intday()) + ("%.15f   %.3f  %s"%(toa.MJD.fracday(),
+                        toa.TOA_error, tempo_codes[toa.telescope.lower()]))[1:]
+        else:
+            toa_string = "%s %.8f %d"%(toa.archive, toa.frequency,
+                    toa.MJD.intday()) + ("%.15f   %.3f  %s"%(toa.MJD.fracday(),
+                        toa.TOA_error, tempo_codes[toa.telescope.lower()]))[1:]
         if toa.DM is not None:
             #toa_string += " -dm %.7f"%toa.DM
             toa_string += " -pp_dm %.7f"%toa.DM

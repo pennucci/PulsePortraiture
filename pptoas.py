@@ -60,14 +60,15 @@ class TOA:
         for flag in flags.keys():
             exec('self.%s = flags["%s"]'%(flag, flag))
 
-    def write_TOA(self, outfile=None):
+    def write_TOA(self, inf_is_zero=True, outfile=None):
         """
         Print a loosely IPTA-formatted TOA to standard output or to file.
-
+        inf_is_zero=True follows the TEMPO/2 convention of writing 0.0 MHz as
+            the frequency for infinite-frequency TOAs.
         outfile is the output file name; if None, will print to standard
             output.
         """
-        write_TOAs(self, outfile=outfile, append=True)
+        write_TOAs(self, inf_is_zero=inf_is_zero, outfile=outfile, append=True)
 
 class GetTOAs:
 
@@ -912,7 +913,7 @@ if __name__ == "__main__":
     parser.add_option("--nu_ref",
                       action="store", metavar="nu_ref", dest="nu_ref_DM",
                       default=None,
-                      help="Topocentric frequency [MHz] to which the output TOAs are referenced, i.e. the frequency that has zero delay from a non-zero DM. 'inf' is used for inifite frequency. [defaults to zero-covariance frequency, recommended]")
+                      help="Topocentric frequency [MHz] to which the output TOAs are referenced, i.e. the frequency that has zero delay from a non-zero DM. 'inf' is used as an argument here for infinite frequency, but the default internal behavior follows TEMPO/2 convention and will write 0.0 for infinite-frequency TOAs. [defaults to zero-covariance frequency, recommended]")
     parser.add_option("--DM",
                       action="store", metavar="DM", dest="DM0", default=None,
                       help="Nominal DM [cm**-3 pc] from which to reference offset DM measurements.  If unspecified, will use the DM stored in each archive.")
@@ -1044,8 +1045,8 @@ if __name__ == "__main__":
                 toa.DM = DDM + gt.DM0s[ifile]
                 toa.DM_error = DDM_err
                 toa.flags['DM_mean'] = True
-            write_TOAs(gt.TOA_one_DM_list, SNR_cutoff=snr_cutoff,
-                    outfile=outfile, append=True)
+            write_TOAs(gt.TOA_one_DM_list, inf_is_zero=True,
+                    SNR_cutoff=snr_cutoff, outfile=outfile, append=True)
         else:
-            write_TOAs(gt.TOA_list, SNR_cutoff=snr_cutoff, outfile=outfile,
-                    append=True)
+            write_TOAs(gt.TOA_list, inf_is_zero=True, SNR_cutoff=snr_cutoff,
+                    outfile=outfile, append=True)
