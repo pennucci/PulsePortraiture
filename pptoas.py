@@ -612,8 +612,7 @@ class GetTOAs:
                 toa_flags['tobs'] = subtimes[isub]
                 toa_flags['tmplt'] = self.modelfile
                 toa_flags['snr'] = results.snr
-                if (nu_ref_DM is not None and self.fit_phi and self.fit_DM) or\
-                        (np.sum(self.fit_flags) == 5):
+                if (nu_ref_DM is not None and np.all(fit_flags[:2])):
                             toa_flags['phi_DM_cov'] = \
                                     results.covariance_matrix[0,1]
                 toa_flags['gof'] = results.red_chi2
