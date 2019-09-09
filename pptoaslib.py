@@ -1078,7 +1078,9 @@ def fit_portrait_full(data_port, model_port, init_params, P, freqs,
     # SNR of the fit, based on PDB's notes
     scat_port_FT = scattering_portrait_FT(taus, nbin, binshift=binshift)
     S = Sbp(scat_port_FT, model_port_FT, errs_FT)
-    snr = pow(np.sum(scales**2.0 * S), 0.5)
+    channel_snrs = scales * np.sqrt(S)
+    snr = pow(np.sum(channel_snrs**2), 0.5)
+    #snr = pow(np.sum(scales**2.0 * S), 0.5)  # same as above
     chi2 = Sd + results.fun
     red_chi2 = chi2 / dof
     fit_port_results = DataBunch(params=params, param_errs=param_errs,
@@ -1089,5 +1091,6 @@ def fit_portrait_full(data_port, model_port, init_params, P, freqs,
             alpha_err=param_errs[4], scales=scales, scale_errs=scale_errs,
             nu_DM=nu_out_DM, nu_GM=nu_out_GM, nu_tau=nu_out_tau,
             covariance_matrix=covariance_matrix, chi2=chi2, red_chi2=red_chi2,
-            snr=snr, duration=duration, nfeval=nfeval, return_code=return_code)
+            snr=snr, channel_snrs=channel_snrs, duration=duration,
+            nfeval=nfeval, return_code=return_code)
     return fit_port_results

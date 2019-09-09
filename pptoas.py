@@ -124,18 +124,22 @@ class GetTOAs:
         self.alpha_errs = []  # their uncertainties
         self.scales = []  # fitted per-channel scaling parameters
         self.scale_errs = []  # their uncertainties
+        self.snrs = []  # signal-to-noise ratios (S/N)
+        self.channel_snrs = []  # per-channel S/Ns
         self.profile_fluxes = []  # estimated per-channel fluxes
         self.profile_flux_errs = []  # their uncertainties
         self.fluxes = []  # estimated overall fluxes
         self.flux_errs = []  # their uncertainties
         self.flux_freqs = []  # their reference frequencies
         self.red_chi2s = []  # reduced chi2 values of the fit
+        self.channel_red_chi2s = []  # per-channel reduced chi2 values
         self.covariances = []  # full covariance matrices
         self.nfevals = []  # number of likelihood function evaluations
         self.rcs = []  # return codes from the fit
         self.fit_durations = []  # durations of the fit
         self.order = []  # order that datafiles are examined (deprecated)
         self.TOA_list = []  # complete, single list of TOAs
+        self.zap_channels = []  # proposed channels to be zapped
         # dictionary of instrumental response characteristics
         self.instrumental_response_dict = self.ird = \
                 {'DM':0.0, 'wids':[], 'irf_types':[]}
@@ -280,6 +284,8 @@ class GetTOAs:
             alpha_errs = np.zeros(nsub, dtype=np.float64)
             scales = np.zeros([nsub, nchan], dtype=np.float64)
             scale_errs = np.zeros([nsub, nchan], dtype=np.float64)
+            snrs = np.zeros(nsub, dtype=np.float64)
+            channel_snrs = np.zeros([nsub, nchan], dtype=np.float64)
             profile_fluxes = np.zeros([nsub, nchan], dtype=np.float64)
             profile_flux_errs = np.zeros([nsub, nchan], dtype=np.float64)
             fluxes = np.zeros(nsub, dtype=np.float64)
@@ -568,6 +574,8 @@ class GetTOAs:
                 rcs[isub] = results.return_code
                 scales[isub, ok_ichans[isub]] = results.scales
                 scale_errs[isub, ok_ichans[isub]] = results.scale_errs
+                snrs[isub] = results.snr
+                channel_snrs[isub, ok_ichans[isub]] = results.channel_snrs
                 try:
                     covariances[isub] = results.covariance_matrix
                 except ValueError:
@@ -678,6 +686,8 @@ class GetTOAs:
             self.alpha_errs.append(alpha_errs)
             self.scales.append(scales)
             self.scale_errs.append(scale_errs)
+            self.snrs.append(snrs)
+            self.channel_snrs.append(channel_snrs)
             self.profile_fluxes.append(profile_fluxes)
             self.profile_flux_errs.append(profile_flux_errs)
             self.fluxes.append(fluxes)
@@ -707,23 +717,26 @@ class GetTOAs:
             print "Total time: %.2f sec, ~%.4f sec/TOA"%(tot_duration,
                     tot_duration / (np.array(map(len, self.ok_isubs)).sum()))
 
-    def get_channel_red_chi2s(self, threshold=1.3, show=False):
+    def get_channels_to_zap(self, SNR_threshold=8.0, rchi2_threshold=1.3,
+            iterate=True, show=False):
         """
-        Calculate reduced chi-squared values for each profile fit.
-
-        Adds attributes self.channel_red_chi2s and self.zap_channels, the
-            latter based on a thresholding value.
-
         NB: get_TOAs(...) needs to have been called first.
 
-        threshold is a reduced chi-squared value which is used to flag channels
-            for zapping (cf. ppzap.py).  Values above threshold are added to
+        SNR_threshold is a signal-to-noise ratio value which is used to flag
+            channels for zapping (cf. ppzap.py).  Channels that have a S/N
+            values below (SNR_threshold**2 / nchx)**0.5, where nchx is the
+            number of channels used in the fit, are added to self.zap_channels.
+        rchi2_threshold is a reduced chi-squared value which is used to flag
+            channels for zapping (cf. ppzap.py).  Channels that have a reduced
+            chi-squared value above rchi2_threshold are added to
             self.zap_channels.
+        iterate=True will iterate over the S/N cut by recalculating the
+            effective single-channel S/N threshold and continuing cuts until
+            no new channels are cut; this helps to ensure all TOAs will have a
+            wideband TOA S/N above SNR_threshold.
         show=True will show the before/after portraits for each subint with
             proposed channels to zap.
         """
-        self.channel_red_chi2s = []
-        self.zap_channels = []
         for iarch,ok_idatafile in enumerate(self.ok_idatafiles):
             datafile = self.datafiles[ok_idatafile]
             channel_red_chi2s = []
@@ -734,15 +747,41 @@ class GetTOAs:
                 port, model, ok_ichans, freqs, noise_stds = self.show_fit(
                         datafile=datafile, isub=isub, rotate=0.0, show=False,
                         return_fit=True, quiet=True)
-                for ichan in ok_ichans:
-                    channel_red_chi2 = get_red_chi2(port[ichan],
-                            model[ichan], errs=noise_stds[ichan],
-                            dof=len(port[ichan])-2) #Not sure about exact dof
+                channel_snrs = self.channel_snrs[iarch][isub]
+                channel_SNR_threshold = (SNR_threshold**2.0 / \
+                        len(ok_ichans))**0.5
+                for ichan,ok_ichan in enumerate(ok_ichans):
+                    channel_red_chi2 = get_red_chi2(port[ok_ichan],
+                            model[ok_ichan], errs=noise_stds[ok_ichan],
+                            dof=len(port[ok_ichan])-2) #Not sure about dof
                     red_chi2s.append(channel_red_chi2)
-                    if channel_red_chi2 > threshold: bad_ichans.append(ichan)
-                    elif np.isnan(channel_red_chi2): bad_ichans.append(ichan)
+                    if channel_red_chi2 > rchi2_threshold:
+                        bad_ichans.append(ok_ichan)
+                    elif np.isnan(channel_red_chi2):
+                        bad_ichans.append(ok_ichan)
+                    elif channel_snrs[ok_ichan] < channel_SNR_threshold:
+                        bad_ichans.append(ok_ichan)
+                    else:
+                        pass
                 channel_red_chi2s.append(red_chi2s)
                 zap_channels.append(bad_ichans)
+                if iterate and len(bad_ichans):
+                    old_len = len(bad_ichans)
+                    added_new = True
+                    while(added_new and (len(ok_ichans)-len(bad_ichans))):
+                        # recalculate threshold after removing channels
+                        channel_SNR_threshold = (SNR_threshold**2.0 / \
+                                (len(ok_ichans)-len(bad_ichans)))**0.5
+                        for ichan,ok_ichan in enumerate(ok_ichans):
+                            if ok_ichan in bad_ichans:
+                                continue
+                            elif channel_snrs[ok_ichan] < \
+                                    channel_SNR_threshold:
+                                bad_ichans.append(ok_ichan)
+                            else:
+                                pass
+                        added_new = bool(len(bad_ichans) - old_len)
+                        old_len = len(bad_ichans)
                 if show and len(bad_ichans):
                     show_portrait(port, get_bin_centers(port.shape[1]),
                             title="%s, subint: %d\nbad chans: %s"%(datafile,

@@ -124,10 +124,14 @@ if __name__ == "__main__":
     parser.add_option("-T", "--tscrunch",
                       action="store_true", dest="tscrunch", default=False,
                       help="Examine tscrunch'ed archives and apply channel zapping to all subints.")
-    parser.add_option("-t", "--threshold",
-                      metavar="red_chi2", action="store", dest="threshold",
-                      default=1.3,
-                      help="Set a reduced chi-squared threshold for flagging bad channels [default=1.5].")
+    parser.add_option("-S", "--SNR-threshold",
+                      metavar="S/N", action="store", dest="SNR_threshold",
+                      default=8.0,
+                      help="Set a TOA signal-to-noise ratio threshold for flagging low S/N channels; this is used in combination with the number of channels fit to ensure a wideband TOA S/N greater than SNR_threshold [default=8.0].")
+    parser.add_option("-R", "--rchi2-threshold",
+                      metavar="red_chi2", action="store",
+                      dest="rchi2_threshold", default=1.3,
+                      help="Set a reduced chi-squared threshold for flagging bad channels [default=1.3].")
     parser.add_option("-o", "--outfile",
                       action="store", metavar="outfile", dest="outfile",
                       default=None,
@@ -155,7 +159,8 @@ if __name__ == "__main__":
     norm = options.norm
     modelfile = options.modelfile
     tscrunch = options.tscrunch
-    threshold = float(options.threshold)
+    SNR_threshold = float(options.SNR_threshold)
+    rchi2_threshold = float(options.rchi2_threshold)
     outfile = options.outfile
     modify = options.modify
     hist = options.hist
@@ -164,7 +169,8 @@ if __name__ == "__main__":
     if modelfile is not None:
         gt = GetTOAs(datafiles=datafiles, modelfile=modelfile, quiet=True)
         gt.get_TOAs(tscrunch=tscrunch, quiet=True)
-        gt.get_channel_red_chi2s(threshold=threshold, show=False)
+        gt.get_channels_to_zap(SNR_threshold=SNR_threshold,
+                rchi2_threshold=rchi2_threshold, iterate=True, show=False)
         ok_datafiles = list(np.array(gt.datafiles)[gt.ok_idatafiles])
         print_paz_cmds(ok_datafiles, gt.zap_channels, all_subs=tscrunch,
                 modify=modify, outfile=outfile, quiet=quiet)
@@ -182,17 +188,18 @@ if __name__ == "__main__":
                 for isub in range(len(gt.channel_red_chi2s[iarch])):
                     red_chi2s.extend(gt.channel_red_chi2s[iarch][isub])
             red_chi2s = np.nan_to_num(np.array(red_chi2s))
+            nzap_rchi2 = sum(np.array(red_chi2s) > rchi2_threshold)
             plt.hist(red_chi2s, bins=min(50, len(red_chi2s)), log=True)
             ymin, ymax = plt.ylim()
-            plt.vlines(threshold, ymin, ymax, linestyles='dashed')
+            plt.vlines(rchi2_threshold, ymin, ymax, linestyles='dashed')
             plt.ylim(ymin, ymax)
             plt.xlabel(r"Reduced $\chi^2$")
             plt.ylabel("#")
-            plt.title("%s\n"%datafiles + r"%d / %d channels w/ $\chi^2_{red}$ > %.1f"%(nzap, nchan, threshold))
+            plt.title("%s\n"%datafiles + r"%d / %d channels w/ $\chi^2_{red}$ > %.1f"%(nzap_rchi2, nchan, rchi2_threshold))
             plt.savefig(datafiles+"_ppzap_hist.png")
 
         if not quiet:
-            print "ppzap.py found %d bad channels out of a total %d channels fit (=%.2f%%) in %s."%(nzap, nchan, 100*float(nzap)/nchan, datafiles)
+            print "ppzap.py found %d channels to zap out of a total %d channels fit (=%.2f%%) in %s."%(nzap, nchan, 100*float(nzap)/nchan, datafiles)
 
     else:
         if file_is_type(datafiles, "ASCII"):
@@ -231,4 +238,4 @@ if __name__ == "__main__":
                 nzap += len(zap_channels[iarch][isub])
 
         if not quiet:
-            print "ppzap.py found %d bad channels out of a total %d channels (=%.2f%%) in %s."%(nzap, nchan, 100*float(nzap)/nchan, datafiles)
+            print "ppzap.py found %d channels to zap out of a total %d channels (=%.2f%%) in %s."%(nzap, nchan, 100*float(nzap)/nchan, datafiles)
