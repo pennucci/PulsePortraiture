@@ -697,7 +697,8 @@ class GetTOAs:
             if show_plot:
                 stop = time.time()
                 tot_duration += stop - start
-                self.show_fit(datafile)
+                for isub in ok_isubs:
+                    self.show_fit(datafile, isub)
                 start = time.time()
         if not show_plot:
             tot_duration = time.time() - start
