@@ -98,16 +98,25 @@ def align_archives(metafile, initial_guess, tscrunch=False, pscrunch=True,
     else:
         state = 'Stokes'
         npol = 4
-    model_data = load_data(initial_guess, dedisperse=True, dededisperse=False,
-            tscrunch=True, pscrunch=True, fscrunch=False, rm_baseline=True,
-            flux_prof=False, refresh_arch=True, return_arch=True, quiet=quiet)
+    try:
+        model_data = load_data(initial_guess, state=state, dedisperse=True,
+                dededisperse=False, tscrunch=True, pscrunch=pscrunch,
+                fscrunch=False, rm_baseline=True, flux_prof=False,
+                refresh_arch=True, return_arch=True, quiet=quiet)
+    except IndexError:
+        print "%s: has npol = 1; need npol == 4."%initial_guess
+        sys.exit()
     model_port = (model_data.masks * model_data.subints)[0,0]
+    skip_these = []
     count = 1
     while(niter):
         print "Doing iteration %d..."%count
         load_quiet = quiet
         aligned_port = np.zeros((npol,nchan,nbin))
         total_weights = np.zeros((nchan,nbin))
+        if count == 2:
+            for skipfile in skip_these:
+                skipped = datafiles.pop(datafiles.index(skipfile))
         for ifile in range(len(datafiles)):
             try:
                 data = load_data(datafiles[ifile], state=state,
@@ -119,25 +128,25 @@ def align_archives(metafile, initial_guess, tscrunch=False, pscrunch=True,
                 if not quiet:
                     print "%s: cannot load_data().  Skipping it."%\
                             datafiles[ifile]
-                datafiles.pop(datafiles.index(datafiles[ifile]))
+                skip_these.append(datafiles[ifile])
                 continue
             except IndexError:
                 if not quiet:
-                    print "%s: has npol == 1.  Skipping it."%\
+                    print "%s: has npol = 1.  Skipping it."%\
                             datafiles[ifile]
-                datafiles.pop(datafiles.index(datafiles[ifile]))
+                skip_these.append(datafiles[ifile])
                 continue
             if data.nbin != model_data.nbin:
                 if not quiet:
                     print "%s: %d != %d phase bins.  Skipping it."%\
                             (datafiles[ifile], data.nbin, model_data.nbin)
-                datafiles.pop(datafiles.index(datafiles[ifile]))
+                skip_these.append(datafiles[ifile])
                 continue
             if data.prof_SNR < SNR_cutoff:
                 if not quiet:
                     print "%s: %d < %d S/N cutoff.  Skipping it."%\
                             (datafiles[ifile], data.prof_SNR, SNR_cutoff)
-                datafiles.pop(datafiles.index(datafiles[ifile]))
+                skip_these.append(datafiles[ifile])
                 continue
             try:
                 freq_diffs = data.freqs - model_data.freqs
