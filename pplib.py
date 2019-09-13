@@ -2645,9 +2645,9 @@ def calculate_TOA(epoch, P, phi, DM=0.0, nu_ref1=np.inf, nu_ref2=np.inf):
     TOA = epoch + pr.MJD((phi_prime * P) / (3600 * 24.))
     return TOA
 
-def load_data(filename, dedisperse=False, dededisperse=False, tscrunch=False,
-        pscrunch=False, fscrunch=False, rm_baseline=True, flux_prof=False,
-        refresh_arch=True, return_arch=True, quiet=False):
+def load_data(filename, state=None, dedisperse=False, dededisperse=False,
+        tscrunch=False, pscrunch=False, fscrunch=False, rm_baseline=True,
+        flux_prof=False, refresh_arch=True, return_arch=True, quiet=False):
     """
     Load data from a PSRCHIVE archive.
 
@@ -2656,6 +2656,8 @@ def load_data(filename, dedisperse=False, dededisperse=False, tscrunch=False,
     filename is the input PSRCHIVE archive.
     Most of the options should be self-evident; archives are manipulated by
         PSRCHIVE only.
+    Setting state='Intensity' or pscrunch=True overrides any conflicting that
+        would result in npol=4.
     flux_prof=True will include an array with the phase-averaged flux profile.
     refresh_arch=True refreshes the returned archive to its original state.
     return_arch=False will not return the archive, which may be smart at times.
@@ -2675,6 +2677,10 @@ def load_data(filename, dedisperse=False, dededisperse=False, tscrunch=False,
     frontend = arch.get_receiver_name()
     backend = arch.get_backend_name()
     backend_delay = arch.get_backend_delay()
+    #Set state?
+    if state is not None:
+        if state != arch.get_state():
+            arch.convert_state(state)
     #De/dedisperse?
     if dedisperse: arch.dedisperse()
     if dededisperse: arch.dededisperse()

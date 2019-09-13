@@ -51,23 +51,6 @@ def psrsmooth_archive(archive, options="-W"):
     psrsmooth_call = sub.Popen(shlex.split(psrsmooth_cmd))
     psrsmooth_call.wait()
 
-def check_if_Stokes(metafile):
-    """
-    Checks that archives all have state 'Stokes'.
-
-    metafile is a file containing PSRFITS archive names to be averaged.
-    """
-    datafiles = [datafile[:-1] for datafile in open(metafile, "r").readlines()]
-    for datafile in datafiles:
-        vap_cmd = "vap -c state %s"%datafile
-        state = sub.Popen(shlex.split(vap_cmd), stdout=sub.PIPE
-                ).stdout.readlines()[1].split()[1]
-        if state == 'Stokes':
-            return True
-        else:
-            print "Archives do not all have state 'Stokes'."
-            return False
-
 def align_archives(metafile, initial_guess, tscrunch=False, pscrunch=True,
         SNR_cutoff=0.0, outfile=None, norm=None, rot_phase=0.0, place=None,
         niter=1, quiet=False):
@@ -85,9 +68,8 @@ def align_archives(metafile, initial_guess, tscrunch=False, pscrunch=True,
     initial_guess is the PSRFITS archive providing the initial alignment guess.
     tscrunch=True will pre-average the subintegrations; recommended unless
         there is a reason to keep the invidual subints for looping over.
-    pscrunch=False will average the available polarizations as well as average
-        intensity.  Alignment and weighting is still performed only via the
-        total intensity portrait.
+    pscrunch=False will return the average Stokes portraits.  Alignment and
+        weighting is performed only via the total intensity portrait.
     SNR_cutoff is used to filter out low S/N archives from the average.
     outfile is the name of the output archive; defaults to
         <metafile>.algnd.fits.
@@ -110,8 +92,12 @@ def align_archives(metafile, initial_guess, tscrunch=False, pscrunch=True,
     vap_cmd = "vap -c nchan,nbin %s"%initial_guess
     nchan,nbin = map(int, sub.Popen(shlex.split(vap_cmd), stdout=sub.PIPE
             ).stdout.readlines()[1].split()[-2:])
-    if pscrunch: npol = 1
-    else: npol = 4
+    if pscrunch:
+        state = 'Intensity'
+        npol = 1
+    else:
+        state = 'Stokes'
+        npol = 4
     model_data = load_data(initial_guess, dedisperse=True, dededisperse=False,
             tscrunch=True, pscrunch=True, fscrunch=False, rm_baseline=True,
             flux_prof=False, refresh_arch=True, return_arch=True, quiet=quiet)
@@ -124,17 +110,35 @@ def align_archives(metafile, initial_guess, tscrunch=False, pscrunch=True,
         total_weights = np.zeros((nchan,nbin))
         for ifile in range(len(datafiles)):
             try:
-                data = load_data(datafiles[ifile], dedisperse=False,
-                        tscrunch=tscrunch, pscrunch=pscrunch, fscrunch=False,
-                        rm_baseline=True, flux_prof=False, refresh_arch=False,
-                        return_arch=False, quiet=load_quiet)
+                data = load_data(datafiles[ifile], state=state,
+                        dedisperse=False, tscrunch=tscrunch, pscrunch=pscrunch,
+                        fscrunch=False, rm_baseline=True, flux_prof=False,
+                        refresh_arch=False, return_arch=False,
+                        quiet=load_quiet)
             except RuntimeError:
                 if not quiet:
-                    print "Cannot load_data(%s).  Skipping it."%\
+                    print "%s: cannot load_data().  Skipping it."%\
                             datafiles[ifile]
+                datafiles.pop(datafiles.index(datafiles[ifile]))
                 continue
-            if data.nbin != model_data.nbin: continue
-            if data.prof_SNR < SNR_cutoff: continue
+            except IndexError:
+                if not quiet:
+                    print "%s: has npol == 1.  Skipping it."%\
+                            datafiles[ifile]
+                datafiles.pop(datafiles.index(datafiles[ifile]))
+                continue
+            if data.nbin != model_data.nbin:
+                if not quiet:
+                    print "%s: %d != %d phase bins.  Skipping it."%\
+                            (datafiles[ifile], data.nbin, model_data.nbin)
+                datafiles.pop(datafiles.index(datafiles[ifile]))
+                continue
+            if data.prof_SNR < SNR_cutoff:
+                if not quiet:
+                    print "%s: %d < %d S/N cutoff.  Skipping it."%\
+                            (datafiles[ifile], data.prof_SNR, SNR_cutoff)
+                datafiles.pop(datafiles.index(datafiles[ifile]))
+                continue
             try:
                 freq_diffs = data.freqs - model_data.freqs
                 if freq_diffs.min() == freq_diffs.max() == 0.0:
@@ -207,11 +211,11 @@ def align_archives(metafile, initial_guess, tscrunch=False, pscrunch=True,
     arch = model_data.arch
     arch.tscrunch()
     if pscrunch: arch.pscrunch()
-    else: arch.set_state("Stokes")
+    else: arch.convert_state("Stokes")
     arch.set_dispersion_measure(0.0)
     for subint in arch:
-        for ipol in range(model_data.arch.get_npol()):
-            for ichan in range(model_data.arch.get_nchan()):
+        for ipol in range(arch.get_npol()):
+            for ichan in range(arch.get_nchan()):
                 prof = subint.get_Profile(ipol, ichan)
                 prof.get_amps()[:] = aligned_port[ipol,ichan]
                 if total_weights[ichan].sum() == 0.0:
@@ -251,7 +255,7 @@ if __name__ == "__main__":
     parser.add_option("-p", "--poln",
                       default=True,
                       action="store_false", dest="pscrunch",
-                      help="Output averaged polarizations, not just total intensity.")
+                      help="Output average Stokes portraits, not just total intensity.  Archives are internally converted or skipped (if state == 'Intensity').")
     parser.add_option("-C", "--cutoff",
                       default=0.0,
                       action="store", metavar="SNR_cutoff", dest="SNR_cutoff",
@@ -341,17 +345,14 @@ if __name__ == "__main__":
                     dmc=False, weights=None, quiet=quiet)
             initial_guess = tmp_file
             rm = True
-    if not pscrunch: all_Stokes = check_if_Stokes(metafile)
-    else: all_Stokes = False
-    if all_Stokes or pscrunch:
-        align_archives(metafile, initial_guess=initial_guess,
-                tscrunch=tscrunch, pscrunch=pscrunch, SNR_cutoff=SNR_cutoff,
-                outfile=outfile, norm=norm, rot_phase=rot_phase, place=place,
-                niter=niter, quiet=quiet)
-        if smooth:
-            if outfile is None:
-                outfile = metafile + ".algnd.fits"
-            psrsmooth_archive(outfile, options="-W")
+    align_archives(metafile, initial_guess=initial_guess, tscrunch=tscrunch,
+            pscrunch=pscrunch, SNR_cutoff=SNR_cutoff, outfile=outfile,
+            norm=norm, rot_phase=rot_phase, place=place, niter=niter,
+            quiet=quiet)
+    if smooth:
+        if outfile is None:
+            outfile = metafile + ".algnd.fits"
+        psrsmooth_archive(outfile, options="-W")
     if rm:
         rm_cmd = "rm -f %s"%tmp_file
         rm_call = sub.Popen(shlex.split(rm_cmd))

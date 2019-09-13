@@ -726,6 +726,8 @@ class GetTOAs:
             channels for zapping (cf. ppzap.py).  Channels that have a S/N
             values below (SNR_threshold**2 / nchx)**0.5, where nchx is the
             number of channels used in the fit, are added to self.zap_channels.
+            NB: only operates if SNR_threshold != 0.0 (individual channels may
+            have S/N < 0.0).
         rchi2_threshold is a reduced chi-squared value which is used to flag
             channels for zapping (cf. ppzap.py).  Channels that have a reduced
             chi-squared value above rchi2_threshold are added to
@@ -759,13 +761,14 @@ class GetTOAs:
                         bad_ichans.append(ok_ichan)
                     elif np.isnan(channel_red_chi2):
                         bad_ichans.append(ok_ichan)
-                    elif channel_snrs[ok_ichan] < channel_SNR_threshold:
-                        bad_ichans.append(ok_ichan)
+                    elif SNR_threshold and \
+                            channel_snrs[ok_ichan] < channel_SNR_threshold:
+                                bad_ichans.append(ok_ichan)
                     else:
                         pass
                 channel_red_chi2s.append(red_chi2s)
                 zap_channels.append(bad_ichans)
-                if iterate and len(bad_ichans):
+                if iterate and SNR_threshold and len(bad_ichans):
                     old_len = len(bad_ichans)
                     added_new = True
                     while(added_new and (len(ok_ichans)-len(bad_ichans))):
