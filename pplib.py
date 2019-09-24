@@ -35,6 +35,7 @@ except ImportError: print "No pywt found.  You will not be able to use wavelet_s
 import psrchive as pr
 import matplotlib.gridspec as gs
 import matplotlib.pyplot as plt
+from telescope_codes import telescope_code_dict
 
 ############
 # settings #
@@ -104,20 +105,6 @@ cols = ['b', 'g', 'r', 'c', 'm', 'y', 'k', 'orange', 'brown', 'purple', 'pink',
 ########
 # misc #
 ########
-
-#Dictionary of observatory codes; not sure what "0" corresponds to.
-#These are used for Princeton formatted TOAs, which may be incorrect...
-obs_codes = {'bary':'@', '???':'0', 'gbt':'1', 'atca':'2', 'ao':'3',
-             'arecibo':'3', 'nanshan':'5', 'tid43':'6', 'pks':'7', 'jb':'8',
-             'vla':'c', 'ncy':'f', 'eff':'g', 'jbdfb':'q', 'wsrt':'i',
-             'lofar':'t'}
-
-#Dictionary of two-character observatory codes recognized by tempo/2.
-#Taken and lowered from $TEMPO/obsys.dat
-tempo_codes = {'arecibo':'ao', 'chime':'ch', 'effelsberg':'ef', 'gbt':'gbt',
-               'gmrt':'gm', 'jodrell':'jb', 'lofar':'lf', 'lwa1':'lw',
-               'meerkat':'mk', 'nancay':'nc', 'parkes':'pks', 'shao':'sh',
-               'srt':'sr', 'vla':'v2', 'wsrt':'wb'}
 
 #RCSTRINGS dictionary, for the return codes given by scipy.optimize.fmin_tnc.
 #These are only needed for debugging.
@@ -2670,10 +2657,8 @@ def load_data(filename, state=None, dedisperse=False, dededisperse=False,
         print "\nReading data from %s on source %s..."%(filename, source)
     #Basic info used in TOA output
     telescope = arch.get_telescope()
-    try:
-        tempo_code = tempo_codes[telescope.lower()]
-    except KeyError:
-        tempo_code = '??'
+    try: telescope_code = telescope_code_dict[telescope.upper()][0]
+    except KeyError: telescope_code = telescope
     frontend = arch.get_receiver_name()
     backend = arch.get_backend_name()
     backend_delay = arch.get_backend_delay()
@@ -2808,8 +2793,8 @@ def load_data(filename, state=None, dedisperse=False, dededisperse=False,
             ok_isubs=ok_isubs, parallactic_angles=parallactic_angles,
             phases=phases, prof=prof, prof_noise=prof_noise, prof_SNR=prof_SNR,
             Ps=Ps, SNRs=SNRs, source=source, state=state, subints=subints,
-            subtimes=subtimes, telescope=telescope, tempo_code=tempo_code,
-            weights=weights)
+            subtimes=subtimes, telescope=telescope,
+            telescope_code=telescope_code, weights=weights)
     return data
 
 def unpack_dict(data):
@@ -3067,7 +3052,7 @@ def unload_new_archive(data, arch, outfile, DM=None, dmc=0, weights=None,
 
 def write_archive(data, ephemeris, freqs, nu0=None, bw=None,
         outfile="pparchive.fits", tsub=1.0, start_MJD=None, weights=None,
-        dedispersed=False, state="Stokes", obs="GBT", quiet=False):
+        dedispersed=False, state="Stokes", telescope="GBT", quiet=False):
     """
     Write data to a PSRCHIVE psrfits file (using a hack).
 
@@ -3088,7 +3073,7 @@ def write_archive(data, ephemeris, freqs, nu0=None, bw=None,
     dedispersed=True, will save the archive as dedispered.
     state is the polarization state of the data ("Coherence" or "Stokes" for
         npol == 4, or "Intensity" for npol == 1).
-    obs is the telescope code.
+    telescope is the telescope name.
     quiet=True suppresses output.
 
     Mostly written by PBD.
@@ -3145,7 +3130,7 @@ def write_archive(data, ephemeris, freqs, nu0=None, bw=None,
     #Set some other stuff
     arch.set_centre_frequency(nu0)
     arch.set_bandwidth(bw)
-    arch.set_telescope(obs)
+    arch.set_telescope(telescope)
     if npol==4:
         arch.set_state(state)
     #Fill in some subintegration attributes
@@ -3181,8 +3166,8 @@ def make_fake_pulsar(modelfile, ephemeris, outfile="fake_pulsar.fits", nsub=1,
         npol=1, nchan=512, nbin=2048, nu0=1500.0, bw=800.0, tsub=300.0,
         phase=0.0, dDM=0.0, start_MJD=None, weights=None, noise_stds=1.0,
         scales=1.0, dedispersed=False, t_scat=0.0, alpha=scattering_alpha,
-        scint=False, xs=None, Cs=None, nu_DM=np.inf, state="Stokes", obs="GBT",
-        quiet=False):
+        scint=False, xs=None, Cs=None, nu_DM=np.inf, state="Stokes",
+        telescope="GBT", quiet=False):
     """
     Generate fake pulsar data written to a PSRCHIVE psrfits archive.
 
@@ -3225,7 +3210,7 @@ def make_fake_pulsar(modelfile, ephemeris, outfile="fake_pulsar.fits", nsub=1,
         DM(nu) with xs and Cs.
     state is the polarization state of the data ("Coherence" or "Stokes" for
         npol == 4, or "Intensity" for npol == 1).
-    obs is the telescope code.
+    telescope is the telescope name.
     quiet=True suppresses output.
 
     Mostly written by PBD.
@@ -3300,7 +3285,7 @@ def make_fake_pulsar(modelfile, ephemeris, outfile="fake_pulsar.fits", nsub=1,
     #Set some other stuff
     arch.set_centre_frequency(nu0)
     arch.set_bandwidth(bw)
-    arch.set_telescope(obs)
+    arch.set_telescope(telescope)
     if npol==4:
         arch.set_state(state)
     #Fill in some subintegration attributes
@@ -3463,11 +3448,11 @@ def write_TOAs(TOAs, inf_is_zero=True, SNR_cutoff=0.0, outfile=None,
         if toa.frequency == np.inf and inf_is_zero:
             toa_string = "%s %.8f %d"%(toa.archive, 0.0,
                     toa.MJD.intday()) + ("%.15f   %.3f  %s"%(toa.MJD.fracday(),
-                        toa.TOA_error, tempo_codes[toa.telescope.lower()]))[1:]
+                        toa.TOA_error, toa.telescope_code))[1:]
         else:
             toa_string = "%s %.8f %d"%(toa.archive, toa.frequency,
                     toa.MJD.intday()) + ("%.15f   %.3f  %s"%(toa.MJD.fracday(),
-                        toa.TOA_error, tempo_codes[toa.telescope.lower()]))[1:]
+                        toa.TOA_error, toa.telescope_code))[1:]
         if toa.DM is not None:
             #toa_string += " -dm %.7f"%toa.DM
             toa_string += " -pp_dm %.7f"%toa.DM

@@ -51,7 +51,7 @@ for ifile in range(nfiles):
             nsub=nsub, npol=npol, nchan=nchan, nbin=nbin, nu0=nu0, bw=bw,
             tsub=tsub, phase=0.0, dDM=dDMs[ifile], start_MJD=start_MJD,
             weights=weights, noise_stds=noise_std, scales=1.0,
-            dedispersed=False, scint=scint, state="Stokes", obs="GBT",
+            dedispersed=False, scint=scint, state="Stokes", telescope="GBT",
             quiet=quiet)
     #NB: the input parfile for fake data cannot yet have binary parameters
 os.system('psredit -q -m -c rcvr:name="fake_rx" -c be:name="fake_be" example-*.fits')

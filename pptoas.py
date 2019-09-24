@@ -34,8 +34,8 @@ class TOA:
     TOA class bundles common TOA attributes together with useful functions.
     """
 
-    def __init__(self, archive, frequency, MJD, TOA_error, telescope, DM=None,
-            DM_error=None, flags={}):
+    def __init__(self, archive, frequency, MJD, TOA_error, telescope,
+            telescope_code, DM=None, DM_error=None, flags={}):
         """
         Form a TOA.
 
@@ -43,7 +43,8 @@ class TOA:
         frequency is the reference frequency [MHz] of the TOA.
         MJD is a PSRCHIVE MJD object (the TOA, topocentric).
         TOA_error is the TOA uncertainty [us].
-        telescope is the string designating the observatory.
+        telescope is the name of the observatory.
+        telescope_code is the string written on the TOA line.
         DM is the full DM [cm**-3 pc] associated with the TOA.
         DM_error is the DM uncertainty [cm**-3 pc].
         flags is a dictionary of arbitrary TOA flags
@@ -54,6 +55,7 @@ class TOA:
         self.MJD = MJD
         self.TOA_error = TOA_error
         self.telescope = telescope
+        self.telescope_code = telescope_code
         self.DM = DM
         self.DM_error = DM_error
         self.flags = flags
@@ -267,7 +269,7 @@ class GetTOAs:
             if source is None: source = "noname"
             #Observation info
             obs = DataBunch(telescope=telescope, backend=backend,
-                    frontend=frontend, tempo_code=tempo_code)
+                    frontend=frontend)
             nu_fits = list(np.zeros([nsub, 3], dtype=np.float64))
             nu_refs = list(np.zeros([nsub, 3], dtype=np.float64))
             phis = np.zeros(nsub, dtype=np.double)
@@ -637,7 +639,7 @@ class GetTOAs:
                 for k,v in addtnl_toa_flags.iteritems():
                     toa_flags[k] = v
                 self.TOA_list.append(TOA(datafile, results.nu_DM, results.TOA,
-                    results.TOA_err, telescope.lower(), results.DM,
+                    results.TOA_err, telescope, telescope_code, results.DM,
                     results.DM_err, toa_flags))
                 itoa += 1
 
