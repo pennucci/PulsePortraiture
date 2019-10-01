@@ -631,8 +631,8 @@ class GetTOAs:
                     toa_flags['phs_err'] = results.phi_err
                 if print_flux:
                     toa_flags['flux'] = fluxes[isub]
-                    #toa_flags['flux_err'] = flux_errs[isub]
-                    toa_flags['fluxe'] = flux_errs[isub]  # consistent w/ pat
+                    toa_flags['flux_err'] = flux_errs[isub] # consistent w/ pat
+                    #toa_flags['fluxe'] = flux_errs[isub]  # consistent w/ pat
                     toa_flags['flux_ref_freq'] = flux_freqs[isub]
                 if print_parangle:
                     toa_flags['par_angle'] = parallactic_angles[isub]
