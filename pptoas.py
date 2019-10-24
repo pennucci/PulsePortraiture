@@ -620,6 +620,7 @@ class GetTOAs:
                 toa_flags['bw'] = freqsx.max() - freqsx.min()
                 toa_flags['subint'] = isub
                 toa_flags['tobs'] = subtimes[isub]
+                toa_flags['fratio'] = freqsx.max() / freqsx.min()
                 toa_flags['tmplt'] = self.modelfile
                 toa_flags['snr'] = results.snr
                 if (nu_ref_DM is not None and np.all(fit_flags[:2])):

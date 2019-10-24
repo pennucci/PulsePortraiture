@@ -520,7 +520,7 @@ class DataPortrait(object):
 
         phase is a value specifying the amount of achromatic rotation [rot].
         DM is a value specifying the amount of rotation based on the
-        cold-plasma dispersion law [cm**-3 pc].
+            cold-plasma dispersion law [cm**-3 pc].
         ichans is an array specifying the channel indices to be rotated; in
             this way, disparate bands can be aligned.  ichans=None defaults to
             all channels.
