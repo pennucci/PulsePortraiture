@@ -252,6 +252,16 @@ class GetTOAs:
                         pscrunch=True, fscrunch=False, rm_baseline=rm_baseline,
                         flux_prof=False, refresh_arch=False, return_arch=False,
                         quiet=quiet)
+                if data.dmc:
+                    if not quiet:
+                        print "%s is dedispersed (dmc = 1).  Reloading it."%\
+                                datafile
+                    #continue
+                    data = load_data(datafile, dedisperse=False,
+                            dededisperse=True, tscrunch=tscrunch,
+                            pscrunch=True, fscrunch=False,
+                            rm_baseline=rm_baseline, flux_prof=False,
+                            refresh_arch=False, return_arch=False, quiet=quiet)
                 if not len(data.ok_isubs):
                     if not quiet:
                         print "No subints to fit for %s.  Skipping it."%\
@@ -936,8 +946,8 @@ if __name__ == "__main__":
     parser.add_option("-d", "--datafiles",
                       action="store", metavar="archive", dest="datafiles",
                       help="PSRCHIVE archive from which to measure TOAs/DMs, or a metafile listing archive filenames.  \
-                              ***NB: Files should NOT be dedispersed!!*** \
-                              i.e. vap -c dmc <datafile> should return 0!")
+                              ***Recommended: files should not be dedispersed!*** \
+                              (i.e. vap -c dmc <datafile> should return 0)")
     parser.add_option("-m", "--modelfile",
                       action="store", metavar="model", dest="modelfile",
                       help="Model file from ppgauss.py, ppspline.py, or PSRCHIVE FITS file that either has same channel frequencies, nchan, & nbin as datafile(s), or is a single profile (nchan = 1, with the same nbin) to be interpreted as a constant template.")

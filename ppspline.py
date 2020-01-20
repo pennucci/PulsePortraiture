@@ -71,6 +71,13 @@ class DataPortrait(DataPortrait):
         freqs = self.freqsxs[0]
         nu_lo = freqs.min()
         nu_hi = freqs.max()
+        #Check nbin
+        nbin = port.shape[1]
+        if nbin % 2 != 0:
+            print "nbin = %d is odd; cannot wavelet_smooth.\n"%nbin
+            smooth = False
+        elif np.modf(np.log2(nbin))[0] != 0.0:
+            print "nbin = %d is not a power of two; can only try wavelet_smooth to one level; recommend resampling to a power-of-two number of phase bins.\n"%nbin
         #Do principal component analysis
         eigval, eigvec = pca(port, mean_prof, pca_weights, quiet=quiet)
         #Get "significant" eigenvectors
@@ -241,10 +248,12 @@ class DataPortrait(DataPortrait):
             show_eigenprofiles(eigvec, seigvec, self.mean_prof,
                     self.smooth_mean_prof, title=title, **kwargs)
         else:
-            if ncomp: eigvec = self.eigvec[:,self.ieig[:ncomp]].T
-            else: eigvec = None
-            show_eigenprofiles(self.eigvec[:,self.ieig[:ncomp]].T, None,
-                    self.mean_prof, None, title=title, **kwargs)
+            if ncomp:
+                eigvec = self.eigvec[:,self.ieig[:ncomp]].T
+            else:
+                eigvec = None
+            show_eigenprofiles(eigvec, None, self.mean_prof, None, title=title,
+                    **kwargs)
 
     def show_spline_curve_projections(self, ncomp=None, title=None, **kwargs):
         """

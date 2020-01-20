@@ -1670,7 +1670,8 @@ def smart_smooth(port, try_nlevels=None, rchi2_tol=0.1, **kwargs):
     try_nlevels is the number of levels to minimize over in
         wavelet_smooth(...).  A value of 0 returns the port as is.  nlevel
         cannot be higher than log2(nbin), which is the default value for
-        try_nlevels.
+        try_nlevels.  If nbin is odd, try_nlevels = 0, if nbin is not a power
+        of two, try_nlevels = 1.
     rchi2_tol is the tolerance parameter that will allow greater deviations in
         the smooth profile from the input profile shape.
     **kwargs are passed to wavelet_smooth(...)
@@ -1683,7 +1684,12 @@ def smart_smooth(port, try_nlevels=None, rchi2_tol=0.1, **kwargs):
         port = np.array([port])
         nchan,nbin = port.shape
         one_prof = True
-    if try_nlevels is None: try_nlevels = int(np.log2(port.shape[-1]))
+    if nbin % 2 != 0:
+        return port
+    elif np.modf(np.log2(nbin))[0] != 0.0:
+        try_nlevels = 1
+    elif try_nlevels is None:
+        try_nlevels = int(np.log2(port.shape[-1]))
     smooth_port = np.zeros(port.shape)
     if kwargs.has_key('wavelet'): wavelet = kwargs['wave']
     else: wavelet = 'db8'
@@ -1793,7 +1799,7 @@ def fit_DM_to_freq_resids(freqs, frequency_residuals, errs):
     freqs is the nchan arrray of frequencies [MHz]
     frequency_residuals is the nchan array of residuals [s].
     errs is the array of uncertainties on the frequency residuals [s].
-    
+
     Returned parameters are DM, offset, nu_ref for:
        res = Dconst*DM*(freqs**-2) + offset
        res = Dconst*DM*(freqs**-2 - nu_ref**-2)
@@ -2643,8 +2649,8 @@ def load_data(filename, state=None, dedisperse=False, dededisperse=False,
     filename is the input PSRCHIVE archive.
     Most of the options should be self-evident; archives are manipulated by
         PSRCHIVE only.
-    Setting state='Intensity' or pscrunch=True overrides any conflicting that
-        would result in npol=4.
+    Setting state='Intensity' or pscrunch=True overrides any conflicting
+        keyword that would result in npol=4.
     flux_prof=True will include an array with the phase-averaged flux profile.
     refresh_arch=True refreshes the returned archive to its original state.
     return_arch=False will not return the archive, which may be smart at times.
@@ -2670,6 +2676,7 @@ def load_data(filename, state=None, dedisperse=False, dededisperse=False,
     if dedisperse: arch.dedisperse()
     if dededisperse: arch.dededisperse()
     DM = arch.get_dispersion_measure()
+    dmc = arch.get_dedispersed()
     #Maybe use better baseline subtraction??
     if rm_baseline: arch.remove_baseline()
     #tscrunch?
@@ -2785,8 +2792,8 @@ def load_data(filename, state=None, dedisperse=False, dededisperse=False,
     if not return_arch: arch = None
     #Return getitem/attribute-accessible class!
     data = DataBunch(arch=arch, backend=backend, backend_delay=backend_delay,
-            bw=bw, doppler_factors=doppler_factors, DM=DM, epochs=epochs,
-            filename=filename, flux_prof=flux_prof, freqs=freqs,
+            bw=bw, doppler_factors=doppler_factors, DM=DM, dmc=dmc,
+            epochs=epochs, filename=filename, flux_prof=flux_prof, freqs=freqs,
             frontend=frontend, integration_length=integration_length,
             masks=masks, nbin=nbin, nchan=nchan, noise_stds=noise_stds,
             npol=npol, nsub=nsub, nu0=nu0, ok_ichans=ok_ichans,
