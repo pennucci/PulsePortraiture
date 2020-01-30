@@ -336,7 +336,6 @@ class GetTOAs:
             if not quiet:
                 print "\nEach of the %d TOAs is approximately %.2f s"%(
                         len(ok_isubs), integration_length / nsub)
-                print "Doing Fourier-domain least-squares fit..."
             itoa = 1
             for isub in ok_isubs:
                 sub_id = datafile + "_%d"%isub
