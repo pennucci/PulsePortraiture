@@ -627,6 +627,7 @@ class GetTOAs:
                 toa_flags['nch'] = nchan
                 toa_flags['nchx'] = len(freqsx)
                 toa_flags['bw'] = freqsx.max() - freqsx.min()
+                toa_flags['chbw'] = abs(bw) / nchan
                 toa_flags['subint'] = isub
                 toa_flags['tobs'] = subtimes[isub]
                 toa_flags['fratio'] = freqsx.max() / freqsx.min()
