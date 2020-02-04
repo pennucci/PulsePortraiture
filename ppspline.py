@@ -10,7 +10,7 @@
 #    an input nchan x nbin average portrait of aligned profiles, the model is a
 #    B-spline representation of the curve traced out by the nchan profile
 #    amplitude vectors in an nbin vector space.  Since the profile shapes are
-#    highly correlated, the B-spline representation can be reduced to << nbin 
+#    highly correlated, the B-spline representation can be reduced to << nbin
 #    dimensions, and is limited to ten dimensions.  Therefore, the profile
 #    variability is decomposed using PCA and a small number of eigenprofiles
 #    that encompass most of the profile evolution are selected.  The input data
@@ -357,7 +357,7 @@ if __name__ == "__main__":
     make_plots = options.make_plots
     quiet = options.quiet
 
-    dp = DataPortrait(datafile)
+    dp = DataPortrait(datafile, quiet=quiet)
 
     if norm in ("mean", "max", "prof", "rms", "abs"):
         dp.normalize_portrait(norm)

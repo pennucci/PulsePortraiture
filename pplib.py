@@ -582,7 +582,8 @@ class DataPortrait(object):
                     data[isub,ipol] = self.port
             unload_new_archive(data, self.arch, outfile,
                     DM=self.arch.get_dispersion_measure(),
-                    dmc=int(self.arch.get_dedispersed()), weights=self.weights,
+                    #dmc=int(self.arch.get_dedispersed()), weights=self.weights,
+                    dmc=self.dmc, weights=self.weights,
                     quiet=quiet)
 
 
