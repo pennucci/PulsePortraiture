@@ -973,6 +973,7 @@ def make_constant_portrait(archive, outfile, profile=None, DM=0.0, dmc=False,
         arch.pscrunch()
         arch.fscrunch()
         profile = arch.get_data()[0,0,0]
+        arch.refresh()
     nbin_check_output = "len(profile) != number of bins in dummy archive"
     assert (len(profile) == nbin), nbin_check_output
     if weights is None:

@@ -328,12 +328,12 @@ if __name__ == "__main__":
 
     rm = False
     if initial_guess is None and fwhm is None:  # use psradd :(
-        tmp_file = "ppalign.tmp.fits"
+        tmp_file = "ppalign.%d.tmp.fits"%np.random.randint(100,1000)
         psradd_archives(metafile, outfile=tmp_file, palign=palign)
         initial_guess = tmp_file
         rm = True
     elif fwhm:  # use fixed Gaussian component
-        tmp_file = "ppalign.tmp.fits"
+        tmp_file = "ppalign.%d.tmp.fits"%np.random.randint(100,1000)
         archive = open(metafile,'r').readlines()[0][:-1]  # use first archive
         vap_cmd = "vap -n -c nbin %s"%archive
         nbin = int(sub.Popen(shlex.split(vap_cmd), stdout=sub.PIPE
@@ -348,7 +348,7 @@ if __name__ == "__main__":
         nchan = int(sub.Popen(shlex.split(vap_cmd), stdout=sub.PIPE
             ).stdout.readlines()[0].split()[-1])
         if nchan == 1:  # used constant average profile
-            tmp_file = "ppalign.tmp.fits"
+            tmp_file = "ppalign.%d.tmp.fits"%np.random.randint(100,1000)
             archive = open(metafile,'r').readlines()[0][:-1]  # use first arch
             make_constant_portrait(archive, tmp_file, profile=None, DM=0.0,
                     dmc=False, weights=None, quiet=quiet)

@@ -1023,7 +1023,7 @@ if __name__ == "__main__":
     parser.add_option("--flags",
                       action="store", metavar="flags", dest="toa_flags",
                       default="",
-                      help="Pairs making up TOA flags to be written uniformly to all IPTA-formatted TOAs.  e.g. ('pta','NANOGrav','version',0.1)")
+                      help="Pairs making up TOA flags to be written uniformly to all IPTA-formatted TOAs.  e.g., --flags=pta,NANOGrav,version,0.1,key3,val3... etc.")
     parser.add_option("--snr_cut",
                       metavar="S/N", action="store", dest="snr_cutoff",
                       default=0.0,
