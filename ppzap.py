@@ -112,7 +112,7 @@ if __name__ == "__main__":
     parser.add_option("-n", "--num_std",
                       action="store", metavar="num_std", dest="nstd",
                       default=5.0,
-                      help="Channels with noise levels greater than num_std stamdard deviations away from the median t value will be flagged.  This process is iterated until there are zero flagged channels.  This is the default method for ppzap, but is ignored if -m is provided.")
+                      help="Channels with noise levels greater than num_std standard deviations away from the median t value will be flagged.  This process is iterated until there are zero flagged channels.  This is the default method for ppzap, but is ignored if -m is provided.")
     parser.add_option("-N", "--norm",
                       action="store", metavar="normalization", dest="norm",
                       default=None,
