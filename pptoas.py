@@ -868,10 +868,12 @@ class GetTOAs:
             if not quiet:
                 print "%s is dedispersed (dmc = 1).  Reloading it."%datafile
             #continue
-            data = load_data(datafile, dedisperse=False, dededisperse=True,
-                    tscrunch=tscrunch, pscrunch=True, fscrunch=False,
-                    rm_baseline=rm_baseline, flux_prof=False,
-                    refresh_arch=False, return_arch=False, quiet=quiet)
+            data = load_data(datafile, dedisperse=False,
+                    dededisperse=True, tscrunch=tscrunch,
+                    #pscrunch=True, fscrunch=False, rm_baseline=rm_baseline,
+                    pscrunch=True, fscrunch=False, rm_baseline=True,
+                    flux_prof=False, refresh_arch=False, return_arch=False,
+                    quiet=quiet)
         phi = self.phis[ifile][isub]
         DM = self.DMs[ifile][isub]
         GM = self.GMs[ifile][isub]
