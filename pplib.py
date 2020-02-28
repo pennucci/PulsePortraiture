@@ -423,8 +423,8 @@ class DataPortrait(object):
             self.noise_stdsxs[ichanx] = get_noise(self.portx[ichanx])
         self.flux_profx = self.portx.mean(axis=1)
 
-    def fit_flux_profile(self, channel_errs=None, guessA=1.0, guessalpha=0.0,
-            plot=True, quiet=False):
+    def fit_flux_profile(self, channel_errs=None, nu_ref=None, guessA=1.0,
+            guessalpha=0.0, plot=True, savefig=False, quiet=False):
         """
         Fit a power-law to the phase-averaged flux spectrum of the data.
 
@@ -433,12 +433,14 @@ class DataPortrait(object):
         guessA is the initial amplitude parameter.
         guessalpha is the initial spectral index parameter.
         plot=True shows the fit results.
+        savefig specifies a string for a saved figure; will not show the plot.
         quiet=True suppresses output.
         """
+        if nu_ref is None: nu_ref = self.nu0
         #Noise level below may be off
         if channel_errs is None: channel_errs = np.ones(len(self.freqsxs[0]))
         fp = fit_powlaw(self.flux_profx, np.array([guessA,guessalpha]),
-            channel_errs, self.freqsxs[0], self.nu0)
+            channel_errs, self.freqsxs[0], nu_ref)
         if not quiet:
             print ""
             print "Flux-density power-law fit"
@@ -447,14 +449,16 @@ class DataPortrait(object):
             print "residual std. = %.2f"%fp.residuals.std()
             print "reduced chi-squared = %.2f"%(fp.chi2 / fp.dof)
             print "A = %.3f +/- %.3f (flux at %.2f MHz)"%(fp.amp,
-                    fp.amp_err, self.nu0)
+                    fp.amp_err, fp.nu_ref)
             print "alpha = %.3f +/- %.3f"%(fp.alpha, fp.alpha_err)
-        if plot:
+        if plot or savefig:
             ax1 = plt.subplot(211, position=(0.1,0.1,0.8,0.4))
             ax2 = plt.subplot(212, position=(0.1,0.5,0.8,0.4))
             ax1.errorbar(self.freqsxs[0], fp.residuals, channel_errs, fmt='r+')
-            ax2.plot(self.freqs[0], powlaw(self.freqs[0], self.nu0,
-                fp.amp, fp.alpha), 'k-')
+            plot_freqs = np.linspace(self.freqs[0].min(), self.freqs[0].max(),
+                    1000)
+            ax2.plot(plot_freqs, powlaw(plot_freqs, fp.nu_ref, fp.amp,
+                fp.alpha), 'k-')
             ax2.errorbar(self.freqsxs[0], self.flux_profx, channel_errs,
                     fmt='r+')
             ax1.set_xlim(self.freqs[0].min(), self.freqs[0].max())
@@ -470,9 +474,12 @@ class DataPortrait(object):
             ax1.set_ylabel("Residual")
             ax2.set_ylabel("Flux")
             ax2.set_title("Average Flux Profile for %s"%self.source)
-            plt.show()
+            if savefig: plt.savefig(savefig)
+            if plot: plt.show()
+        self.flux_fit = fp
         self.spect_A = fp.amp
         self.spect_A_err = fp.amp_err
+        self.spect_A_ref = fp.nu_ref
         self.spect_index = fp.alpha
         self.spect_index_err = fp.alpha_err
 
@@ -1312,7 +1319,7 @@ def fit_portrait_function(params, model=None, p_n=None, data=None, errs=None,
         harmind = np.arange(len(model[nn]))
         phasor = np.exp(harmind * 2.0j * np.pi * (phase + (D * (freq**-2.0 -
             nu_ref**-2.0))))
-        #Cdp is related to the inverse DFT of the cross-correlation 
+        #Cdp is related to the inverse DFT of the cross-correlation
         Cdp = np.real(data[nn,:] * np.conj(model[nn,:]) * phasor).sum()
         m += (Cdp**2.0) / (err**2.0 * p)
     return -m
@@ -2166,7 +2173,7 @@ def fit_portrait(data, model, init_params, P, freqs, nu_fit=None, nu_out=None,
         sys.stderr.write("Fit succeeded with return code %d -- %s\n"
                 %(results.status, rcstring))
     #Curvature matrix = 1/2 2deriv of chi2 (cf. Gregory sect 11.5)
-    #Parameter errors are related to curvature matrix by **-0.5 
+    #Parameter errors are related to curvature matrix by **-0.5
     #Calculate nu_zero
     nu_zero = fit_portrait_function_2deriv(np.array([phi, DM]), mFFT,
             p_n, dFFT, errs, P, freqs, nu_fit)[1]

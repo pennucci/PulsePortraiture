@@ -869,7 +869,7 @@ class GetTOAs:
                 print "%s is dedispersed (dmc = 1).  Reloading it."%datafile
             #continue
             data = load_data(datafile, dedisperse=False,
-                    dededisperse=True, tscrunch=tscrunch,
+                    dededisperse=True, tscrunch=self.tscrunch,
                     #pscrunch=True, fscrunch=False, rm_baseline=rm_baseline,
                     pscrunch=True, fscrunch=False, rm_baseline=True,
                     flux_prof=False, refresh_arch=False, return_arch=False,

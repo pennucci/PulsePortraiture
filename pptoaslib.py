@@ -750,7 +750,7 @@ def get_nu_zeros(params, data_portrait_FT, model_portrait_FT, errs_FT, P,
         denom = H21_n.sum()
         nu_zero_DM = (numer / denom)**-0.5
         nu_zero_GM, nu_zero_tau = nu_GM, nu_tau
-    elif np.all(fit_flags == [1,0,1,0,0]):  # only phi and GM, not likely 
+    elif np.all(fit_flags == [1,0,1,0,0]):  # only phi and GM, not likely
         Hij_n = np.delete(np.delete(Hij_n, 1, 0), 1, 1)
         Hij_n = Hij_n[:2,:2]
         H21_n = Hij_n[0,1] / phis_deriv[2]  # (freqs**-4 - nu_GM**-4)
@@ -1035,7 +1035,7 @@ def fit_portrait_full(data_port, model_port, init_params, P, freqs,
         sys.stderr.write("Fit 'succeeded' with return code %d -- %s\n"
                 %(results.status, rcstring))
     #Curvature matrix = 1/2 2deriv of chi2 (cf. Gregory sect 11.5)
-    #Parameter errors are related to curvature matrix by **-0.5 
+    #Parameter errors are related to curvature matrix by **-0.5
     #Calculate nu_zeros
     nu_out_DM, nu_out_GM, nu_out_tau = nu_outs
     if not bool(np.all(nu_outs)):
