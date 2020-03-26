@@ -24,7 +24,7 @@ if 'TEMPO2' in os.environ:
                 if line.startswith('#') or line.startswith('\n'): pass
                 else:
                     line = line.split()
-                    for telescope,short_code in telescope_code_dict.items():
+                    for telescope,short_code in list(telescope_code_dict.items()):
                         if line[0] == short_code[0]:
                             for alias in line[1:]:
                                 telescope_code_dict[telescope].append(alias)

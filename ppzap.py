@@ -14,6 +14,8 @@
 #Written by Timothy T. Pennucci (TTP; tim.pennucci@nanograv.org).
 
 from __future__ import print_function
+from builtins import map
+from builtins import range
 from pptoas import *
 
 def get_zap_channels(data, nstd=3):
@@ -221,7 +223,7 @@ if __name__ == "__main__":
                 if not quiet:
                     print("Cannot load_data(%s).  Skipping it."%datafile)
                 continue
-            nchan += np.array(map(len, data.ok_ichans)).sum()
+            nchan += np.array(list(map(len, data.ok_ichans))).sum()
             if norm is not None:
                 for isub in data.ok_isubs:
                     data.subints[isub,0] = normalize_portrait(

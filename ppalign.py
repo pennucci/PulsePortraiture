@@ -15,6 +15,10 @@
 #Need option for constant Gaussian initial guess.
 
 from __future__ import print_function
+from __future__ import division
+from builtins import map
+from builtins import range
+from past.utils import old_div
 import os, shlex
 import subprocess as sub
 from pptoas import *
@@ -91,8 +95,8 @@ def align_archives(metafile, initial_guess, tscrunch=False, pscrunch=True,
     else: # assume metafile is list or array already; to be updated
         datafiles = metafile
     vap_cmd = "vap -c nchan,nbin %s"%initial_guess
-    nchan,nbin = map(int, sub.Popen(shlex.split(vap_cmd), stdout=sub.PIPE
-            ).stdout.readlines()[1].split()[-2:])
+    nchan,nbin = list(map(int, sub.Popen(shlex.split(vap_cmd), stdout=sub.PIPE
+            ).stdout.readlines()[1].split()[-2:]))
     if pscrunch:
         state = 'Intensity'
         npol = 1
@@ -193,7 +197,7 @@ def align_archives(metafile, initial_guess, tscrunch=False, pscrunch=True,
                     results.DM = data.DM
                     results.nu_ref = freqs[0]
                     results.scales = np.array([results.scale])
-                weights = np.outer(results.scales / errs**2, np.ones(nbin))
+                weights = np.outer(old_div(results.scales, errs**2), np.ones(nbin))
                 for ipol in range(npol):
                     aligned_port[ipol, model_ichans] += weights * \
                             rotate_data(data.subints[isub,ipol,ichans],

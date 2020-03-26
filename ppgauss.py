@@ -13,6 +13,11 @@
 #Contributions by Scott M. Ransom (SMR) and Paul B. Demorest (PBD).
 
 from __future__ import print_function
+from __future__ import division
+from builtins import next
+from builtins import range
+from builtins import object
+from past.utils import old_div
 from matplotlib.patches import Rectangle
 from pplib import *
 
@@ -51,7 +56,7 @@ class DataPortrait(DataPortrait):
         if show: plt.show()
         self.init_params = self.interactor.fitted_params
         self.init_param_errs = self.interactor.fit_errs
-        self.ngauss = (len(self.init_params) - 2) / 3
+        self.ngauss = old_div((len(self.init_params) - 2), 3)
 
     def make_gaussian_model(self, modelfile=None,
             ref_prof=(None, None), tau=0.0, fixloc=False, fixwid=False,
@@ -108,7 +113,7 @@ class DataPortrait(DataPortrait):
                             modelfile)
             self.fixalpha = not(self.fitalpha)
             if model_name is not None: self.model_name = model_name
-            self.init_model_params[1] *= self.nbin / self.Ps[0]
+            self.init_model_params[1] *= old_div(self.nbin, self.Ps[0])
         else:
             self.model_code = model_code
             self.scattering_index = scattering_index
@@ -126,8 +131,8 @@ class DataPortrait(DataPortrait):
                 self.bw_ref = ref_prof[1]
                 if self.nu_ref is None: self.nu_ref = self.nu0
                 if self.bw_ref is None: self.bw_ref = abs(self.bw)
-                okinds = np.compress(np.less(self.nu_ref - (self.bw_ref/2),
-                    self.freqs[0]) * np.greater(self.nu_ref + (self.bw_ref/2),
+                okinds = np.compress(np.less(self.nu_ref - (old_div(self.bw_ref,2)),
+                    self.freqs[0]) * np.greater(self.nu_ref + (old_div(self.bw_ref,2)),
                     self.freqs[0]) * self.masks[0,0].mean(axis=1),
                     np.arange(self.nchan))
                 #The below profile average gives a slightly different set of
@@ -349,7 +354,7 @@ class DataPortrait(DataPortrait):
         model_params[2::6] = np.where(model_params[2::6] >= 1.0,
                 model_params[2::6] % 1, model_params[2::6])
         #Convert tau (scattering timescale) to sec
-        model_params[1] *= self.Ps[0] / self.nbin
+        model_params[1] *= old_div(self.Ps[0], self.nbin)
         write_model(outfile, self.model_name, self.model_code, self.nu_ref,
                 model_params, self.fit_flags, self.scattering_index,
                 self.fitalpha, append=append, quiet=quiet)
@@ -366,13 +371,13 @@ class DataPortrait(DataPortrait):
             errfile = self.datafile + ".gmodel_errs"
         model_param_errs = np.copy(self.model_param_errs)
         #Convert tau (scattering timescale) to sec
-        model_param_errs[1] *= self.Ps[0] / self.nbin
+        model_param_errs[1] *= old_div(self.Ps[0], self.nbin)
         write_model(errfile, self.model_name + "_errors", self.model_code,
                 self.nu_ref, model_param_errs, self.fit_flags,
                 self.scattering_index_err, self.fitalpha, append=append,
                 quiet=quiet)
 
-class GaussianSelector:
+class GaussianSelector(object):
     """
     GaussianSelector is a class for hand-fitting Gaussian components.
 
@@ -409,7 +414,7 @@ class GaussianSelector:
         self.ax = ax.axes
         self.profile = profile
         self.proflen = len(profile)
-        self.phases = np.arange(self.proflen, dtype='d') / self.proflen
+        self.phases = old_div(np.arange(self.proflen, dtype='d'), self.proflen)
         self.errs = errs
         self.tauguess = tau #in bins
         self.fit_scattering = not fixscat
@@ -417,7 +422,7 @@ class GaussianSelector:
             self.tauguess = 0.1 #seems to break otherwise
         self.profile_fit_flags = profile_fit_flags
         self.visible = True
-        self.DCguess = sorted(profile)[len(profile)/10 + 1]
+        self.DCguess = sorted(profile)[old_div(len(profile),10) + 1]
         self.init_params = [self.DCguess, self.tauguess]
         self.ngauss = 0
         self.canvas = ax.figure.canvas
@@ -791,7 +796,7 @@ if __name__ == "__main__":
                 outfile=outfile, writeerrfile=True, errfile=errfile,
                 model_name=model_name, residplot=figure, quiet=quiet)
     else:
-        tau *= dp.nbin / dp.Ps[0]
+        tau *= old_div(dp.nbin, dp.Ps[0])
         dp.make_gaussian_model(modelfile=None, ref_prof=(nu_ref, bw_ref),
                 tau=tau, fixloc=fixloc, fixwid=fixwid, fixamp=fixamp,
                 fixscat=fixscat, fixalpha=fixalpha, model_code=model_code,

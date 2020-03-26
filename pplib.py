@@ -1,4 +1,5 @@
 from __future__ import print_function
+from __future__ import division
 #########
 # pplib #
 #########
@@ -16,6 +17,12 @@ from __future__ import print_function
 ###########
 
 #Unfortunately, this has to come first in the event nodes = True
+from builtins import str
+from builtins import map
+from builtins import zip
+from builtins import range
+from builtins import object
+from past.utils import old_div
 nodes = False  #Used when needing parallelized operation
 if nodes:
     import matplotlib
@@ -224,10 +231,10 @@ class DataPortrait(object):
                     self.join_params.append(data.DM*0.0)
                     self.join_fit_flags.append(1)
                 self.Ps += data.Ps.mean()
-                lf = data.freqs.min() - (abs(data.bw) / (2*data.nchan))
+                lf = data.freqs.min() - (old_div(abs(data.bw), (2*data.nchan)))
                 if lf < self.lofreq:
                     self.lofreq = lf
-                hf = data.freqs.max() + (abs(data.bw) / (2*data.nchan))
+                hf = data.freqs.max() + (old_div(abs(data.bw), (2*data.nchan)))
                 if hf > self.hifreq:
                     self.hifreq = hf
                 self.freqs.extend(data.freqs[0])
@@ -302,7 +309,7 @@ class DataPortrait(object):
                 self.data = data
                 #Unpack the data dictionary into the local namespace;
                 #see load_data for dictionary keys.
-                for key in self.data.keys():
+                for key in list(self.data.keys()):
                     exec("self." + key + " = self.data['" + key + "']")
         else:
             self.njoin = 0
@@ -317,7 +324,7 @@ class DataPortrait(object):
                     return_arch=True, quiet=quiet, **load_data_kwargs)
             #Unpack the data dictionary into the local namespace;
             #see load_data for dictionary keys.
-            for key in self.data.keys():
+            for key in list(self.data.keys()):
                 exec("self." + key + " = self.data['" + key + "']")
             if self.source is None: self.source = "noname"
             self.port = (self.masks * self.subints)[0,0]
@@ -448,7 +455,7 @@ class DataPortrait(object):
             print("----------------------------------")
             print("residual mean = %.2f"%fp.residuals.mean())
             print("residual std. = %.2f"%fp.residuals.std())
-            print("reduced chi-squared = %.2f"%(fp.chi2 / fp.dof))
+            print("reduced chi-squared = %.2f"%(old_div(fp.chi2, fp.dof)))
             print("A = %.3f +/- %.3f (flux at %.2f MHz)"%(fp.amp,
                     fp.amp_err, fp.nu_ref))
             print("alpha = %.3f +/- %.3f"%(fp.alpha, fp.alpha_err))
@@ -680,7 +687,7 @@ def get_bin_centers(nbin, lo=0.0, hi=1.0):
     lo = np.double(lo)
     hi = np.double(hi)
     diff = hi-lo
-    bin_centers = np.linspace(lo + diff/(nbin*2), hi - diff/(nbin*2), nbin)
+    bin_centers = np.linspace(lo + old_div(diff,(nbin*2)), hi - old_div(diff,(nbin*2)), nbin)
     bin_centers = np.double(bin_centers)
     return bin_centers
 
@@ -705,7 +712,7 @@ def weighted_mean(data, errs=1.0):
     if hasattr(errs, 'is_integer'):
         errs = np.ones(len(data))
     iis = np.where(errs > 0.0)[0]
-    mean = (data[iis]*(errs[iis]**-2.0)).sum() / (errs[iis]**-2.0).sum()
+    mean = old_div((data[iis]*(errs[iis]**-2.0)).sum(), (errs[iis]**-2.0).sum())
     mean_std_err = (errs[iis]**-2.0).sum()**-0.5
     return mean, mean_std_err
 
@@ -723,7 +730,7 @@ def get_WRMS(data, errs=1.0):
     w_mean = weighted_mean(data, errs)[0]
     d_sum = ((data[iis] - w_mean)**2.0 * (errs[iis]**-2.0)).sum()
     w_sum = (errs[iis]**-2.0).sum()
-    return (d_sum / w_sum)**0.5
+    return (old_div(d_sum, w_sum))**0.5
 
 def get_red_chi2(data, model, errs=None, dof=None):
     """
@@ -744,10 +751,10 @@ def get_red_chi2(data, model, errs=None, dof=None):
             print("Can only handle 1- or 2-D input.")
     if dof is None: dof = sum(data.shape)
     if len(data.shape) == 1:
-        red_chi2 = np.sum((resids/errs)**2.0) / dof
+        red_chi2 = old_div(np.sum((old_div(resids,errs))**2.0), dof)
     else:
-        red_chi2 = np.array([(resids[ii]/errs[ii])**2.0 for ii in
-            range(len(resids))]).sum() / dof
+        red_chi2 = old_div(np.array([(old_div(resids[ii],errs[ii]))**2.0 for ii in
+            range(len(resids))]).sum(), dof)
     return red_chi2
 
 def gaussian_function(xs, loc, wid, norm=False):
@@ -760,9 +767,9 @@ def gaussian_function(xs, loc, wid, norm=False):
     norm=True returns the profile such that the integrated density = 1.
     """
     mean = loc
-    sigma = wid / (2 * np.sqrt(2 * np.log(2)))
+    sigma = old_div(wid, (2 * np.sqrt(2 * np.log(2))))
     scale = 1.0
-    zs = (xs - mean) / sigma
+    zs = old_div((xs - mean), sigma)
     ys = np.exp(-0.5 * zs**2)
     if norm:
         scale *= (sigma**2.0 * 2.0 * np.pi)**-0.5
@@ -797,7 +804,7 @@ def gaussian_profile(nbin, loc, wid, norm=False, abs_wid=False, zeroout=True):
         pass
     else:
         return 0
-    sigma = wid / (2 * np.sqrt(2 * np.log(2)))
+    sigma = old_div(wid, (2 * np.sqrt(2 * np.log(2))))
     mean = loc % 1.0
     locval = get_bin_centers(nbin, lo=0.0, hi=1.0)
     if (mean < 0.5):
@@ -805,20 +812,20 @@ def gaussian_profile(nbin, loc, wid, norm=False, abs_wid=False, zeroout=True):
     else:
         locval = np.where(np.less(locval, mean - 0.5), locval + 1.0, locval)
     try:
-        zs = (locval - mean) / sigma
+        zs = old_div((locval - mean), sigma)
         okzinds = np.compress(np.fabs(zs) < 20.0, np.arange(nbin))   #Why 20?
         okzs = np.take(zs, okzinds)
         retval = np.zeros(nbin, 'd')
-        np.put(retval, okzinds, np.exp(-0.5 * (okzs)**2.0)/(sigma * np.sqrt(2 *
-            np.pi)))
+        np.put(retval, okzinds, old_div(np.exp(-0.5 * (okzs)**2.0),(sigma * np.sqrt(2 *
+            np.pi))))
         if norm:
             return retval
         else:
             if np.max(abs(retval)) == 0.0:
                 return retval
             else:
-                z = (locval[retval.argmax()] - loc) / sigma
-                fact = np.exp(-0.5 * z**2.0) / retval[retval.argmax()]
+                z = old_div((locval[retval.argmax()] - loc), sigma)
+                fact = old_div(np.exp(-0.5 * z**2.0), retval[retval.argmax()])
                 return fact * retval
     except OverflowError:
         print("Problem in gaussian_profile:  mean = %f  sigma = %f" %(mean,
@@ -837,7 +844,7 @@ def gen_gaussian_profile(params, nbin):
 
     Taken and tweaked from SMR's pygaussfit.py
     """
-    ngauss = (len(params) - 2) / 3
+    ngauss = old_div((len(params) - 2), 3)
     model = np.zeros(nbin, dtype='d') + params[0]
     for igauss in range(ngauss):
         loc, wid, amp = params[(2 + igauss*3):(5 + igauss*3)]
@@ -1050,7 +1057,7 @@ def powlaw(nu, nu_ref, A, alpha):
     """
     Return a power-law 'spectrum' given by F(nu) = A*(nu/nu_ref)**alpha
     """
-    return A * (nu/nu_ref)**alpha
+    return A * (old_div(nu,nu_ref))**alpha
 
 def powlaw_integral(nu2, nu1, nu_ref, A, alpha):
     """
@@ -1060,9 +1067,9 @@ def powlaw_integral(nu2, nu1, nu_ref, A, alpha):
     """
     alpha = np.float64(alpha)
     if alpha == -1.0:
-        return A * nu_ref * np.log(nu2/nu1)
+        return A * nu_ref * np.log(old_div(nu2,nu1))
     else:
-        C = A * (nu_ref**-alpha) / (1 + alpha)
+        C = old_div(A * (nu_ref**-alpha), (1 + alpha))
         diff = ((nu2**(1+alpha)) - (nu1**(1+alpha)))
         return C * diff
 
@@ -1115,7 +1122,7 @@ def scattering_kernel(tau, nu_ref, freqs, phases, P, alpha):
         ts[:,0] = 1.0
     else:
         ts = np.array([phases*P for ichan in range(nchan)])
-        taus = tau * (freqs / nu_ref)**alpha
+        taus = tau * (old_div(freqs, nu_ref))**alpha
         sk = np.exp(-np.transpose(np.transpose(ts) * taus**-1.0))
     return sk
 
@@ -1129,12 +1136,12 @@ def add_scattering(port, kernel, repeat=3):
         port and kernel repeat times before convolution; the center portion is
         returned.
     """
-    mid = repeat/2
+    mid = old_div(repeat,2)
     d = np.array(list(port.transpose()) * repeat).transpose()
     k = np.array(list(kernel.transpose()) * repeat).transpose()
     if len(port.shape) == 1:
         nbin = port.shape[0]
-        norm_kernel = kernel / kernel.sum()
+        norm_kernel = old_div(kernel, kernel.sum())
         scattered_port = ss.convolve(norm_kernel, d)[mid * nbin : (mid+1) *
                 nbin]
     else:
@@ -1161,7 +1168,7 @@ def add_scintillation(port, params=None, random=True, nsin=2, amax=1.0,
     if params is None and random is False:
         return port
     elif params is not None:
-        nsin = len(params)/3
+        nsin = old_div(len(params),3)
         for isin in range(nsin):
             a,w,p = params[isin*3:isin*3 + 3]
             pattern += a * np.sin(np.linspace(0, w * np.pi, nchan) +
@@ -1212,10 +1219,10 @@ def fit_powlaw_function(params, freqs, nu_ref, data=None, errs=None):
     data is the array of the data values.
     errs is the array of uncertainties on the data values.
     """
-    prms = np.array([param.value for param in params.itervalues()])
+    prms = np.array([param.value for param in params.values()])
     A = prms[0]
     alpha = prms[1]
-    return (data - powlaw(freqs, nu_ref, A, alpha)) / errs
+    return old_div((data - powlaw(freqs, nu_ref, A, alpha)), errs)
 
 def fit_gaussian_profile_function(params, data=None, errs=None):
     """
@@ -1225,8 +1232,8 @@ def fit_gaussian_profile_function(params, data=None, errs=None):
     data is the array of data values.
     errs is the array of uncertainties on the data values.
     """
-    prms = np.array([param.value for param in params.itervalues()])
-    return (data - gen_gaussian_profile(prms, len(data))) / errs
+    prms = np.array([param.value for param in params.values()])
+    return old_div((data - gen_gaussian_profile(prms, len(data))), errs)
 
 def fit_gaussian_portrait_function(params, model_code, phases, freqs, nu_ref,
         data=None, errs=None, join_ichans=None, P=None,):
@@ -1237,9 +1244,9 @@ def fit_gaussian_portrait_function(params, model_code, phases, freqs, nu_ref,
     data is the 2D array of data values.
     errs is the 2D array of the uncertainties on the data values.
     """
-    prms = np.array([param.value for param in params.itervalues()])
-    deviates = np.ravel((data - gen_gaussian_portrait(model_code, prms[:-1],
-        prms[-1], phases, freqs, nu_ref, join_ichans, P)) / errs)
+    prms = np.array([param.value for param in params.values()])
+    deviates = np.ravel(old_div((data - gen_gaussian_portrait(model_code, prms[:-1],
+        prms[-1], phases, freqs, nu_ref, join_ichans, P)), errs))
     return deviates
 
 def fit_phase_shift_function(phase, model=None, data=None, err=None):
@@ -1253,7 +1260,7 @@ def fit_phase_shift_function(phase, model=None, data=None, err=None):
     """
     harmind = np.arange(len(model))
     phasor = np.exp(harmind * 2.0j * np.pi * phase)
-    C = -np.real((data * np.conj(model) * phasor).sum()) / err**2.0
+    C = old_div(-np.real((data * np.conj(model) * phasor).sum()), err**2.0)
     return C
 
 def fit_phase_shift_function_deriv(phase, model=None, data=None, err=None):
@@ -1264,8 +1271,8 @@ def fit_phase_shift_function_deriv(phase, model=None, data=None, err=None):
     """
     harmind = np.arange(len(model))
     phasor = np.exp(harmind * 2.0j * np.pi * phase)
-    dC = -np.real((2.0j * np.pi * harmind * data * np.conj(model) *
-        phasor).sum()) / err**2.0
+    dC = old_div(-np.real((2.0j * np.pi * harmind * data * np.conj(model) *
+        phasor).sum()), err**2.0)
     return dC
 
 def fit_phase_shift_function_2deriv(phase, model=None, data=None, err=None):
@@ -1276,8 +1283,8 @@ def fit_phase_shift_function_2deriv(phase, model=None, data=None, err=None):
     """
     harmind = np.arange(len(model))
     phasor = np.exp(harmind * 2.0j * np.pi * phase)
-    d2C = -np.real((-4.0 * (np.pi**2.0) * (harmind**2.0) * data *
-        np.conj(model) * phasor).sum()) / err**2.0
+    d2C = old_div(-np.real((-4.0 * (np.pi**2.0) * (harmind**2.0) * data *
+        np.conj(model) * phasor).sum()), err**2.0)
     return d2C
 
 def fit_portrait_function(params, model=None, p_n=None, data=None, errs=None,
@@ -1312,7 +1319,7 @@ def fit_portrait_function(params, model=None, p_n=None, data=None, errs=None,
     if P is None or freqs is None:
         D = 0.0
         freqs = np.inf * np.ones(len(model))
-    else: D = Dconst * params[1] / P
+    else: D = old_div(Dconst * params[1], P)
     for nn in range(len(freqs)):
         freq = freqs[nn]
         p = p_n[nn]
@@ -1322,7 +1329,7 @@ def fit_portrait_function(params, model=None, p_n=None, data=None, errs=None,
             nu_ref**-2.0))))
         #Cdp is related to the inverse DFT of the cross-correlation
         Cdp = np.real(data[nn,:] * np.conj(model[nn,:]) * phasor).sum()
-        m += (Cdp**2.0) / (err**2.0 * p)
+        m += old_div((Cdp**2.0), (err**2.0 * p))
     return -m
 
 def fit_portrait_function_deriv(params, model=None, p_n=None, data=None,
@@ -1333,7 +1340,7 @@ def fit_portrait_function_deriv(params, model=None, p_n=None, data=None,
     See fit_portrait_function for form of input.
     """
     phase = params[0]
-    D = Dconst * params[1] / P
+    D = old_div(Dconst * params[1], P)
     d_phi, d_DM = 0.0, 0.0
     for nn in range(len(freqs)):
         freq = freqs[nn]
@@ -1345,9 +1352,9 @@ def fit_portrait_function_deriv(params, model=None, p_n=None, data=None,
         Cdp = np.real(data[nn,:] * np.conj(model[nn,:]) * phasor).sum()
         dCdp1 = np.real(2.0j * np.pi * harmind * data[nn,:] *
                 np.conj(model[nn,:]) * phasor).sum()
-        dDM = (freq**-2.0 - nu_ref**-2.0) * (Dconst/P)
-        d_phi += -2 * Cdp * dCdp1 / (err**2.0 * p)
-        d_DM += -2 * Cdp * dCdp1 * dDM / (err**2.0 * p)
+        dDM = (freq**-2.0 - nu_ref**-2.0) * (old_div(Dconst,P))
+        d_phi += old_div(-2 * Cdp * dCdp1, (err**2.0 * p))
+        d_DM += old_div(-2 * Cdp * dCdp1 * dDM, (err**2.0 * p))
     return np.array([d_phi, d_DM])
 
 def fit_portrait_function_2deriv(params, model=None, p_n=None, data=None,
@@ -1367,7 +1374,7 @@ def fit_portrait_function_2deriv(params, model=None, p_n=None, data=None,
     See fit_portrait_function for form of input.
     """
     phase = params[0]
-    D = Dconst * params[1] / P
+    D = old_div(Dconst * params[1], P)
     d2_phi, d2_DM, d2_cross = 0.0, 0.0, 0.0
     W_n = np.zeros(len(freqs))
     for nn in range(len(freqs)):
@@ -1382,13 +1389,13 @@ def fit_portrait_function_2deriv(params, model=None, p_n=None, data=None,
                 np.conj(model[nn,:]) * phasor).sum()
         dCdp2 = np.real(pow(2.0j * np.pi * harmind, 2.0) * data[nn,:] *
                 np.conj(model[nn,:]) * phasor).sum()
-        dDM = (freq**-2.0 - nu_ref**-2.0) * (Dconst/P)
+        dDM = (freq**-2.0 - nu_ref**-2.0) * (old_div(Dconst,P))
         W = (pow(dCdp1, 2.0) + (Cdp * dCdp2))
-        W_n[nn] = W / (err**2.0 * p)
-        d2_phi += -2.0 * W / (err**2.0 * p)
-        d2_DM += -2.0 * W * dDM**2.0 / (err**2.0 * p)
-        d2_cross += -2.0 * W * dDM / (err**2.0 * p)
-    nu_zero = (W_n.sum() / np.sum(W_n * freqs**-2))**0.5
+        W_n[nn] = old_div(W, (err**2.0 * p))
+        d2_phi += old_div(-2.0 * W, (err**2.0 * p))
+        d2_DM += old_div(-2.0 * W * dDM**2.0, (err**2.0 * p))
+        d2_cross += old_div(-2.0 * W * dDM, (err**2.0 * p))
+    nu_zero = (old_div(W_n.sum(), np.sum(W_n * freqs**-2)))**0.5
     return (np.array([d2_phi, d2_DM, d2_cross]), nu_zero)
 
 def wiener_filter(prof, noise):
@@ -1404,8 +1411,8 @@ def wiener_filter(prof, noise):
     Reference: PBD's PhDT
     """
     FFT = fft.rfft(prof)
-    pows = np.real(FFT * np.conj(FFT)) / len(prof)
-    return pows / (pows + (noise**2))
+    pows = old_div(np.real(FFT * np.conj(FFT)), len(prof))
+    return old_div(pows, (pows + (noise**2)))
     #return (pows - (noise**2)) / pows
 
 def brickwall_filter(N, kc):
@@ -1443,7 +1450,7 @@ def half_triangle_function(a, b, dc, N):
     """
     fn = np.zeros(N) + dc
     a = int(np.floor(a))
-    fn[:a] += -(np.float64(b)/a)*np.arange(a) + b
+    fn[:a] += -(old_div(np.float64(b),a))*np.arange(a) + b
     return fn
 
 def find_kc_function(params, data, errs=1.0, fn='exp_dc'):
@@ -1461,7 +1468,7 @@ def find_kc_function(params, data, errs=1.0, fn='exp_dc'):
     if fn == 'exp_dc': model = b * np.exp(-a * np.arange(len(data))) + dc
     elif fn == 'half_tri': model = half_triangle_function(a, b, dc, len(data))
     else: return 0.0
-    return np.sum(((data - model) / errs)**2.0)
+    return np.sum((old_div((data - model), errs))**2.0)
 
 def find_kc(pows, errs=1.0, fn='exp_dc'):
     """
@@ -1522,7 +1529,7 @@ def pca(port, mean_prof=None, weights=None, quiet=False):
 
     #Subtract weighted average from each set of measurements
     if mean_prof is None:
-        mean_prof = (port.T * weights).T.sum(axis=0) / weights.sum()
+        mean_prof = old_div((port.T * weights).T.sum(axis=0), weights.sum())
     delta_port = port - mean_prof
 
     #Compute unbiased weighted covariance matrix
@@ -1588,7 +1595,7 @@ def find_significant_eigvec(eigvec, check_max=10, return_max=10,
         # Get Fourier-domain noise
         ev_noise = get_noise(eigvec.T[ivec]) * np.sqrt(len(ev) / 2.0)
         # Get Fourier-domain signal, and calculate S/N
-        ev_snr = np.sum(np.abs(np.fft.rfft(ev)[1:])**2) / ev_noise
+        ev_snr = old_div(np.sum(np.abs(np.fft.rfft(ev)[1:])**2), ev_noise)
         if ev_snr >= snr_cutoff:
             #Only check if close
             if check_crossings and ev_snr < 3*snr_cutoff:
@@ -1658,7 +1665,7 @@ def wavelet_smooth(port, wavelet='db8', nlevel=5, threshtype='hard', fact=1.0):
         #Do wavelet thresholding
         coeffs = pw.threshold(coeffs, lopt, mode=threshtype, substitute=0.0)
         #Reconstruct data
-        smooth_port[ichan] = pw.iswt(map(tuple, coeffs), wavelet)
+        smooth_port[ichan] = pw.iswt(list(map(tuple, coeffs)), wavelet)
 
     #Return smoothed portrait
     if one_prof:
@@ -1751,8 +1758,8 @@ def fit_wavelet_smooth_function(fact, prof, wavelet, nlevel, threshtype,
         smooth_prof_noise = get_noise(smooth_prof) * \
                 np.sqrt(len(smooth_prof) / 2.0)
         if smooth_prof_noise:
-            smooth_prof_snr = smooth_prof_signal / \
-                    smooth_prof_noise
+            smooth_prof_snr = old_div(smooth_prof_signal, \
+                    smooth_prof_noise)
         else:
             smooth_prof_snr = np.inf
     else:
@@ -1820,20 +1827,20 @@ def fit_DM_to_freq_resids(freqs, frequency_residuals, errs):
     w = errs**-2
     p,V = np.polyfit(x=x, y=y, deg=1, w=w, cov=True)
     a,b = p[0],p[1]
-    DM = a / Dconst
+    DM = old_div(a, Dconst)
     offset = b
-    nu_ref = (-b/a)**-0.5
+    nu_ref = (old_div(-b,a))**-0.5
     a_err = (np.diag(V)[0])**0.5
     b_err = (np.diag(V)[1])**0.5
     cov = V.ravel()[1]
-    DM_err = a_err / Dconst
+    DM_err = old_div(a_err, Dconst)
     offset_err = b_err
     nu_ref_err = (((nu_ref**2)/4.0) * \
-            (((a_err/a)**2) + ((b_err/b)**2) - (2*cov/(a*b))))**0.5
+            (((old_div(a_err,a))**2) + ((old_div(b_err,b))**2) - (old_div(2*cov,(a*b)))))**0.5
     residuals = frequency_residuals - (a*(freqs**-2) + b)
-    chi2 = ((residuals/errs)**2).sum()
+    chi2 = ((old_div(residuals,errs))**2).sum()
     dof = len(frequency_residuals) - 2
-    red_chi2 = chi2 / dof
+    red_chi2 = old_div(chi2, dof)
     results = DataBunch(DM=DM, DM_err=DM_err, offset=offset,
             offset_err = offset_err, nu_ref=nu_ref, nu_ref_err=nu_ref_err,
             ab_cov = cov, residuals=residuals, chi2=chi2, dof=dof,
@@ -1865,7 +1872,7 @@ def fit_gaussian_profile(data, init_params, errs, fit_flags=None,
     if 'lmfit' not in sys.modules:
         raise ImportError("You failed to import lmfit and need it to use fit_gaussian_profile!")
     nparam = len(init_params)
-    ngauss = (len(init_params) - 2) / 3
+    ngauss = old_div((len(init_params) - 2), 3)
     if fit_flags is None:
         fit_flags = [True for t in range(nparam)]
         fit_flags[1] = fit_scattering
@@ -1882,13 +1889,13 @@ def fit_gaussian_profile(data, init_params, errs, fit_flags=None,
             params.add('tau', init_params[ii], vary=fit_flags[ii], min=0.0,
                     max=None, expr=None)
         elif ii in range(nparam)[2::3]:
-            params.add('loc%s'%str((ii-2)/3 + 1), init_params[ii],
+            params.add('loc%s'%str(old_div((ii-2),3) + 1), init_params[ii],
                     vary=fit_flags[ii], min=None, max=None, expr=None)
         elif ii in range(nparam)[3::3]:
-            params.add('wid%s'%str((ii-3)/3 + 1), init_params[ii],
+            params.add('wid%s'%str(old_div((ii-3),3) + 1), init_params[ii],
                     vary=fit_flags[ii], min=0.0, max=wid_max, expr=None)
         elif ii in range(nparam)[4::3]:
-            params.add('amp%s'%str((ii-4)/3 + 1), init_params[ii],
+            params.add('amp%s'%str(old_div((ii-4),3) + 1), init_params[ii],
                     vary=fit_flags[ii], min=0.0, max=None, expr=None)
         else:
             print("Undefined index %d."%ii)
@@ -1898,9 +1905,9 @@ def fit_gaussian_profile(data, init_params, errs, fit_flags=None,
     results = lm.minimize(fit_gaussian_profile_function, params,
             kws=other_args)
     fitted_params = np.array([param.value for param in
-        results.params.itervalues()])
+        results.params.values()])
     fit_errs = np.array([param.stderr for param in
-        results.params.itervalues()])
+        results.params.values()])
     dof = results.nfree
     chi2 = results.chisqr
     red_chi2 = results.redchi
@@ -1959,7 +1966,7 @@ def fit_gaussian_portrait(model_code, data, init_params, scattering_index,
     if 'lmfit' not in sys.modules:
         raise ImportError("You failed to import lmfit and need it to use fit_gaussian_portrait!")
     nparam = len(init_params)
-    ngauss = (len(init_params) - 2) / 6
+    ngauss = old_div((len(init_params) - 2), 6)
     #Generate the parameter structure
     params = lm.Parameters()
     for ii in range(nparam):
@@ -1970,22 +1977,22 @@ def fit_gaussian_portrait(model_code, data, init_params, scattering_index,
             params.add('tau', init_params[ii], vary=bool(fit_flags[ii]),
                     min=0.0, max=None, expr=None)
         elif ii%6 == 2:     #loc limits
-            params.add('loc%s'%str((ii-2)/6 + 1), init_params[ii],
+            params.add('loc%s'%str(old_div((ii-2),6) + 1), init_params[ii],
                     vary=bool(fit_flags[ii]), min=None, max=None, expr=None)
         elif ii%6 == 3:     #loc slope limits
-            params.add('m_loc%s'%str((ii-3)/6 + 1), init_params[ii],
+            params.add('m_loc%s'%str(old_div((ii-3),6) + 1), init_params[ii],
                     vary=bool(fit_flags[ii]), min=None, max=None, expr=None)
         elif ii%6 == 4:     #wid limits, limited by 0
-            params.add('wid%s'%str((ii-4)/6 + 1), init_params[ii],
+            params.add('wid%s'%str(old_div((ii-4),6) + 1), init_params[ii],
                     vary=bool(fit_flags[ii]), min=0.0, max=wid_max, expr=None)
         elif ii%6 == 5:     #wid slope limits
-            params.add('m_wid%s'%str((ii-5)/6 + 1), init_params[ii],
+            params.add('m_wid%s'%str(old_div((ii-5),6) + 1), init_params[ii],
                     vary=bool(fit_flags[ii]), min=None, max=None, expr=None)
         elif ii%6 == 0:     #amp limits, limited by 0
-            params.add('amp%s'%str((ii-6)/6 + 1), init_params[ii],
+            params.add('amp%s'%str(old_div((ii-6),6) + 1), init_params[ii],
                     vary=bool(fit_flags[ii]), min=0.0, max=None, expr=None)
         elif ii%6 == 1:     #amp index limits
-            params.add('alpha%s'%str((ii-7)/6 + 1), init_params[ii],
+            params.add('alpha%s'%str(old_div((ii-7),6) + 1), init_params[ii],
                     vary=bool(fit_flags[ii]), min=None, max=None, expr=None)
         else:
             print("Undefined index %d."%ii)
@@ -2023,11 +2030,11 @@ def fit_gaussian_portrait(model_code, data, init_params, scattering_index,
     results = lm.minimize(fit_gaussian_portrait_function, params,
             kws=other_args)
     fitted_params = np.array([param.value for param in
-        results.params.itervalues()])
+        results.params.values()])
     scattering_index = fitted_params[-1]
     fitted_params = fitted_params[:-1]
     fit_errs = np.array([param.stderr for param in
-        results.params.itervalues()])
+        results.params.values()])
     scattering_index_err = fit_errs[-1]
     fit_errs = fit_errs[:-1]
     dof = results.nfree
@@ -2079,8 +2086,8 @@ def fit_phase_shift(data, model, noise=None, bounds=[-0.5, 0.5], Ns=100):
         err = get_noise(data) * np.sqrt(len(data)/2.0)
     else:
         err = noise * np.sqrt(len(data)/2.0)
-    d = np.real(np.sum(dFFT * np.conj(dFFT))) / err**2.0
-    p = np.real(np.sum(mFFT * np.conj(mFFT))) / err**2.0
+    d = old_div(np.real(np.sum(dFFT * np.conj(dFFT))), err**2.0)
+    p = old_div(np.real(np.sum(mFFT * np.conj(mFFT))), err**2.0)
     other_args = (mFFT, dFFT, err)
     start = time.time()
     results = opt.brute(fit_phase_shift_function, [tuple(bounds)],
@@ -2088,12 +2095,12 @@ def fit_phase_shift(data, model, noise=None, bounds=[-0.5, 0.5], Ns=100):
     duration = time.time() - start
     phase = results[0][0]
     fmin = results[1]
-    scale = -fmin / p
+    scale = old_div(-fmin, p)
     #In the next two error equations, consult fit_portrait for factors of 2
     phase_error = (scale * fit_phase_shift_function_2deriv(phase, mFFT, dFFT,
         err))**-0.5
     scale_error = p**-0.5
-    red_chi2 = (d - ((fmin**2) / p)) / (len(data) - 2)
+    red_chi2 = old_div((d - (old_div((fmin**2), p))), (len(data) - 2))
     #SNR of the fit, based on PDB's notes
     snr = pow(scale**2 * p, 0.5)
     return DataBunch(phase=phase, phase_err=phase_error, scale=scale,
@@ -2191,13 +2198,13 @@ def fit_portrait(data, model, init_params, P, freqs, nu_fit=None, nu_out=None,
     param_errs = list(covariance_matrix.diagonal()**0.5)
     dof = len(data.ravel()) - (len(freqs) + 2)
     chi2 = (d + results.fun)
-    red_chi2 = chi2 / dof
+    red_chi2 = old_div(chi2, dof)
     #Calculate scales
     scales = get_scales(data, model, phi, DM, P, freqs, nu_fit)
     #Errors on scales, if ever needed (these may be wrong b/c of covariances)
-    scale_errs = pow(p_n / errs**2.0, -0.5)
+    scale_errs = pow(old_div(p_n, errs**2.0), -0.5)
     #SNR of the fit, based on PDB's notes
-    snr = pow(np.sum(scales**2.0 * p_n / errs**2.0), 0.5)
+    snr = pow(np.sum(old_div(scales**2.0 * p_n, errs**2.0)), 0.5)
     results = DataBunch(phase=phi_out, phase_err=param_errs[0], DM=DM,
             DM_err=param_errs[1], scales=scales, scale_errs=scale_errs,
             nu_ref=nu_out, covariance=covariance, chi2=chi2, red_chi2=red_chi2,
@@ -2242,14 +2249,14 @@ def get_noise_PS(data, frac=4, chans=False):
         for ichan in range(len(noise)):
             prof = data[ichan]
             FFT = fft.rfft(prof)
-            pows = np.real(FFT * np.conj(FFT)) / len(prof)
+            pows = old_div(np.real(FFT * np.conj(FFT)), len(prof))
             kc = int((1 - frac**-1)*len(pows))
             noise[ichan] = np.sqrt(np.mean(pows[kc:]))
         return noise
     else:
         raveld = data.ravel()
         FFT = fft.rfft(raveld)
-        pows = np.real(FFT * np.conj(FFT)) / len(raveld)
+        pows = old_div(np.real(FFT * np.conj(FFT)), len(raveld))
         kc = int((1 - frac**-1)*len(pows))
         return np.sqrt(np.mean(pows[kc:]))
 
@@ -2270,7 +2277,7 @@ def get_noise_fit(data, fact=1.1, chans=False):
         for ichan in range(len(noise)):
             prof = data[ichan]
             FFT = fft.rfft(prof)
-            pows = np.real(FFT * np.conj(FFT)) / len(prof)
+            pows = old_div(np.real(FFT * np.conj(FFT)), len(prof))
             k_crit = fact * find_kc(pows)
             if k_crit >= len(pows):
                 #Will only matter in unresolved or super narrow, high SNR cases
@@ -2280,7 +2287,7 @@ def get_noise_fit(data, fact=1.1, chans=False):
     else:
         raveld = data.ravel()
         FFT = fft.rfft(raveld)
-        pows = np.real(FFT * np.conj(FFT)) / len(raveld)
+        pows = old_div(np.real(FFT * np.conj(FFT)), len(raveld))
         k_crit = fact * find_kc(pows)
         if k_crit >= len(pows):
             #Will only matter in unresolved or super narrow, high SNR cases
@@ -2302,11 +2309,11 @@ def get_SNR(prof, fudge=3.25):
     nbin = len(prof)
     #dc = np.real(np.fft.rfft(data))[0]
     dc = 0
-    Weq = (prof - dc).sum() / (prof - dc).max()
+    Weq = old_div((prof - dc).sum(), (prof - dc).max())
     mask = np.where(Weq <= 0.0, 0.0, 1.0)
     Weq = np.where(Weq <= 0.0, 1.0, Weq)
-    SNR = (prof - dc).sum() / (noise * Weq**0.5)
-    return (SNR * mask) / fudge
+    SNR = old_div((prof - dc).sum(), (noise * Weq**0.5))
+    return old_div((SNR * mask), fudge)
 
 def get_scales(data, model, phase, DM, P, freqs, nu_ref=np.inf):
     """
@@ -2328,7 +2335,7 @@ def get_scales(data, model, phase, DM, P, freqs, nu_ref=np.inf):
     mFFT = fft.rfft(model, axis=1)
     mFFT[:, 0] *= F0_fact
     p_n = np.real(np.sum(mFFT * np.conj(mFFT), axis=1))
-    D = Dconst * DM / P
+    D = old_div(Dconst * DM, P)
     harmind = np.arange(len(mFFT[0]))
     phasor = np.exp(2.0j * np.pi * np.outer((phase + (D * (freqs**-2.0 -
         nu_ref**-2.0))), harmind))
@@ -2361,7 +2368,7 @@ def rotate_data(data, phase=0.0, DM=0.0, Ps=None, freqs=None, nu_ref=np.inf):
     if DM == 0.0:
         idim = 'ijkl'
         idim = idim[:ndim]
-        iaxis = range(ndim)
+        iaxis = list(range(ndim))
         baxis = iaxis[-1]
         bdim = list(idim)[baxis]
         dFFT = fft.rfft(data, axis=baxis)
@@ -2387,7 +2394,7 @@ def rotate_data(data, phase=0.0, DM=0.0, Ps=None, freqs=None, nu_ref=np.inf):
         dFFT = fft.rfft(datacopy, axis=baxis)
         nharm = dFFT.shape[baxis]
         harmind = np.arange(nharm)
-        D = Dconst * DM / (np.ones(nsub)*Ps)
+        D = old_div(Dconst * DM, (np.ones(nsub)*Ps))
         if len(D) != nsub:
             print("Wrong shape for array of periods.")
             return 0
@@ -2453,7 +2460,7 @@ def rotate_portrait(port, phase=0.0, DM=None, P=None, freqs=None,
             pFFT[nn,:] *= np.exp(np.arange(len(pFFT[nn])) * 2.0j * np.pi *
                     phase)
         else:
-            D = Dconst * DM / P
+            D = old_div(Dconst * DM, P)
             freq = freqs[nn]
             phasor = np.exp(np.arange(len(pFFT[nn])) * 2.0j * np.pi * (phase +
                 (D * (freq**-2.0 - nu_ref**-2.0))))
@@ -2500,7 +2507,7 @@ def normalize_portrait(port, method='rms', weights=None, return_norms=False):
                     norm = get_noise(port[ichan])
                 else:
                     norm = (pow(port[ichan], 2.0).sum())**0.5
-                norm_port[ichan] = port[ichan] / norm
+                norm_port[ichan] = old_div(port[ichan], norm)
                 norm_vals[ichan] = norm
         if return_norms:
             return norm_port, norm_vals
@@ -2532,7 +2539,7 @@ def add_DM_nu(port, phase=0.0, DM=None, P=None, freqs=None, xs=[-2.0],
             pFFT[nn,:] *= np.exp(np.arange(len(pFFT[nn])) * 2.0j * np.pi *
                     phase)
         else:
-            D = Dconst * DM / P
+            D = old_div(Dconst * DM, P)
             freq = freqs[nn]
             freq_term = 0.0
             if not hasattr(Cs, "__iter__"):
@@ -2570,9 +2577,9 @@ def fft_rotate(arr, bins):
     Taken and tweaked from SMR's PRESTO.  Used for testing.
     """
     arr = np.asarray(arr)
-    freqs = np.arange(arr.size/2 + 1, dtype=np.float64)
-    phasor = np.exp(complex(0.0, 2*np.pi) * freqs * bins /
-            np.float64(arr.size))
+    freqs = np.arange(old_div(arr.size,2) + 1, dtype=np.float64)
+    phasor = np.exp(old_div(complex(0.0, 2*np.pi) * freqs * bins,
+            np.float64(arr.size)))
     return np.fft.irfft(phasor * np.fft.rfft(arr), arr.size)
 
 def DM_delay(DM, freq, freq_ref=np.inf, P=None):
@@ -2586,7 +2593,7 @@ def DM_delay(DM, freq, freq_ref=np.inf, P=None):
     """
     delay = Dconst * DM * ((freq**-2.0) - (freq_ref**-2.0))
     if P:
-        return delay / P
+        return old_div(delay, P)
     else:
         return delay
 
@@ -2629,7 +2636,7 @@ def guess_fit_freq(freqs, SNRs=None):
     nu0 = (freqs.min() + freqs.max()) * 0.5
     if SNRs is None:
         SNRs = np.ones(len(freqs))
-    diff = np.sum((freqs - nu0) * SNRs * freqs**-2) / np.sum(SNRs * freqs**-2)
+    diff = old_div(np.sum((freqs - nu0) * SNRs * freqs**-2), np.sum(SNRs * freqs**-2))
     return nu0 + diff
 
 def calculate_TOA(epoch, P, phi, DM=0.0, nu_ref1=np.inf, nu_ref2=np.inf):
@@ -2645,7 +2652,7 @@ def calculate_TOA(epoch, P, phi, DM=0.0, nu_ref1=np.inf, nu_ref2=np.inf):
     """
     #The pre-Doppler corrected DM must be used
     phi_prime = phase_transform(phi, DM, nu_ref1, nu_ref2, P, mod=False)
-    TOA = epoch + pr.MJD((phi_prime * P) / (3600 * 24.))
+    TOA = epoch + pr.MJD(old_div((phi_prime * P), (3600 * 24.)))
     return TOA
 
 def load_data(filename, state=None, dedisperse=False, dededisperse=False,
@@ -2753,8 +2760,8 @@ def load_data(filename, state=None, dedisperse=False, dededisperse=False,
     #        for ibad_chan in np.where(noise_stds[isub,ipol] < 1e-8)[0]:
     #            weights_norm[isub,ibad_chan] *= 0.0
     #            weights[isub,ibad_chan] *= 0.0
-    ok_isubs = np.compress(weights_norm.mean(axis=1), range(nsub))
-    ok_ichans = [np.compress(weights_norm[isub], range(nchan)) \
+    ok_isubs = np.compress(weights_norm.mean(axis=1), list(range(nsub)))
+    ok_ichans = [np.compress(weights_norm[isub], list(range(nchan))) \
             for isub in range(nsub)]
     #np.einsum is AWESOME
     masks = np.einsum('ij,k', weights_norm, np.ones(nbin))
@@ -2783,7 +2790,7 @@ def load_data(filename, state=None, dedisperse=False, dededisperse=False,
     prof_noise = arch.get_Integration(0).baseline_stats()[1][0,0]**0.5
     prof_SNR = arch.get_Integration(0).get_Profile(0,0).snr()
     #Number unzapped channels (mean), subints
-    nchanx = np.array(map(len, ok_ichans)).mean()
+    nchanx = np.array(list(map(len, ok_ichans))).mean()
     nsubx = len(ok_isubs)
     if not quiet:
         P = arch.get_Integration(0).get_folding_period()*1000.0
@@ -2823,7 +2830,7 @@ def unpack_dict(data):
     This does not work yet; just for reference...
     Dictionary has to be named 'data'...
     """
-    for key in data.keys():
+    for key in list(data.keys()):
         exec(key + " = data['" + key + "']")
 
 def write_model(filename, name, model_code, nu_ref, model_params, fit_flags,
@@ -2856,11 +2863,11 @@ def write_model(filename, name, model_code, nu_ref, model_params, fit_flags,
     outfile.write("DC     % .8f %d\n"%(model_params[0], fit_flags[0]))
     outfile.write("TAU    % .8f %d\n"%(model_params[1], fit_flags[1]))
     outfile.write("ALPHA  % .3f      %d\n"%(alpha, fit_alpha))
-    ngauss = (len(model_params) - 2) / 6
+    ngauss = old_div((len(model_params) - 2), 6)
     for igauss in range(ngauss):
         comp = model_params[(2 + igauss*6):(8 + igauss*6)]
         fit_comp = fit_flags[(2 + igauss*6):(8 + igauss*6)]
-        line = (igauss + 1, ) + tuple(np.array(zip(comp, fit_comp)).ravel())
+        line = (igauss + 1, ) + tuple(np.array(list(zip(comp, fit_comp))).ravel())
         outfile.write("COMP%02d % .8f %d  % .8f %d  % .8f %d  % .8f %d  % .8f %d  % .8f %d\n"%line)
     outfile.close()
     if not quiet: print("%s written."%filename)
@@ -2922,8 +2929,8 @@ def read_model(modelfile, phases=None, freqs=None, P=None, quiet=False):
     fit_flags[0] = fit_dc
     fit_flags[1] = fit_tau
     for igauss in range(ngauss):
-        comp = map(np.float64, comps[igauss].split()[1::2])
-        fit_comp = map(int, comps[igauss].split()[2::2])
+        comp = list(map(np.float64, comps[igauss].split()[1::2]))
+        fit_comp = list(map(int, comps[igauss].split()[2::2]))
         params[2 + igauss*6 : 8 + (igauss*6)] = comp
         fit_flags[2 + igauss*6 : 8 + (igauss*6)] = fit_comp
     if not read_only:
@@ -2934,7 +2941,7 @@ def read_model(modelfile, phases=None, freqs=None, P=None, quiet=False):
                 print("Need period P for non-zero scattering value TAU.")
                 return 0
             else:
-                params[1] *= nbin / P
+                params[1] *= old_div(nbin, P)
         model = gen_gaussian_portrait(model_code, params, alpha, phases, freqs,
                 nu_ref)
     if not quiet and not read_only:
@@ -3232,8 +3239,8 @@ def make_fake_pulsar(modelfile, ephemeris, outfile="fake_pulsar.fits", nsub=1,
 
     Mostly written by PBD.
     """
-    chanwidth = bw / nchan
-    lofreq = nu0 - (bw/2)
+    chanwidth = old_div(bw, nchan)
+    lofreq = nu0 - (old_div(bw,2))
     #Channel frequency centers
     freqs = np.linspace(lofreq + (chanwidth/2.0), lofreq + bw -
             (chanwidth/2.0), nchan)
@@ -3351,7 +3358,7 @@ def make_fake_pulsar(modelfile, ephemeris, outfile="fake_pulsar.fits", nsub=1,
                 #sk = scattering_kernel(t_scat, nu0, freqs, phases, P,
                 #        alpha=alpha)
                 #rotmodel = add_scattering(rotmodel, sk, repeat=3)
-                taus = scattering_times(t_scat/P, alpha, freqs, nu0)
+                taus = scattering_times(old_div(t_scat,P), alpha, freqs, nu0)
                 sp_FT = scattering_portrait_FT(taus, nbin)
                 rotmodel = np.fft.irfft(sp_FT * \
                         np.fft.rfft(rotmodel, axis=-1), axis=-1)
@@ -3476,7 +3483,7 @@ def write_TOAs(TOAs, inf_is_zero=True, SNR_cutoff=0.0, outfile=None,
         if toa.DM_error is not None:
             #toa_string += " -dm_err %.7f"%toa.DM_error
             toa_string += " -pp_dme %.7f"%toa.DM_error
-        for flag,value in toa.flags.iteritems():
+        for flag,value in toa.flags.items():
             if value is not None:
                 if hasattr(value, "lower"):
                     exec("toa_string += ' -%s %s'"%(flag, value))
@@ -3560,7 +3567,7 @@ def show_portrait(port, phases=None, freqs=None, title=None, prof=True,
         freqsx = np.compress(weights, freqs)
         fi = 1
     if colorbar: ci = 1
-    ax1 = plt.subplot(grid[(pi*nn/6):, (fi*nn/6):])
+    ax1 = plt.subplot(grid[(old_div(pi*nn,6)):, (old_div(fi*nn,6)):])
     im = ax1.imshow(port, aspect=aspect, origin=origin, extent=extent,
         interpolation=interpolation, **kwargs)
     if colorbar: plt.colorbar(im, ax=ax1, use_gridspec=False)
@@ -3574,23 +3581,23 @@ def show_portrait(port, phases=None, freqs=None, title=None, prof=True,
         if title: plt.title(title)
     if pi:
         if ci:
-            ax2 = plt.subplot(grid[:(pi*nn/6), (fi*nn/6):((3+fi+ci)*nn) /
-                (4+fi+ci)])
+            ax2 = plt.subplot(grid[:(old_div(pi*nn,6)), (old_div(fi*nn,6)):old_div(((3+fi+ci)*nn),
+                (4+fi+ci))])
         else:
-            ax2 = plt.subplot(grid[:(pi*nn/6), (fi*nn/6):])
+            ax2 = plt.subplot(grid[:(old_div(pi*nn,6)), (old_div(fi*nn,6)):])
         ax2.plot(phases, prof, 'k-')
         ax2.set_xticks(ax1.get_xticks())
         ax2.set_xticklabels(())
-        ax2.set_yticks([0, round(prof.max() / 2, 1), round(prof.max(), 1)])
+        ax2.set_yticks([0, round(old_div(prof.max(), 2), 1), round(prof.max(), 1)])
         ax2.set_xlim(phases.min(), phases.max())
         rng = prof.max() - prof.min()
         ax2.set_ylim(prof.min() - 0.03*rng, prof.max() + 0.05*rng)
         ax2.set_ylabel("Flux Units")
         if title: plt.title(title)
     if fi:
-        ax3 = plt.subplot(grid[(pi*nn/6):, :(fi*nn/6)])
+        ax3 = plt.subplot(grid[(old_div(pi*nn,6)):, :(old_div(fi*nn,6))])
         ax3.plot(fluxprofx, freqsx, 'kx')
-        ax3.set_xticks([0, round(fluxprofx.max() / 2, 2),
+        ax3.set_xticks([0, round(old_div(fluxprofx.max(), 2), 2),
             round(fluxprofx.max(), 2)])
         rng = fluxprofx.max() - fluxprofx.min()
         ax3.set_xlim(fluxprofx.max() + 0.03*rng, fluxprofx.min() - 0.01*rng)
@@ -3661,9 +3668,9 @@ def show_stacked_profiles(data_profiles, model_profiles=None, phases=None,
     ytick_labels = ax.get_yticklabels()
     ytick_labels = freqs[::10]
     #ytick_labels = np.linspace(freqs[0], freqs[-1], len(ytick_labels))
-    ytick_labels = map(round, ytick_labels)
-    ytick_labels = map(int, ytick_labels)
-    ytick_labels = map(str, ytick_labels)
+    ytick_labels = list(map(round, ytick_labels))
+    ytick_labels = list(map(int, ytick_labels))
+    ytick_labels = list(map(str, ytick_labels))
     ax.set_yticklabels(ytick_labels)
     ax.set_ylabel(ylabel)
     if title is not None: ax.set_title(title)
@@ -3693,7 +3700,7 @@ def show_profiles(model, phases=None, cmap=plt.cm.Spectral, s=1, offset=None,
         phases = get_bin_centers(len(model[0]))
     if offset is None: offset = model_range / float(len(model))
     for iprof,prof in enumerate(model):
-        norm_prof = (prof - model_min) / model_range
+        norm_prof = old_div((prof - model_min), model_range)
         c = cmap(norm_prof)
         plt.scatter(phases, prof + (offset*iprof), c=c, edgecolor='none', s=s,
                 **kwargs)
@@ -3730,7 +3737,7 @@ def show_residual_plot(port, model, resids=None, phases=None, freqs=None,
     **kwargs get passed to imshow.  e.g. vmin, vmax...
     """
     mm = 6
-    nn = (2*mm) + (mm/3)
+    nn = (2*mm) + (old_div(mm,3))
     grid = gs.GridSpec(nn, nn)
     if freqs is None:
         freqs = np.arange(len(port))
@@ -4007,7 +4014,7 @@ def show_eigenprofiles(eigprofs=None, smooth_eigprofs=None, mean_prof=None,
             ev = eigprofs[ie]
             se = smooth_eigprofs[ie]
             ev_noise = get_noise(ev) * np.sqrt(len(ev) / 2.0)
-            ev_snrs[ie] = np.sum(np.abs(np.fft.rfft(se)[1:])**2) / ev_noise
+            ev_snrs[ie] = old_div(np.sum(np.abs(np.fft.rfft(se)[1:])**2), ev_noise)
             #print "ev_snr", ev_snrs[ie]
     for iax,ax in enumerate(axes):
         if plot_mean and iax == 0:
@@ -4048,7 +4055,7 @@ def show_eigenprofiles(eigprofs=None, smooth_eigprofs=None, mean_prof=None,
 def scattering_times(tau, alpha, freqs, nu_tau):
     """
     """
-    taus = tau * (freqs/nu_tau)**alpha
+    taus = tau * (old_div(freqs,nu_tau))**alpha
     return taus
 
 def scattering_profile_FT(tau, nbin, binshift=binshift):
@@ -4065,7 +4072,7 @@ def scattering_profile_FT(tau, nbin, binshift=binshift):
 
     Note that the function returns the analytic FT sampled nbin/2 + 1 times.
     """
-    nharm = nbin/2 + 1
+    nharm = old_div(nbin,2) + 1
     if tau == 0.0:
         scat_prof_FT = np.ones(nharm)
     else:
@@ -4080,7 +4087,7 @@ def scattering_portrait_FT(taus, nbin, binshift=binshift):
     """
     """
     nchan = len(taus)
-    nharm = nbin/2 + 1
+    nharm = old_div(nbin,2) + 1
     if not np.any(taus):
         scat_port_FT = np.ones([nchan, nharm])
     else:

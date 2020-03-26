@@ -14,6 +14,12 @@
 #Contributions by Scott M. Ransom (SMR) and Paul B. Demorest (PBD).
 
 from __future__ import print_function
+from __future__ import division
+from builtins import zip
+from builtins import map
+from builtins import range
+from past.utils import old_div
+from builtins import object
 from pptoaslib import *
 
 #cfitsio defines a maximum number of files (NMAXFILES) that can be opened in
@@ -29,7 +35,7 @@ if F0_fact:
 else:
     rm_baseline = False
 
-class TOA:
+class TOA(object):
 
     """
     TOA class bundles common TOA attributes together with useful functions.
@@ -60,7 +66,7 @@ class TOA:
         self.DM = DM
         self.DM_error = DM_error
         self.flags = flags
-        for flag in flags.keys():
+        for flag in list(flags.keys()):
             exec('self.%s = flags["%s"]'%(flag, flag))
 
     def write_TOA(self, inf_is_zero=True, outfile=None):
@@ -73,7 +79,7 @@ class TOA:
         """
         write_TOAs(self, inf_is_zero=inf_is_zero, outfile=outfile, append=True)
 
-class GetTOAs:
+class GetTOAs(object):
 
     """
     GetTOAs is a class with methods to measure TOAs and DMs from data.
@@ -275,7 +281,7 @@ class GetTOAs:
                 continue
             #Unpack the data dictionary into the local namespace; see load_data
             #for dictionary keys.
-            for key in data.keys():
+            for key in list(data.keys()):
                 exec(key + " = data['" + key + "']")
             if source is None: source = "noname"
             #Observation info
@@ -336,7 +342,7 @@ class GetTOAs:
                             len(freqs[0]), nbin)
             if not quiet:
                 print("\nEach of the %d TOAs is approximately %.2f s"%(
-                        len(ok_isubs), integration_length / nsub))
+                        len(ok_isubs), old_div(integration_length, nsub)))
             itoa = 1
             for isub in ok_isubs:
                 sub_id = datafile + "_%d"%isub
@@ -422,14 +428,14 @@ class GetTOAs:
                 if fit_scat:
                     if self.scat_guess is not None:
                         tau_guess_s,tau_guess_ref,alpha_guess = self.scat_guess
-                        tau_guess = (tau_guess_s / P) * \
-                                (nu_fit_tau / tau_guess_ref)**alpha_guess
+                        tau_guess = (old_div(tau_guess_s, P)) * \
+                                (old_div(nu_fit_tau, tau_guess_ref))**alpha_guess
                     else:
                         if hasattr(self, 'alpha'): alpha_guess = self.alpha
                         else: alpha_guess = scattering_alpha
                         if hasattr(self, 'gparams'):
-                            tau_guess = (self.gparams[1] / P) * \
-                                    (nu_fit_tau/self.model_nu_ref)**alpha_guess
+                            tau_guess = (old_div(self.gparams[1], P)) * \
+                                    (old_div(nu_fit_tau,self.model_nu_ref))**alpha_guess
                         else:
                             tau_guess = 0.0  # nbin**-1?
                             #tau_guess = guess_tau(...)
@@ -520,8 +526,8 @@ class GetTOAs:
                 #  CALCULATE  TOA  #
                 ####################
                 results.TOA = epoch + pr.MJD(
-                        ((results.phi * P) + backend_delay) /
-                        (3600 * 24.))
+                        old_div(((results.phi * P) + backend_delay),
+                        (3600 * 24.)))
                 results.TOA_err = results.phi_err * P * 1e6 # [us]
 
                 ######################
@@ -607,15 +613,15 @@ class GetTOAs:
                     toa_flags['gm_err'] = results.GM_err
                 if fit_flags[3]:
                     if self.log10_tau:
-                        toa_flags['scat_time'] = 10**results.tau * P / df * 1e6
+                        toa_flags['scat_time'] = old_div(10**results.tau * P, df) * 1e6
                                                  # usec, w/ df
                         toa_flags['log10_scat_time'] = results.tau + \
-                                np.log10(P / df)  # w/ df
+                                np.log10(old_div(P, df))  # w/ df
                         toa_flags['log10_scat_time_err'] = results.tau_err
                     else:
-                        toa_flags['scat_time'] = results.tau * P / df * 1e6
+                        toa_flags['scat_time'] = old_div(results.tau * P, df) * 1e6
                                                  # usec, w/ df
-                        toa_flags['scat_time_err'] = results.tau_err * P / df \
+                        toa_flags['scat_time_err'] = old_div(results.tau_err * P, df) \
                                 * 1e6  # usec, w/ df
                     toa_flags['scat_ref_freq'] = results.nu_tau * df  # w/ df
                     toa_flags['scat_ind'] = results.alpha
@@ -628,10 +634,10 @@ class GetTOAs:
                 toa_flags['nch'] = nchan
                 toa_flags['nchx'] = len(freqsx)
                 toa_flags['bw'] = freqsx.max() - freqsx.min()
-                toa_flags['chbw'] = abs(bw) / nchan
+                toa_flags['chbw'] = old_div(abs(bw), nchan)
                 toa_flags['subint'] = isub
                 toa_flags['tobs'] = subtimes[isub]
-                toa_flags['fratio'] = freqsx.max() / freqsx.min()
+                toa_flags['fratio'] = old_div(freqsx.max(), freqsx.min())
                 toa_flags['tmplt'] = self.modelfile
                 toa_flags['snr'] = results.snr
                 if (nu_ref_DM is not None and np.all(fit_flags[:2])):
@@ -648,7 +654,7 @@ class GetTOAs:
                     toa_flags['flux_ref_freq'] = flux_freqs[isub]
                 if print_parangle:
                     toa_flags['par_angle'] = parallactic_angles[isub]
-                for k,v in addtnl_toa_flags.iteritems():
+                for k,v in addtnl_toa_flags.items():
                     toa_flags[k] = v
                 self.TOA_list.append(TOA(datafile, results.nu_DM, results.TOA,
                     results.TOA_err, telescope, telescope_code, results.DM,
@@ -669,9 +675,8 @@ class GetTOAs:
             if len(ok_isubs) > 1:
                 #The below multiply by the red. chi-squared to inflate the
                 #errors.
-                DeltaDM_var *= np.sum(
-                        ((DeltaDMs[ok_isubs] - DeltaDM_mean)**2) * DM_weights)\
-                                / (len(DeltaDMs[ok_isubs]) - 1)
+                DeltaDM_var *= old_div(np.sum(
+                        ((DeltaDMs[ok_isubs] - DeltaDM_mean)**2) * DM_weights), (len(DeltaDMs[ok_isubs]) - 1))
             DeltaDM_err = DeltaDM_var**0.5
             self.order.append(datafile)
             self.obs.append(obs)
@@ -715,7 +720,7 @@ class GetTOAs:
             if not quiet:
                 print("--------------------------")
                 print(datafile)
-                print("~%.4f sec/TOA"%(fit_duration / len(ok_isubs)))
+                print("~%.4f sec/TOA"%(old_div(fit_duration, len(ok_isubs))))
                 print("Med. TOA error is %.3f us"%(np.median(
                     phi_errs[ok_isubs]) * Ps.mean() * 1e6))
             if show_plot:
@@ -729,7 +734,7 @@ class GetTOAs:
         if not quiet and len(self.ok_isubs):
             print("--------------------------")
             print("Total time: %.2f sec, ~%.4f sec/TOA"%(tot_duration,
-                    tot_duration / (np.array(map(len, self.ok_isubs)).sum())))
+                    old_div(tot_duration, (np.array(list(map(len, self.ok_isubs))).sum()))))
 
     def get_channels_to_zap(self, SNR_threshold=8.0, rchi2_threshold=1.3,
             iterate=True, show=False):
@@ -764,8 +769,8 @@ class GetTOAs:
                         datafile=datafile, isub=isub, rotate=0.0, show=False,
                         return_fit=True, quiet=True)
                 channel_snrs = self.channel_snrs[iarch][isub]
-                channel_SNR_threshold = (SNR_threshold**2.0 / \
-                        len(ok_ichans))**0.5
+                channel_SNR_threshold = (old_div(SNR_threshold**2.0, \
+                        len(ok_ichans)))**0.5
                 for ichan,ok_ichan in enumerate(ok_ichans):
                     channel_red_chi2 = get_red_chi2(port[ok_ichan],
                             model[ok_ichan], errs=noise_stds[ok_ichan],
@@ -787,8 +792,8 @@ class GetTOAs:
                     added_new = True
                     while(added_new and (len(ok_ichans)-len(bad_ichans))):
                         # recalculate threshold after removing channels
-                        channel_SNR_threshold = (SNR_threshold**2.0 / \
-                                (len(ok_ichans)-len(bad_ichans)))**0.5
+                        channel_SNR_threshold = (old_div(SNR_threshold**2.0, \
+                                (len(ok_ichans)-len(bad_ichans))))**0.5
                         for ichan,ok_ichan in enumerate(ok_ichans):
                             if ok_ichan in bad_ichans:
                                 continue
@@ -1071,7 +1076,7 @@ if __name__ == "__main__":
     scat_guess = options.scat_guess
     if scat_guess:
         scat_guess = [s.upper() for s in scat_guess.split(',')]
-        scat_guess = map(float, scat_guess)
+        scat_guess = list(map(float, scat_guess))
     fix_alpha = options.fix_alpha
     nu_ref_tau = options.nu_ref_tau
     if nu_ref_tau:
@@ -1084,7 +1089,7 @@ if __name__ == "__main__":
     print_flux = options.print_flux
     print_parangle = options.print_parangle
     k,v = options.toa_flags.split(',')[::2],options.toa_flags.split(',')[1::2]
-    addtnl_toa_flags = dict(zip(k,v))
+    addtnl_toa_flags = dict(list(zip(k,v)))
     snr_cutoff = float(options.snr_cutoff)
     show_plot = options.show_plot
     quiet = options.quiet

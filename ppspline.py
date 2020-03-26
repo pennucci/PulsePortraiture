@@ -22,6 +22,8 @@
 #Written by Timothy T. Pennucci (TTP; tim.pennucci@nanograv.org).
 
 from __future__ import print_function
+from __future__ import division
+from past.utils import old_div
 from pplib import *
 
 class DataPortrait(DataPortrait):
@@ -67,8 +69,8 @@ class DataPortrait(DataPortrait):
 
         #Definitions
         port = self.portx
-        pca_weights = self.SNRsxs / np.sum(self.SNRsxs)
-        mean_prof = (port.T * pca_weights).T.sum(axis=0) / pca_weights.sum()
+        pca_weights = old_div(self.SNRsxs, np.sum(self.SNRsxs))
+        mean_prof = old_div((port.T * pca_weights).T.sum(axis=0), pca_weights.sum())
         freqs = self.freqsxs[0]
         nu_lo = freqs.min()
         nu_hi = freqs.max()
@@ -269,7 +271,7 @@ class DataPortrait(DataPortrait):
         if ncomp is None: ncomp = self.ncomp
         if ncomp:
             show_spline_curve_projections(self.proj_port, self.tck,
-                    self.freqsxs[0], self.SNRsxs / np.sum(self.SNRsxs),
+                    self.freqsxs[0], old_div(self.SNRsxs, np.sum(self.SNRsxs)),
                     ncoord=ncomp, title=title, **kwargs)
 
 

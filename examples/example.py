@@ -1,6 +1,9 @@
 #!/usr/bin/env python
 
 from __future__ import print_function
+from __future__ import division
+from builtins import range
+from past.utils import old_div
 import os
 from pplib import *
 
@@ -108,7 +111,7 @@ else:
     print("Have a look at the average data you're fitting...")
     dp.show_data_portrait()
     #Fit a model; see ppgauss.py for all options
-    dp.make_gaussian_model(ref_prof=(nu0, bw/4), fixloc=True,
+    dp.make_gaussian_model(ref_prof=(nu0, old_div(bw,4)), fixloc=True,
             fixscat=not(fitscat), fixalpha=not(fitalpha), niter=3,
             fiducial_gaussian=True, writemodel=True, outfile=fitted_modelfile,
             writeerrfile=True, model_name="example-fit",
