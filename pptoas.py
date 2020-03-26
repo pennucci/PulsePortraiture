@@ -13,6 +13,7 @@
 #Written by Timothy T. Pennucci (TTP; tim.pennucci@nanograv.org).
 #Contributions by Scott M. Ransom (SMR) and Paul B. Demorest (PBD).
 
+from __future__ import print_function
 from pptoaslib import *
 
 #cfitsio defines a maximum number of files (NMAXFILES) that can be opened in
@@ -95,7 +96,7 @@ class GetTOAs:
         else:
             self.datafiles = [datafiles]
         if len(self.datafiles) > max_nfile:
-            print "Too many archives.  See/change max_nfile(=%d) in pptoas.py."%max_nfile
+            print("Too many archives.  See/change max_nfile(=%d) in pptoas.py."%max_nfile)
             sys.exit()
         self.is_FITS_model = file_is_type(modelfile, "FITS")
         self.modelfile = modelfile  # the model file in use
@@ -228,7 +229,7 @@ class GetTOAs:
         if not fit_scat:
             self.log10_tau = log10_tau = False
         if self.fit_GM or fit_scat or self.fit_tau or self.fit_alpha:
-            print warning_message
+            print(warning_message)
             already_warned = True
         self.scat_guess = scat_guess
         nu_ref_tuple = nu_refs
@@ -254,8 +255,8 @@ class GetTOAs:
                         quiet=quiet)
                 if data.dmc:
                     if not quiet:
-                        print "%s is dedispersed (dmc = 1).  Reloading it."%\
-                                datafile
+                        print("%s is dedispersed (dmc = 1).  Reloading it."%\
+                                datafile)
                     #continue
                     data = load_data(datafile, dedisperse=False,
                             dededisperse=True, tscrunch=tscrunch,
@@ -264,13 +265,13 @@ class GetTOAs:
                             refresh_arch=False, return_arch=False, quiet=quiet)
                 if not len(data.ok_isubs):
                     if not quiet:
-                        print "No subints to fit for %s.  Skipping it."%\
-                                datafile
+                        print("No subints to fit for %s.  Skipping it."%\
+                                datafile)
                     continue
                 else: self.ok_idatafiles.append(iarch)
             except RuntimeError:
                 if not quiet:
-                    print "Cannot load_data(%s).  Skipping it."%datafile
+                    print("Cannot load_data(%s).  Skipping it."%datafile)
                 continue
             #Unpack the data dictionary into the local namespace; see load_data
             #for dictionary keys.
@@ -318,7 +319,7 @@ class GetTOAs:
                 DM0 = self.DM0
             if self.is_FITS_model:
                 if not already_warned:
-                    print warning_message
+                    print(warning_message)
                     already_warned = True
                 model_data = load_data(self.modelfile, dedisperse=False,
                     dededisperse=False, tscrunch=True, pscrunch=True,
@@ -327,15 +328,15 @@ class GetTOAs:
                     refresh_arch=False, return_arch=False, quiet=True)
                 model = (model_data.masks * model_data.subints)[0,0]
                 if model.shape[-1] != nbin:
-                    print "Model nbin %d != data nbin %d for %s; skipping it."\
-                            %(model.shape[-1], nbin, datafile)
+                    print("Model nbin %d != data nbin %d for %s; skipping it."\
+                            %(model.shape[-1], nbin, datafile))
                     continue
                 if model_data.nchan == 1:
                     model = np.tile(model[0], len(freqs[0])).reshape(
                             len(freqs[0]), nbin)
             if not quiet:
-                print "\nEach of the %d TOAs is approximately %.2f s"%(
-                        len(ok_isubs), integration_length / nsub)
+                print("\nEach of the %d TOAs is approximately %.2f s"%(
+                        len(ok_isubs), integration_length / nsub))
             itoa = 1
             for isub in ok_isubs:
                 sub_id = datafile + "_%d"%isub
@@ -464,16 +465,16 @@ class GetTOAs:
                 ###########
                 # THE FIT #
                 ###########
-                if not quiet: print "Fitting for TOA #%d"%(itoa)
+                if not quiet: print("Fitting for TOA #%d"%(itoa))
                 if len(freqsx) == 1:
                     fit_flags = [1,0,0,0,0]
                     if not quiet:
-                        print "TOA #%d only has 1 frequency channel...fitting for phase only..."%(itoa)
+                        print("TOA #%d only has 1 frequency channel...fitting for phase only..."%(itoa))
                 elif len(freqsx) == 2 and self.fit_DM and self.fit_GM:
                     # prioritize DM fit
                     fit_flags[2] = 0
                     if not quiet:
-                        print "TOA #%d only has 2 frequency channels...fitting for phase and DM only..."%(itoa)
+                        print("TOA #%d only has 2 frequency channels...fitting for phase and DM only..."%(itoa))
                 else:
                     fit_flags = list(np.copy(self.fit_flags))
                 results = fit_portrait_full(portx, modelx, param_guesses, P,
@@ -712,11 +713,11 @@ class GetTOAs:
             self.rcs.append(rcs)
             self.fit_durations.append(fit_duration)
             if not quiet:
-                print "--------------------------"
-                print datafile
-                print "~%.4f sec/TOA"%(fit_duration / len(ok_isubs))
-                print "Med. TOA error is %.3f us"%(np.median(
-                    phi_errs[ok_isubs]) * Ps.mean() * 1e6)
+                print("--------------------------")
+                print(datafile)
+                print("~%.4f sec/TOA"%(fit_duration / len(ok_isubs)))
+                print("Med. TOA error is %.3f us"%(np.median(
+                    phi_errs[ok_isubs]) * Ps.mean() * 1e6))
             if show_plot:
                 stop = time.time()
                 tot_duration += stop - start
@@ -726,9 +727,9 @@ class GetTOAs:
         if not show_plot:
             tot_duration = time.time() - start
         if not quiet and len(self.ok_isubs):
-            print "--------------------------"
-            print "Total time: %.2f sec, ~%.4f sec/TOA"%(tot_duration,
-                    tot_duration / (np.array(map(len, self.ok_isubs)).sum()))
+            print("--------------------------")
+            print("Total time: %.2f sec, ~%.4f sec/TOA"%(tot_duration,
+                    tot_duration / (np.array(map(len, self.ok_isubs)).sum())))
 
     def get_channels_to_zap(self, SNR_threshold=8.0, rchi2_threshold=1.3,
             iterate=True, show=False):
@@ -866,7 +867,7 @@ class GetTOAs:
                 quiet=quiet)
         if data.dmc:
             if not quiet:
-                print "%s is dedispersed (dmc = 1).  Reloading it."%datafile
+                print("%s is dedispersed (dmc = 1).  Reloading it."%datafile)
             #continue
             data = load_data(datafile, dedisperse=False,
                     dededisperse=True, tscrunch=self.tscrunch,
@@ -1040,9 +1041,9 @@ if __name__ == "__main__":
     (options, args) = parser.parse_args()
 
     if (options.datafiles is None or options.modelfile is None):
-        print "\npptoas.py - simultaneously measure TOAs, DMs, and scattering in broadband data\n"
+        print("\npptoas.py - simultaneously measure TOAs, DMs, and scattering in broadband data\n")
         parser.print_help()
-        print ""
+        print("")
         parser.exit()
 
     datafiles = options.datafiles

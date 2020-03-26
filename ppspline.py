@@ -21,6 +21,7 @@
 
 #Written by Timothy T. Pennucci (TTP; tim.pennucci@nanograv.org).
 
+from __future__ import print_function
 from pplib import *
 
 class DataPortrait(DataPortrait):
@@ -74,10 +75,10 @@ class DataPortrait(DataPortrait):
         #Check nbin
         nbin = port.shape[1]
         if nbin % 2 != 0:
-            print "nbin = %d is odd; cannot wavelet_smooth.\n"%nbin
+            print("nbin = %d is odd; cannot wavelet_smooth.\n"%nbin)
             smooth = False
         elif np.modf(np.log2(nbin))[0] != 0.0:
-            print "nbin = %d is not a power of two; can only try wavelet_smooth to one level; recommend resampling to a power-of-two number of phase bins.\n"%nbin
+            print("nbin = %d is not a power of two; can only try wavelet_smooth to one level; recommend resampling to a power-of-two number of phase bins.\n"%nbin)
         #Do principal component analysis
         eigval, eigvec = pca(port, mean_prof, pca_weights, quiet=quiet)
         #Get "significant" eigenvectors
@@ -144,7 +145,7 @@ class DataPortrait(DataPortrait):
                     quiet=int(quiet))
             if max_nbreak is not None and len(np.unique(tck[0])) > max_nbreak:
                 if max_nbreak < 2:
-                    print "max_nbreak not >= 2; setting max_nbreak = 2..."
+                    print("max_nbreak not >= 2; setting max_nbreak = 2...")
                     max_nbreak = 2
                 if max_nbreak == 2: s = np.inf
                 (tck,u), fp, ier, msg = si.splprep(proj_port[::flip].T,
@@ -153,8 +154,8 @@ class DataPortrait(DataPortrait):
                         nest=max_nbreak+(k*2), per=0, quiet=int(quiet))
 
             if ier > 1: #Will also catch when ier == "unknown"
-                print "Something went wrong in si.splprep for %s:\n%s"%(
-                        self.source, msg)
+                print("Something went wrong in si.splprep for %s:\n%s"%(
+                        self.source, msg))
 
         #Build model
         if ncomp != 0:
@@ -195,11 +196,11 @@ class DataPortrait(DataPortrait):
 
         if not quiet:
             if proj_port.sum():
-                print "B-spline interpolation model %s uses %d basis profile components and %d breakpoints (%d B-splines with k=%d)."%(self.model_name, ncomp,
+                print("B-spline interpolation model %s uses %d basis profile components and %d breakpoints (%d B-splines with k=%d)."%(self.model_name, ncomp,
                         len(np.unique(self.tck[0])),
-                        len(self.tck[0])-self.tck[2]-1, self.tck[2])
+                        len(self.tck[0])-self.tck[2]-1, self.tck[2]))
             else:
-                print "B-spline interpolation model %s uses 0 basis profile components; it returns the average profile."%(self.model_name)
+                print("B-spline interpolation model %s uses 0 basis profile components; it returns the average profile."%(self.model_name))
 
     def write_model(self, outfile, quiet=False):
         """
@@ -225,7 +226,7 @@ class DataPortrait(DataPortrait):
 
         of.close()
         if not quiet:
-            print "Wrote modelfile %s."%outfile
+            print("Wrote modelfile %s."%outfile)
 
     def show_eigenprofiles(self, ncomp=None, title=None, **kwargs):
         """
@@ -336,9 +337,9 @@ if __name__ == "__main__":
     (options, args) = parser.parse_args()
 
     if (options.datafile is None):
-        print "\nppspline.py - make a pulse portrait model using PCA & B-spline interpolation\n"
+        print("\nppspline.py - make a pulse portrait model using PCA & B-spline interpolation\n")
         parser.print_help()
-        print ""
+        print("")
         parser.exit()
 
     datafile = options.datafile

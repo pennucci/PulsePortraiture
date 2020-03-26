@@ -1,3 +1,4 @@
+from __future__ import print_function
 #############
 # pptoaslib #
 #############
@@ -138,8 +139,8 @@ def instrumental_response_FT(nbin, wid=0.0, irf_type='rect'):
             gp_FT /= gp_FT[0]
             return gp_FT
         else:
-            print "Unrecognized instrumental response function type '%s'." \
-                    %irf_type
+            print("Unrecognized instrumental response function type '%s'." \
+                    %irf_type)
             return 0
 
 def instrumental_response_port_FT(nbin, freqs, DM=0.0, P=1.0, wids=[],
@@ -895,13 +896,13 @@ def get_nu_zeros(params, data_portrait_FT, model_portrait_FT, errs_FT, P,
         # willing to write down the explicit formulation of the inverse of a
         # 5x5 matrix as a function of the individual matrix entries.  Plus,
         # the algebra to find the nu_zeros would be even more laborious...
-        print "Approximating zero-covariance frequencies..."
+        print("Approximating zero-covariance frequencies...")
         nu_zero_DM, nu_zero_GM, nu_zero_tau = get_nu_zeros(params,
                 data_portrait_FT, model_portrait_FT, errs_FT, P, freqs, nu_DM,
                 nu_GM, nu_tau, [1,1,0,1,1], log10_tau, option)
     else:
         if np.sum(fit_flags) > 1:
-            print "No zero-covariance frequencies found."
+            print("No zero-covariance frequencies found.")
         nu_zero_DM, nu_zero_GM, nu_zero_tau = nu_DM, nu_GM, nu_tau
     return [nu_zero_DM, nu_zero_GM, nu_zero_tau]
 
@@ -1006,7 +1007,7 @@ def fit_portrait_full(data_port, model_port, init_params, P, freqs,
         minfev = dof - Sd  # minimum function value estimate
         options = {'maxiter':2000, 'disp':False, 'xtol':1e-10, 'minfev':minfev}
     else:
-        print "Method '%s' is not implemented."%method
+        print("Method '%s' is not implemented."%method)
         sys.exit()
     start = time.time()
     results = minimize(fit_portrait_full_function, init_params,

@@ -13,6 +13,7 @@
 
 #Written by Timothy T. Pennucci (TTP; tim.pennucci@nanograv.org).
 
+from __future__ import print_function
 from pptoas import *
 
 def get_zap_channels(data, nstd=3):
@@ -63,7 +64,7 @@ def print_paz_cmds(datafiles, zap_list, all_subs=False, modify=True,
     """
     if not len(datafiles) or not len(zap_list):
         if not quiet:
-            print "Nothing to zap."
+            print("Nothing to zap.")
             return None
     if outfile is not None:
         sys.stdout = open(outfile, "a")
@@ -79,20 +80,20 @@ def print_paz_cmds(datafiles, zap_list, all_subs=False, modify=True,
                 ii = datafile[::-1].find(".")
                 if ii < 0: paz_outfile = datafile + ".zap"
                 else: paz_outfile = datafile[:-ii] + "zap"
-                print "paz -e zap %s"%datafile
+                print("paz -e zap %s"%datafile)
         last_line = ""
         for isub, bad_ichans in enumerate(zap_list[iarch]):
             for bad_ichan in bad_ichans:
                 if not all_subs:
-                    print "paz -m -I -z %d -w %d %s"%(bad_ichan, isub,
-                            paz_outfile)
+                    print("paz -m -I -z %d -w %d %s"%(bad_ichan, isub,
+                            paz_outfile))
                 else:
                     line = "paz -m -z %d %s"%(bad_ichan, paz_outfile)
-                    if line != last_line: print line
+                    if line != last_line: print(line)
                     last_line = line
     sys.stdout = sys.__stdout__
     if outfile is not None and not quiet:
-        print "Wrote %s."%outfile
+        print("Wrote %s."%outfile)
 
 
 if __name__ == "__main__":
@@ -149,9 +150,9 @@ if __name__ == "__main__":
     (options, args) = parser.parse_args()
 
     if (options.datafiles is None):
-        print "\nppzap.py - Identify bad channels to zap.\n"
+        print("\nppzap.py - Identify bad channels to zap.\n")
         parser.print_help()
-        print ""
+        print("")
         parser.exit()
 
     datafiles = options.datafiles
@@ -199,7 +200,7 @@ if __name__ == "__main__":
             plt.savefig(datafiles+"_ppzap_hist.png")
 
         if not quiet:
-            print "ppzap.py found %d channels to zap out of a total %d channels fit (=%.2f%%) in %s."%(nzap, nchan, 100*float(nzap)/nchan, datafiles)
+            print("ppzap.py found %d channels to zap out of a total %d channels fit (=%.2f%%) in %s."%(nzap, nchan, 100*float(nzap)/nchan, datafiles))
 
     else:
         if file_is_type(datafiles, "ASCII"):
@@ -218,7 +219,7 @@ if __name__ == "__main__":
                         quiet=True)
             except RuntimeError:
                 if not quiet:
-                    print "Cannot load_data(%s).  Skipping it."%datafile
+                    print("Cannot load_data(%s).  Skipping it."%datafile)
                 continue
             nchan += np.array(map(len, data.ok_ichans)).sum()
             if norm is not None:
@@ -238,4 +239,4 @@ if __name__ == "__main__":
                 nzap += len(zap_channels[iarch][isub])
 
         if not quiet:
-            print "ppzap.py found %d channels to zap out of a total %d channels (=%.2f%%) in %s."%(nzap, nchan, 100*float(nzap)/nchan, datafiles)
+            print("ppzap.py found %d channels to zap out of a total %d channels (=%.2f%%) in %s."%(nzap, nchan, 100*float(nzap)/nchan, datafiles))

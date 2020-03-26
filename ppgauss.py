@@ -12,6 +12,7 @@
 #Written by Timothy T. Pennucci (TTP; tim.pennucci@nanograv.org).
 #Contributions by Scott M. Ransom (SMR) and Paul B. Demorest (PBD).
 
+from __future__ import print_function
 from matplotlib.patches import Rectangle
 from pplib import *
 
@@ -174,9 +175,9 @@ class DataPortrait(DataPortrait):
         self.start = time.time()
         #if not quiet:
         #    print "\nFitting Gaussian model portrait..."
-        print "Fitting Gaussian model portrait..."
+        print("Fitting Gaussian model portrait...")
         iterator = self.model_iteration(quiet)
-        iterator.next()
+        next(iterator)
         self.cnvrgnc = self.check_convergence(efac=1.0, quiet=quiet)
         if writemodel:
             self.write_model(outfile=outfile, quiet=quiet)
@@ -187,15 +188,15 @@ class DataPortrait(DataPortrait):
                 break
             else:
                 if not quiet:
-                    print "\n...iteration %d..."%(self.itern - self.niter + 1)
+                    print("\n...iteration %d..."%(self.itern - self.niter + 1))
                 if not self.njoin:
                     self.port = rotate_data(self.port, self.phi, self.DM,
                             self.Ps[0], self.freqs[0], self.nu_fit)
                     self.portx = rotate_data(self.portx, self.phi,
                             self.DM, self.Ps[0], self.freqsxs[0], self.nu_fit)
             if not quiet:
-                print "Fitting Gaussian model portrait..."
-            iterator.next()
+                print("Fitting Gaussian model portrait...")
+            next(iterator)
             self.niter -= 1
             self.cnvrgnc = self.check_convergence(efac=1.0, quiet=quiet)
             #For safety, write model after each iteration
@@ -223,13 +224,13 @@ class DataPortrait(DataPortrait):
             self.modelx = np.compress(self.masks[0,0].mean(axis=1), self.model,
                     axis=0)
         if not quiet:
-            print ""
-            print "Residuals mean: %.2e"%(self.portx - self.modelx).mean()
-            print "Residuals std:  %.2e"%(self.portx - self.modelx).std()
-            print "Data std:       %.2e\n"%np.median(self.noise_stdsxs)
-            print "Total fit time: %.2f min"%(self.total_time / 60.0)
-            print "Total time:     %.2f min\n"%((time.time() - self.start) /
-                    60.0)
+            print("")
+            print("Residuals mean: %.2e"%(self.portx - self.modelx).mean())
+            print("Residuals std:  %.2e"%(self.portx - self.modelx).std())
+            print("Data std:       %.2e\n"%np.median(self.noise_stdsxs))
+            print("Total fit time: %.2f min"%(self.total_time / 60.0))
+            print("Total time:     %.2f min\n"%((time.time() - self.start) /
+                    60.0))
         if residplot:
             resids = self.port - self.model_masked
             titles = ("%s"%self.datafile, "%s"%self.model_name, "Residuals")
@@ -315,18 +316,18 @@ class DataPortrait(DataPortrait):
         (self.phi, self.phierr, self.DM, self.DMerr, self.red_chi2) = (
                 fp.phase, fp.phase_err, fp.DM, fp.DM_err, fp.red_chi2)
         if not quiet:
-            print "Iter %d:"%(self.itern - self.niter)
-            print " duration of %.2f min"%(self.duration /  60.)
-            print " phase offset of %.2e +/- %.2e [rot]"%(self.phi,
-                    self.phierr)
-            print " DM of %.6e +/- %.2e [cm**-3 pc]"%(self.DM, self.DMerr)
-            print " red. chi**2 of %.2f."%self.red_chi2
+            print("Iter %d:"%(self.itern - self.niter))
+            print(" duration of %.2f min"%(self.duration /  60.))
+            print(" phase offset of %.2e +/- %.2e [rot]"%(self.phi,
+                    self.phierr))
+            print(" DM of %.6e +/- %.2e [cm**-3 pc]"%(self.DM, self.DMerr))
+            print(" red. chi**2 of %.2f."%self.red_chi2)
         else:
             if self.niter: #and (self.itern - self.niter) != 0:
-                print "Iter %d..."%(self.itern - self.niter + 1)
+                print("Iter %d..."%(self.itern - self.niter + 1))
         if min(abs(self.phi), abs(1 - self.phi)) < abs(self.phierr)*efac:
             if abs(self.DM) < abs(self.DMerr)*efac:
-                print "\nIteration converged.\n"
+                print("\nIteration converged.\n")
                 return 1
                 #print "\nForcing remaining iterations, if any.\n"
                 #return 0
@@ -397,14 +398,14 @@ class GaussianSelector:
         useblit should be True.
         """
         if not auto_gauss:
-            print ""
-            print "============================================="
-            print "Left mouse click to draw a Gaussian component"
-            print "Middle mouse click to fit components to data"
-            print "Right mouse click to remove last component"
-        print "============================================="
-        print "Press 'q' or close window when done fitting"
-        print "============================================="
+            print("")
+            print("=============================================")
+            print("Left mouse click to draw a Gaussian component")
+            print("Middle mouse click to fit components to data")
+            print("Right mouse click to remove last component")
+        print("=============================================")
+        print("Press 'q' or close window when done fitting")
+        print("=============================================")
         self.ax = ax.axes
         self.profile = profile
         self.proflen = len(profile)
@@ -448,7 +449,7 @@ class GaussianSelector:
             self.init_params += [loc, wid, amp]
             self.ngauss += 1
             self.plot_gaussians(self.init_params)
-            print "Auto-fitting a single Gaussian component..."
+            print("Auto-fitting a single Gaussian component...")
             fgp = fit_gaussian_profile(self.profile, self.init_params,
                     np.zeros(self.proflen) + self.errs, self.profile_fit_flags,
                     self.fit_scattering, quiet=True)
@@ -610,7 +611,7 @@ class GaussianSelector:
             plt.draw()
         # Middle mouse button = fit the Gaussians
         elif event1.button == event2.button == 2:
-            print "Fitting reference Gaussian profile..."
+            print("Fitting reference Gaussian profile...")
             fgp = fit_gaussian_profile(self.profile, self.init_params,
                     np.zeros(self.proflen) + self.errs, self.profile_fit_flags,
                     self.fit_scattering, quiet=True)
@@ -745,9 +746,9 @@ if __name__ == "__main__":
     (options, args) = parser.parse_args()
 
     if options.datafile is None and options.metafile is None:
-        print "\nppgauss.py - generate a Gaussian-component model pulse portrait\n"
+        print("\nppgauss.py - generate a Gaussian-component model pulse portrait\n")
         parser.print_help()
-        print ""
+        print("")
         parser.exit()
 
     datafile = options.datafile
@@ -781,7 +782,7 @@ if __name__ == "__main__":
     if normalize in ("mean", "max", "prof", "rms", "abs"):
         dp.normalize_portrait(normalize)
     elif normalize is not None:
-        print "Unknown normalization choice, '%s'."%normalize
+        print("Unknown normalization choice, '%s'."%normalize)
         sys.exit()
     #if not quiet: dp.show_data_portrait()
     if modelfile is not None:
