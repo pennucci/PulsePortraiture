@@ -862,8 +862,7 @@ class GetTOAs(object):
         if quiet is None: quiet = self.quiet
         if datafile is None:
             datafile = self.datafiles[0]
-        ifile = list(np.array(self.datafiles)[self.ok_idatafiles]).index(
-                datafile)
+        ifile = list(np.array(self.datafiles)[self.ok_idatafiles]).index(datafile)
         data = load_data(datafile, dedisperse=False,
                 dededisperse=False, tscrunch=self.tscrunch,
                 #pscrunch=True, fscrunch=False, rm_baseline=rm_baseline,
