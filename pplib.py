@@ -3033,7 +3033,7 @@ def file_is_type(filename, filetype="ASCII"):
     o = subprocess.Popen(cmd, shell=isinstance(cmd, str),
             stdin=subprocess.PIPE, stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT, close_fds=True)
-    line = o.stdout.readline().split()
+    line = o.stdout.readline().decode().split()
     try:
         line.index(filetype)
         return True
