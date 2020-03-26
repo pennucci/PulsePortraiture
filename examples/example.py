@@ -5,6 +5,7 @@ from __future__ import division
 from builtins import range
 from past.utils import old_div
 import os
+import subprocess
 from pplib import *
 
 
@@ -129,8 +130,11 @@ dp.show_model_fit()
 print("Running pptoas.py to fit TOAs and DMs...")
 import pptoas as ppt
 #Set the DM to which the offsets are referenced (e.g. from the input ephemeris)
-i,o = os.popen4("grep DM %s"%ephemeris)
-DM0 = float(o.readline().split()[1])
+cmd = "grep DM %s"%ephemeris
+o = subprocess.Popen(cmd, shell=isinstance(cmd, str),
+        stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT, close_fds=True)
+DM0 = float(o.stdout.readline().split()[1])
 #Initiate Class instance; one could also use a smoothed average of the data
 #as a model instead of the analytic gaussian model
 gt = ppt.GetTOAs(metafile, fitted_modelfile)

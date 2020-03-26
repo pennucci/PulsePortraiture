@@ -29,6 +29,7 @@ if nodes:
     matplotlib.use('Agg')
 
 import sys
+import subprocess
 import time
 import pickle
 import numpy as np
@@ -3028,10 +3029,11 @@ def file_is_type(filename, filetype="ASCII"):
         call to the command 'file -L <filename>'.
     filetype is the string that is searched for in the output.
     """
-    from os import popen4
     cmd = "file -L %s"%filename
-    i,o = popen4(cmd)
-    line = o.readline().split()
+    o = subprocess.Popen(cmd, shell=isinstance(cmd, str),
+            stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT, close_fds=True)
+    line = o.stdout.readline().split()
     try:
         line.index(filetype)
         return True
