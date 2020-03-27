@@ -2897,7 +2897,7 @@ def read_model(modelfile, phases=None, freqs=None, P=None, quiet=False):
     comps = []
     if not quiet:
         print("Reading model from %s..."%modelfile)
-    modeldata = open(modelfile, "r").readlines()
+    modeldata = open(modelfile, "rb").readlines()
     for line in modeldata:
         info = line.split()
         try:
