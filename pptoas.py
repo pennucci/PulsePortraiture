@@ -362,7 +362,6 @@ class GetTOAs(object):
                 if not self.is_FITS_model:
                     # Read model
                     is_spline = file_is_type(self.modelfile, 'data')
-                    print(is_spline)
                     if not is_spline:
                         try:
                             if not fit_scat:
