@@ -4,7 +4,7 @@
 # ppspline #
 ############
 
-#ppspline is a command-line program to make a frequency-parameterized model of
+# ppspline is a command-line program to make a frequency-parameterized model of
 #    wideband profile evolution.  The parameterization is good within the range
 #    of data frequencies, provided there are not huge gaps in frequency.  For
 #    an input nchan x nbin average portrait of aligned profiles, the model is a
@@ -19,12 +19,14 @@
 #    using normalize_portrait('prof')), as is using smooth=True in the
 #    make_model function.
 
-#Written by Timothy T. Pennucci (TTP; tim.pennucci@nanograv.org).
+# Written by Timothy T. Pennucci (TTP; tim.pennucci@nanograv.org).
 
-from __future__ import print_function
 from __future__ import division
+from __future__ import print_function
+
 from past.utils import old_div
 from pplib import *
+
 
 class DataPortrait(DataPortrait):
     """
@@ -35,8 +37,8 @@ class DataPortrait(DataPortrait):
     """
 
     def make_spline_model(self, max_ncomp=10, smooth=True, snr_cutoff=150.0,
-            rchi2_tol=0.1, k=3, sfac=1.0, max_nbreak=None, model_name=None,
-            quiet=False, **kwargs):
+                          rchi2_tol=0.1, k=3, sfac=1.0, max_nbreak=None, model_name=None,
+                          quiet=False, **kwargs):
         """
         Make a model based on PCA and B-spline interpolation.
 
@@ -67,23 +69,24 @@ class DataPortrait(DataPortrait):
         **kwargs get passed to find_significant_eigvec(...).
         """
 
-        #Definitions
+        # Definitions
         port = self.portx
         pca_weights = old_div(self.SNRsxs, np.sum(self.SNRsxs))
         mean_prof = old_div((port.T * pca_weights).T.sum(axis=0), pca_weights.sum())
         freqs = self.freqsxs[0]
         nu_lo = freqs.min()
         nu_hi = freqs.max()
-        #Check nbin
+        # Check nbin
         nbin = port.shape[1]
         if nbin % 2 != 0:
-            print("nbin = %d is odd; cannot wavelet_smooth.\n"%nbin)
+            print("nbin = %d is odd; cannot wavelet_smooth.\n" % nbin)
             smooth = False
         elif np.modf(np.log2(nbin))[0] != 0.0:
-            print("nbin = %d is not a power of two; can only try wavelet_smooth to one level; recommend resampling to a power-of-two number of phase bins.\n"%nbin)
-        #Do principal component analysis
+            print(
+                "nbin = %d is not a power of two; can only try wavelet_smooth to one level; recommend resampling to a power-of-two number of phase bins.\n" % nbin)
+        # Do principal component analysis
         eigval, eigvec = pca(port, mean_prof, pca_weights, quiet=quiet)
-        #Get "significant" eigenvectors
+        # Get "significant" eigenvectors
         if max_ncomp is None:
             return_max = 10
         else:
@@ -92,87 +95,89 @@ class DataPortrait(DataPortrait):
             if 'pywt' not in sys.modules:
                 raise ImportError("You failed to import pywt and need PyWavelets to use smooth=True!")
             ieig, smooth_eigvec = find_significant_eigvec(eigvec, check_max=10,
-                    return_max=return_max, snr_cutoff=snr_cutoff,
-                    return_smooth=True, rchi2_tol=rchi2_tol, **kwargs)
+                                                          return_max=return_max, snr_cutoff=snr_cutoff,
+                                                          return_smooth=True, rchi2_tol=rchi2_tol, **kwargs)
         else:
             ieig = find_significant_eigvec(eigvec, check_max=10,
-                    return_max=return_max, snr_cutoff=snr_cutoff,
-                    return_smooth=False, rchi2_tol=rchi2_tol, **kwargs)
+                                           return_max=return_max, snr_cutoff=snr_cutoff,
+                                           return_smooth=False, rchi2_tol=rchi2_tol, **kwargs)
         ncomp = len(ieig)
 
         if smooth:
             smooth_mean_prof = smart_smooth(mean_prof,
-                    rchi2_tol=rchi2_tol)
+                                            rchi2_tol=rchi2_tol)
 
-        if ncomp == 0: #Will make model with constant average port
-            proj_port = port[:,:ncomp]
+        if ncomp == 0:  # Will make model with constant average port
+            proj_port = port[:, :ncomp]
             if smooth:
                 modelx = reconst_port = np.tile(smooth_mean_prof,
-                        len(freqs)).reshape(len(freqs), port.shape[1])
+                                                len(freqs)).reshape(len(freqs), port.shape[1])
                 model = np.tile(smooth_mean_prof,
-                        len(self.freqs[0])).reshape(len(self.freqs[0]),
-                                port.shape[1])
+                                len(self.freqs[0])).reshape(len(self.freqs[0]),
+                                                            port.shape[1])
             else:
                 modelx = reconst_port = np.tile(mean_prof,
-                        len(freqs)).reshape(len(freqs), port.shape[1])
+                                                len(freqs)).reshape(len(freqs), port.shape[1])
                 model = np.tile(mean_prof,
-                        len(self.freqs[0])).reshape(len(self.freqs[0]),
-                            port.shape[1])
+                                len(self.freqs[0])).reshape(len(self.freqs[0]),
+                                                            port.shape[1])
         else:
             delta_port = port - mean_prof
             if smooth:
                 reconst_port = reconstruct_portrait(port, mean_prof,
-                        smooth_eigvec[:,ieig])
-                #Find the projections of the profiles onto the basis components
-                proj_port = np.dot(delta_port, smooth_eigvec[:,ieig])
+                                                    smooth_eigvec[:, ieig])
+                # Find the projections of the profiles onto the basis components
+                proj_port = np.dot(delta_port, smooth_eigvec[:, ieig])
             else:
                 reconst_port = reconstruct_portrait(port, mean_prof,
-                        eigvec[:,ieig])
-                #Find the projections of the profiles onto the basis components
-                proj_port = np.dot(delta_port, eigvec[:,ieig])
+                                                    eigvec[:, ieig])
+                # Find the projections of the profiles onto the basis components
+                proj_port = np.dot(delta_port, eigvec[:, ieig])
 
         if ncomp == 0:
-            (tck,u) = [np.array([]), np.array([]), 0], np.array([])
+            (tck, u) = [np.array([]), np.array([]), 0], np.array([])
             fp, ier, msg = None, None, None
         else:
             spl_weights = pca_weights
             s = sfac
-            if self.bw < 0: flip = -1   #u in si.splprep has to be increasing...
-            else: flip = 1
-            #Find the B-spline curve traced by the projected vectors,
-            #parameterized by frequency
-            (tck,u), fp, ier, msg = si.splprep(proj_port[::flip].T,
-                    w=spl_weights[::flip], u=freqs[::flip], ub=nu_lo, ue=nu_hi,
-                    k=k, task=0, s=s, t=None, full_output=1, nest=None, per=0,
-                    quiet=int(quiet))
+            if self.bw < 0:
+                flip = -1  # u in si.splprep has to be increasing...
+            else:
+                flip = 1
+            # Find the B-spline curve traced by the projected vectors,
+            # parameterized by frequency
+            (tck, u), fp, ier, msg = si.splprep(proj_port[::flip].T,
+                                                w=spl_weights[::flip], u=freqs[::flip], ub=nu_lo, ue=nu_hi,
+                                                k=k, task=0, s=s, t=None, full_output=1, nest=None, per=0,
+                                                quiet=int(quiet))
             if max_nbreak is not None and len(np.unique(tck[0])) > max_nbreak:
                 if max_nbreak < 2:
                     print("max_nbreak not >= 2; setting max_nbreak = 2...")
                     max_nbreak = 2
                 if max_nbreak == 2: s = np.inf
-                (tck,u), fp, ier, msg = si.splprep(proj_port[::flip].T,
-                        w=spl_weights[::flip], u=freqs[::flip], ub=nu_lo,
-                        ue=nu_hi, k=k, task=0, s=s, t=None, full_output=1,
-                        nest=max_nbreak+(k*2), per=0, quiet=int(quiet))
+                (tck, u), fp, ier, msg = si.splprep(proj_port[::flip].T,
+                                                    w=spl_weights[::flip], u=freqs[::flip], ub=nu_lo,
+                                                    ue=nu_hi, k=k, task=0, s=s, t=None, full_output=1,
+                                                    nest=max_nbreak + (k * 2), per=0, quiet=int(quiet))
 
-            if ier > 1: #Will also catch when ier == "unknown"
-                print("Something went wrong in si.splprep for %s:\n%s"%(
-                        self.source, msg))
+            if ier > 1:  # Will also catch when ier == "unknown"
+                print("Something went wrong in si.splprep for %s:\n%s" % (
+                    self.source, msg))
 
-        #Build model
+        # Build model
         if ncomp != 0:
             if smooth:
                 modelx = gen_spline_portrait(smooth_mean_prof, freqs,
-                        smooth_eigvec[:,ieig], tck)
+                                             smooth_eigvec[:, ieig], tck)
                 model = gen_spline_portrait(smooth_mean_prof, self.freqs[0],
-                        smooth_eigvec[:,ieig], tck)
+                                            smooth_eigvec[:, ieig], tck)
             else:
-                modelx = gen_spline_portrait(mean_prof, freqs, eigvec[:,ieig],
-                        tck)
+                modelx = gen_spline_portrait(mean_prof, freqs, eigvec[:, ieig],
+                                             tck)
                 model = gen_spline_portrait(mean_prof, self.freqs[0],
-                        eigvec[:,ieig], tck)
+                                            eigvec[:, ieig], tck)
 
-        #Assign new attributes
+        # Assign new attributes
         self.ieig = ieig
         self.ncomp = ncomp
         self.eigvec = eigvec
@@ -183,26 +188,32 @@ class DataPortrait(DataPortrait):
             self.smooth_eigvec = smooth_eigvec
         self.proj_port = proj_port
         self.reconst_port = reconst_port
-        #tck contains the knot locations t, B-spline coefficients c, and
-        #polynomial degree k -- end knots will have multiplicity k+1, interior
-        #breakpoints will have multiplicity 1 for maximum continuity.  The
-        #number of B-splines will be n = l + k, where l is the number of
-        #intervals.  l = number of breakpoints - 1 = number of unique knots - 1
+        # tck contains the knot locations t, B-spline coefficients c, and
+        # polynomial degree k -- end knots will have multiplicity k+1, interior
+        # breakpoints will have multiplicity 1 for maximum continuity.  The
+        # number of B-splines will be n = l + k, where l is the number of
+        # intervals.  l = number of breakpoints - 1 = number of unique knots - 1
         # = len(tck[0]) - 2*tck[2] - 1.
         self.tck, self.u, self.fp, self.ier, self.msg = tck, u, fp, ier, msg
-        if model_name is None: self.model_name = self.datafile + '.spl'
-        else: self.model_name = model_name
+        if model_name is None:
+            self.model_name = self.datafile + '.spl'
+        else:
+            self.model_name = model_name
         self.model = model
         self.modelx = modelx
-        self.model_masked = self.model * self.masks[0,0]
+        self.model_masked = self.model * self.masks[0, 0]
 
         if not quiet:
             if proj_port.sum():
-                print("B-spline interpolation model %s uses %d basis profile components and %d breakpoints (%d B-splines with k=%d)."%(self.model_name, ncomp,
-                        len(np.unique(self.tck[0])),
-                        len(self.tck[0])-self.tck[2]-1, self.tck[2]))
+                print(
+                    "B-spline interpolation model %s uses %d basis profile components and %d breakpoints (%d B-splines with k=%d)." % (
+                    self.model_name, ncomp,
+                    len(np.unique(self.tck[0])),
+                    len(self.tck[0]) - self.tck[2] - 1, self.tck[2]))
             else:
-                print("B-spline interpolation model %s uses 0 basis profile components; it returns the average profile."%(self.model_name))
+                print(
+                    "B-spline interpolation model %s uses 0 basis profile components; it returns the average profile." % (
+                        self.model_name))
 
     def write_model(self, outfile, quiet=False):
         """
@@ -212,23 +223,23 @@ class DataPortrait(DataPortrait):
         if hasattr(self, "smooth_eigvec"):
             if len(self.ieig):
                 pickle.dump([self.model_name, self.source, self.datafile,
-                    self.smooth_mean_prof, self.smooth_eigvec[:,self.ieig],
-                    self.tck], of)
+                             self.smooth_mean_prof, self.smooth_eigvec[:, self.ieig],
+                             self.tck], of)
             else:
                 pickle.dump([self.model_name, self.source, self.datafile,
-                    self.smooth_mean_prof, self.smooth_eigvec[:,[]],
-                    self.tck], of)
+                             self.smooth_mean_prof, self.smooth_eigvec[:, []],
+                             self.tck], of)
         else:
             if len(self.ieig):
                 pickle.dump([self.model_name, self.source, self.datafile,
-                    self.mean_prof, self.eigvec[:,self.ieig], self.tck], of)
+                             self.mean_prof, self.eigvec[:, self.ieig], self.tck], of)
             else:
                 pickle.dump([self.model_name, self.source, self.datafile,
-                    self.mean_prof, self.eigvec[:,[]], self.tck], of)
+                             self.mean_prof, self.eigvec[:, []], self.tck], of)
 
         of.close()
         if not quiet:
-            print("Wrote modelfile %s."%outfile)
+            print("Wrote modelfile %s." % outfile)
 
     def show_eigenprofiles(self, ncomp=None, title=None, **kwargs):
         """
@@ -243,20 +254,20 @@ class DataPortrait(DataPortrait):
         if ncomp is None: ncomp = self.ncomp
         if hasattr(self, "smooth_eigvec"):
             if ncomp:
-                eigvec = self.eigvec[:,self.ieig[:ncomp]].T
-                seigvec = self.smooth_eigvec[:,self.ieig[:ncomp]].T
+                eigvec = self.eigvec[:, self.ieig[:ncomp]].T
+                seigvec = self.smooth_eigvec[:, self.ieig[:ncomp]].T
             else:
                 eigvec = None
                 seigvec = None
             show_eigenprofiles(eigvec, seigvec, self.mean_prof,
-                    self.smooth_mean_prof, title=title, **kwargs)
+                               self.smooth_mean_prof, title=title, **kwargs)
         else:
             if ncomp:
-                eigvec = self.eigvec[:,self.ieig[:ncomp]].T
+                eigvec = self.eigvec[:, self.ieig[:ncomp]].T
             else:
                 eigvec = None
             show_eigenprofiles(eigvec, None, self.mean_prof, None, title=title,
-                    **kwargs)
+                               **kwargs)
 
     def show_spline_curve_projections(self, ncomp=None, title=None, **kwargs):
         """
@@ -271,8 +282,8 @@ class DataPortrait(DataPortrait):
         if ncomp is None: ncomp = self.ncomp
         if ncomp:
             show_spline_curve_projections(self.proj_port, self.tck,
-                    self.freqsxs[0], old_div(self.SNRsxs, np.sum(self.SNRsxs)),
-                    ncoord=ncomp, title=title, **kwargs)
+                                          self.freqsxs[0], old_div(self.SNRsxs, np.sum(self.SNRsxs)),
+                                          ncoord=ncomp, title=title, **kwargs)
 
 
 if __name__ == "__main__":
@@ -281,7 +292,7 @@ if __name__ == "__main__":
 
     usage = "Usage: %prog -d <datafile> [options]"
     parser = OptionParser(usage)
-    #parser.add_option("-h", "--help",
+    # parser.add_option("-h", "--help",
     #                  action="store_true", dest="help", default=False,
     #                  help="Show this help message and exit.")
     parser.add_option("-d", "--datafile",
@@ -355,8 +366,10 @@ if __name__ == "__main__":
     rchi2_tol = float(options.rchi2_tol)
     k = int(options.k)
     sfac = float(options.sfac)
-    if options.max_nbreak is not None: max_nbreak = int(options.max_nbreak)
-    else: max_nbreak = None
+    if options.max_nbreak is not None:
+        max_nbreak = int(options.max_nbreak)
+    else:
+        max_nbreak = None
     make_plots = options.make_plots
     quiet = options.quiet
 
@@ -366,8 +379,8 @@ if __name__ == "__main__":
         dp.normalize_portrait(norm)
 
     dp.make_spline_model(max_ncomp=max_ncomp, smooth=smooth,
-            snr_cutoff=snr_cutoff, rchi2_tol=rchi2_tol, k=k, sfac=sfac,
-            max_nbreak=max_nbreak, model_name=model_name, quiet=quiet)
+                         snr_cutoff=snr_cutoff, rchi2_tol=rchi2_tol, k=k, sfac=sfac,
+                         max_nbreak=max_nbreak, model_name=model_name, quiet=quiet)
 
     if modelfile is None: modelfile = datafile + ".spl"
     dp.write_model(modelfile, quiet=quiet)
@@ -378,5 +391,5 @@ if __name__ == "__main__":
     if make_plots:
         dp.show_eigenprofiles(title=dp.model_name, savefig=dp.model_name)
         dp.show_spline_curve_projections(title=dp.model_name,
-                savefig=dp.model_name)
-        dp.show_model_fit(savefig=dp.model_name+'.resids.png')
+                                         savefig=dp.model_name)
+        dp.show_model_fit(savefig=dp.model_name + '.resids.png')

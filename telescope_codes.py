@@ -5,29 +5,31 @@ import os
 telescope_code_dict = dict()
 
 if 'TEMPO2' in os.environ:
-        path_to_obs = os.path.join(os.environ['TEMPO2'],'observatory', \
-                'observatories.dat')
-        if os.path.isfile(path_to_obs):
-            obs_dat = open(path_to_obs,'r').readlines()
-            for line in obs_dat:
-                if line.startswith('#') or line.startswith('\n'): pass
-                else:
-                    line = line.split()
-                    telescope = line[-2].upper()
-                    short_code = line[-1]
-                    telescope_code_dict[telescope] = [short_code]
-        path_to_aliases = os.path.join(os.environ['TEMPO2'],'observatory', \
-                'aliases')
-        if os.path.isfile(path_to_aliases):
-            aliases = open(path_to_aliases,'r').readlines()
-            for line in aliases:
-                if line.startswith('#') or line.startswith('\n'): pass
-                else:
-                    line = line.split()
-                    for telescope,short_code in list(telescope_code_dict.items()):
-                        if line[0] == short_code[0]:
-                            for alias in line[1:]:
-                                telescope_code_dict[telescope].append(alias)
+    path_to_obs = os.path.join(os.environ['TEMPO2'], 'observatory', \
+                               'observatories.dat')
+    if os.path.isfile(path_to_obs):
+        obs_dat = open(path_to_obs, 'r').readlines()
+        for line in obs_dat:
+            if line.startswith('#') or line.startswith('\n'):
+                pass
+            else:
+                line = line.split()
+                telescope = line[-2].upper()
+                short_code = line[-1]
+                telescope_code_dict[telescope] = [short_code]
+    path_to_aliases = os.path.join(os.environ['TEMPO2'], 'observatory', \
+                                   'aliases')
+    if os.path.isfile(path_to_aliases):
+        aliases = open(path_to_aliases, 'r').readlines()
+        for line in aliases:
+            if line.startswith('#') or line.startswith('\n'):
+                pass
+            else:
+                line = line.split()
+                for telescope, short_code in list(telescope_code_dict.items()):
+                    if line[0] == short_code[0]:
+                        for alias in line[1:]:
+                            telescope_code_dict[telescope].append(alias)
 
 else:
     telescope_code_dict = {'ARECIBO': ['ao', '3', 'arecebo', 'arecibo'],
@@ -131,7 +133,7 @@ else:
                            'WARKWORTH_30M': ['wark30m'],
                            'WSRT': ['wsrt', 'i']}
 
-#if 'TEMPO' in os.environ:
+# if 'TEMPO' in os.environ:
 #    path_to_obsys = os.path.join(os.environ['TEMPO'],'obsys.dat')
 #    if os.path.isfile(path_to_obsys):
 #        obsys_dat = open(path_to_obsys,'r').readlines()

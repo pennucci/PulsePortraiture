@@ -4,26 +4,27 @@
 # ppgauss #
 ###########
 
-#ppgauss is a command-line program used to make frequency-dependent,
+# ppgauss is a command-line program used to make frequency-dependent,
 #    Gaussian-component models of pulse portraits.  Full-functionality is
 #    obtained when using ppgauss within an interactive python environment.
 #    Some of this code has not been maintained, and is somewhat out of date.
 
-#Written by Timothy T. Pennucci (TTP; tim.pennucci@nanograv.org).
-#Contributions by Scott M. Ransom (SMR) and Paul B. Demorest (PBD).
+# Written by Timothy T. Pennucci (TTP; tim.pennucci@nanograv.org).
+# Contributions by Scott M. Ransom (SMR) and Paul B. Demorest (PBD).
 
-from __future__ import print_function
 from __future__ import division
+from __future__ import print_function
+
 from builtins import next
-from builtins import range
 from builtins import object
-from past.utils import old_div
+from builtins import range
+
 from matplotlib.patches import Rectangle
+from past.utils import old_div
 from pplib import *
 
 
 class DataPortrait(DataPortrait):
-
     """
     DataPortrait is a class that contains the data to which a model is fit.
 
@@ -32,7 +33,7 @@ class DataPortrait(DataPortrait):
     """
 
     def fit_profile(self, profile, tau=0.0, fixscat=True, auto_gauss=0.0,
-            profile_fit_flags=None, show=True):
+                    profile_fit_flags=None, show=True):
         """
         Fit Gaussian components to a profile.
 
@@ -48,23 +49,23 @@ class DataPortrait(DataPortrait):
         """
         fig = plt.figure()
         profplot = fig.add_subplot(211)
-        #Noise below may be off
+        # Noise below may be off
         self.interactor = GaussianSelector(profplot, profile,
-                get_noise(profile), tau=tau, fixscat=fixscat,
-                auto_gauss=auto_gauss, profile_fit_flags=profile_fit_flags,
-                minspanx=None, minspany=None, useblit=True)
+                                           get_noise(profile), tau=tau, fixscat=fixscat,
+                                           auto_gauss=auto_gauss, profile_fit_flags=profile_fit_flags,
+                                           minspanx=None, minspany=None, useblit=True)
         if show: plt.show()
         self.init_params = self.interactor.fitted_params
         self.init_param_errs = self.interactor.fit_errs
         self.ngauss = old_div((len(self.init_params) - 2), 3)
 
     def make_gaussian_model(self, modelfile=None,
-            ref_prof=(None, None), tau=0.0, fixloc=False, fixwid=False,
-            fixamp=False, fixscat=True, fixalpha=True,
-            scattering_index=scattering_alpha, model_code=default_model,
-            niter=0, fiducial_gaussian=False, auto_gauss=0.0, writemodel=False,
-            outfile=None, writeerrfile=False, errfile=None, model_name=None,
-            residplot=None, quiet=False):
+                            ref_prof=(None, None), tau=0.0, fixloc=False, fixwid=False,
+                            fixamp=False, fixscat=True, fixalpha=True,
+                            scattering_index=scattering_alpha, model_code=default_model,
+                            niter=0, fiducial_gaussian=False, auto_gauss=0.0, writemodel=False,
+                            outfile=None, writeerrfile=False, errfile=None, model_name=None,
+                            residplot=None, quiet=False):
         """
         Fit a Gaussian-component model with independently evolving components.
 
@@ -108,10 +109,10 @@ class DataPortrait(DataPortrait):
             if errfile is None:
                 errfile = outfile + "_errs"
             (self.model_name, self.model_code, self.nu_ref, self.ngauss,
-                    self.init_model_params, self.fit_flags,
-                    self.scattering_index, self.fitalpha) = read_model(
-                            modelfile)
-            self.fixalpha = not(self.fitalpha)
+             self.init_model_params, self.fit_flags,
+             self.scattering_index, self.fitalpha) = read_model(
+                modelfile)
+            self.fixalpha = not (self.fitalpha)
             if model_name is not None: self.model_name = model_name
             self.init_model_params[1] *= old_div(self.nbin, self.Ps[0])
         else:
@@ -125,60 +126,60 @@ class DataPortrait(DataPortrait):
                 self.model_name = self.source
             else:
                 self.model_name = model_name
-            #Fit the profile
+            # Fit the profile
             if not len(self.init_params):
                 self.nu_ref = ref_prof[0]
                 self.bw_ref = ref_prof[1]
                 if self.nu_ref is None: self.nu_ref = self.nu0
                 if self.bw_ref is None: self.bw_ref = abs(self.bw)
-                okinds = np.compress(np.less(self.nu_ref - (old_div(self.bw_ref,2)),
-                    self.freqs[0]) * np.greater(self.nu_ref + (old_div(self.bw_ref,2)),
-                    self.freqs[0]) * self.masks[0,0].mean(axis=1),
-                    np.arange(self.nchan))
-                #The below profile average gives a slightly different set of
-                #values for the profile than self.profile, if given the full
-                #band and center frequency.  Unsure why; shouldn't matter.
-                #The following is an unweighted profile.
+                okinds = np.compress(np.less(self.nu_ref - (old_div(self.bw_ref, 2)),
+                                             self.freqs[0]) * np.greater(self.nu_ref + (old_div(self.bw_ref, 2)),
+                                                                         self.freqs[0]) * self.masks[0, 0].mean(axis=1),
+                                     np.arange(self.nchan))
+                # The below profile average gives a slightly different set of
+                # values for the profile than self.profile, if given the full
+                # band and center frequency.  Unsure why; shouldn't matter.
+                # The following is an unweighted profile.
                 profile = np.take(self.port, okinds, axis=0).mean(axis=0)
                 self.fit_profile(profile, tau=tau, fixscat=fixscat,
-                        auto_gauss=auto_gauss, profile_fit_flags=None,
-                        show=True)
-            #All slopes, spectral indices start at 0.0
+                                 auto_gauss=auto_gauss, profile_fit_flags=None,
+                                 show=True)
+            # All slopes, spectral indices start at 0.0
             locparams = widparams = ampparams = np.zeros(self.ngauss)
             self.init_model_params = np.empty([self.ngauss, 6])
             for igauss in range(self.ngauss):
                 self.init_model_params[igauss] = np.array(
-                        [self.init_params[2::3][igauss], locparams[igauss],
-                            self.init_params[3::3][igauss], widparams[igauss],
-                            self.init_params[4::3][igauss], ampparams[igauss]])
+                    [self.init_params[2::3][igauss], locparams[igauss],
+                     self.init_params[3::3][igauss], widparams[igauss],
+                     self.init_params[4::3][igauss], ampparams[igauss]])
             self.init_model_params = np.array([self.init_params[0]] +
-                [self.init_params[1]] + list(np.ravel(self.init_model_params)))
+                                              [self.init_params[1]] + list(np.ravel(self.init_model_params)))
             self.fit_flags = np.ones(len(self.init_model_params))
-            self.fit_flags[1] *= not(fixscat)
-            self.fit_flags[3::6] *= not(fixloc)
-            self.fit_flags[5::6] *= not(fixwid)
-            self.fit_flags[7::6] *= not(fixamp)
+            self.fit_flags[1] *= not (fixscat)
+            self.fit_flags[3::6] *= not (fixloc)
+            self.fit_flags[5::6] *= not (fixwid)
+            self.fit_flags[7::6] *= not (fixamp)
             if fiducial_gaussian:
-                #ifgauss = self.init_params[4::3].argmax()
+                # ifgauss = self.init_params[4::3].argmax()
                 ifgauss = 0
                 self.fit_flags[3::6] = 1
                 self.fit_flags[3::6][ifgauss] = 0
-        #The noise...
+        # The noise...
         self.portx_noise = np.outer(self.noise_stdsxs, np.ones(self.nbin))
-        #self.portx_noise = np.outer(get_noise(self.portx, chans=True),
+        # self.portx_noise = np.outer(get_noise(self.portx, chans=True),
         #        np.ones(self.nbin))
-        #channel_SNRs = np.array([get_SNR(self.portx[ichan]) for ichan in
+        # channel_SNRs = np.array([get_SNR(self.portx[ichan]) for ichan in
         #    range(self.nchanx)])
-        #self.nu_fit = guess_fit_freq(self.freqsxs[0], channel_SNRs)
+        # self.nu_fit = guess_fit_freq(self.freqsxs[0], channel_SNRs)
         self.nu_fit = guess_fit_freq(self.freqsxs[0], self.SNRsxs)
-        #Here's the loop
+        # Here's the loop
         if niter < 0: niter = 0
         self.niter = niter
         self.itern = niter
         self.model_params = np.copy(self.init_model_params)
         self.total_time = 0.0
         self.start = time.time()
-        #if not quiet:
+        # if not quiet:
         #    print "\nFitting Gaussian model portrait..."
         print("Fitting Gaussian model portrait...")
         iterator = self.model_iteration(quiet)
@@ -193,18 +194,18 @@ class DataPortrait(DataPortrait):
                 break
             else:
                 if not quiet:
-                    print("\n...iteration %d..."%(self.itern - self.niter + 1))
+                    print("\n...iteration %d..." % (self.itern - self.niter + 1))
                 if not self.njoin:
                     self.port = rotate_data(self.port, self.phi, self.DM,
-                            self.Ps[0], self.freqs[0], self.nu_fit)
+                                            self.Ps[0], self.freqs[0], self.nu_fit)
                     self.portx = rotate_data(self.portx, self.phi,
-                            self.DM, self.Ps[0], self.freqsxs[0], self.nu_fit)
+                                             self.DM, self.Ps[0], self.freqsxs[0], self.nu_fit)
             if not quiet:
                 print("Fitting Gaussian model portrait...")
             next(iterator)
             self.niter -= 1
             self.cnvrgnc = self.check_convergence(efac=1.0, quiet=quiet)
-            #For safety, write model after each iteration
+            # For safety, write model after each iteration
             if writemodel:
                 self.write_model(outfile=outfile, quiet=quiet)
             if writeerrfile:
@@ -213,35 +214,35 @@ class DataPortrait(DataPortrait):
             for ii in range(self.njoin):
                 jic = self.join_ichans[ii]
                 self.port[jic] = rotate_data(self.port[jic],
-                        -self.join_params[0::2][ii],
-                        -self.join_params[1::2][ii], self.Ps[0],
-                        self.freqs[0,jic], self.nu_ref)
+                                             -self.join_params[0::2][ii],
+                                             -self.join_params[1::2][ii], self.Ps[0],
+                                             self.freqs[0, jic], self.nu_ref)
                 jicx = self.join_ichanxs[ii]
                 self.portx[jicx] = rotate_data(self.portx[jicx],
-                        -self.join_params[0::2][ii],
-                        -self.join_params[1::2][ii], self.Ps[0],
-                        self.freqsxs[0][jicx], self.nu_ref)
+                                               -self.join_params[0::2][ii],
+                                               -self.join_params[1::2][ii], self.Ps[0],
+                                               self.freqsxs[0][jicx], self.nu_ref)
                 self.model[jic] = rotate_data(self.model[jic],
-                        -self.join_params[0::2][ii],
-                        -self.join_params[1::2][ii], self.Ps[0],
-                        self.freqs[0,jic], self.nu_ref)
-            self.model_masked = self.model * self.masks[0,0]
-            self.modelx = np.compress(self.masks[0,0].mean(axis=1), self.model,
-                    axis=0)
+                                              -self.join_params[0::2][ii],
+                                              -self.join_params[1::2][ii], self.Ps[0],
+                                              self.freqs[0, jic], self.nu_ref)
+            self.model_masked = self.model * self.masks[0, 0]
+            self.modelx = np.compress(self.masks[0, 0].mean(axis=1), self.model,
+                                      axis=0)
         if not quiet:
             print("")
-            print("Residuals mean: %.2e"%(self.portx - self.modelx).mean())
-            print("Residuals std:  %.2e"%(self.portx - self.modelx).std())
-            print("Data std:       %.2e\n"%np.median(self.noise_stdsxs))
-            print("Total fit time: %.2f min"%(self.total_time / 60.0))
-            print("Total time:     %.2f min\n"%((time.time() - self.start) /
-                    60.0))
+            print("Residuals mean: %.2e" % (self.portx - self.modelx).mean())
+            print("Residuals std:  %.2e" % (self.portx - self.modelx).std())
+            print("Data std:       %.2e\n" % np.median(self.noise_stdsxs))
+            print("Total fit time: %.2f min" % (self.total_time / 60.0))
+            print("Total time:     %.2f min\n" % ((time.time() - self.start) /
+                                                  60.0))
         if residplot:
             resids = self.port - self.model_masked
-            titles = ("%s"%self.datafile, "%s"%self.model_name, "Residuals")
+            titles = ("%s" % self.datafile, "%s" % self.model_name, "Residuals")
             show_residual_plot(self.port, self.model, resids, self.phases,
-                    self.freqs[0], self.noise_stds[0,0], 0, titles,
-                    bool(self.bw < 0), savefig=residplot)
+                               self.freqs[0], self.noise_stds[0, 0], 0, titles,
+                               bool(self.bw < 0), savefig=residplot)
 
     def model_iteration(self, quiet=False):
         """
@@ -250,33 +251,33 @@ class DataPortrait(DataPortrait):
         while (1):
             start = time.time()
             fgp = fit_gaussian_portrait(self.model_code, self.portx,
-                    self.model_params, self.scattering_index, self.portx_noise,
-                    self.fit_flags, not(self.fixalpha), self.phases,
-                    self.freqsxs[0], self.nu_ref, self.all_join_params,
-                    self.Ps[0], quiet=quiet)
+                                        self.model_params, self.scattering_index, self.portx_noise,
+                                        self.fit_flags, not (self.fixalpha), self.phases,
+                                        self.freqsxs[0], self.nu_ref, self.all_join_params,
+                                        self.Ps[0], quiet=quiet)
             (self.fitted_params, self.fit_errs, self.chi2, self.dof) = (
-                    fgp.fitted_params, fgp.fit_errs, fgp.chi2, fgp.dof)
+                fgp.fitted_params, fgp.fit_errs, fgp.chi2, fgp.dof)
             self.scattering_index, self.scattering_index_err = \
-                    fgp.scattering_index, fgp.scattering_index_err
+                fgp.scattering_index, fgp.scattering_index_err
             self.fgp = fgp
             if self.njoin:
-                self.model_params = self.fitted_params[:-self.njoin*2]
-                self.model_param_errs = self.fit_errs[:-self.njoin*2]
-                self.join_params = self.fitted_params[-self.njoin*2:]
-                self.join_param_errs = self.fit_errs[-self.njoin*2:]
+                self.model_params = self.fitted_params[:-self.njoin * 2]
+                self.model_param_errs = self.fit_errs[:-self.njoin * 2]
+                self.join_params = self.fitted_params[-self.njoin * 2:]
+                self.join_param_errs = self.fit_errs[-self.njoin * 2:]
                 self.all_join_params[1] = self.join_params
-                #self.red_chi2 = fgp.chi2 / fgp.dof
-                #This function is a hack for now.
+                # self.red_chi2 = fgp.chi2 / fgp.dof
+                # This function is a hack for now.
                 self.write_join_parameters()
             else:
                 self.model_params = self.fitted_params[:]
                 self.model_param_errs = self.fit_errs[:]
             self.model = gen_gaussian_portrait(self.model_code,
-                    self.fitted_params, self.scattering_index, self.phases,
-                    self.freqs[0], self.nu_ref, self.join_ichans, self.Ps[0])
-            self.model_masked = self.model * self.masks[0,0]
-            self.modelx = np.compress(self.masks[0,0].mean(axis=1), self.model,
-                    axis=0)
+                                               self.fitted_params, self.scattering_index, self.phases,
+                                               self.freqs[0], self.nu_ref, self.join_ichans, self.Ps[0])
+            self.model_masked = self.model * self.masks[0, 0]
+            self.modelx = np.compress(self.masks[0, 0].mean(axis=1), self.model,
+                                      axis=0)
             self.duration = time.time() - start
             self.total_time += self.duration
             yield
@@ -297,45 +298,45 @@ class DataPortrait(DataPortrait):
                 jic = self.join_ichans[ii]
                 jicx = self.join_ichanxs[ii]
                 portx[jicx] = rotate_data(self.portx[jicx],
-                        -self.join_params[0::2][ii],
-                        -self.join_params[1::2][ii], self.Ps[0],
-                        self.freqsxs[0][jicx], self.nu_ref)
+                                          -self.join_params[0::2][ii],
+                                          -self.join_params[1::2][ii], self.Ps[0],
+                                          self.freqsxs[0][jicx], self.nu_ref)
                 modelx[jicx] = rotate_data(self.modelx[jicx],
-                        -self.join_params[0::2][ii],
-                        -self.join_params[1::2][ii], self.Ps[0],
-                        self.freqsxs[0][jicx], self.nu_ref)
+                                           -self.join_params[0::2][ii],
+                                           -self.join_params[1::2][ii], self.Ps[0],
+                                           self.freqsxs[0][jicx], self.nu_ref)
         else:
             portx = np.copy(self.portx)
             modelx = np.copy(self.modelx)
-        #Currently, fit_phase_shift returns an unbounded phase
-        phase_guess = fit_phase_shift(portx.mean(axis=0),  #Unweighted mean
-                modelx.mean(axis=0)).phase
+        # Currently, fit_phase_shift returns an unbounded phase
+        phase_guess = fit_phase_shift(portx.mean(axis=0),  # Unweighted mean
+                                      modelx.mean(axis=0)).phase
         phase_guess %= 1
         if phase_guess >= 0.5:
             phase_guess -= 1.0
         DM_guess = 0.0
         fp = fit_portrait(portx, modelx, np.array([phase_guess, DM_guess]),
-                self.Ps[0], self.freqsxs[0], self.nu_fit, None, None,
-                bounds=[(None, None), (None, None)], id=None, quiet=True)
+                          self.Ps[0], self.freqsxs[0], self.nu_fit, None, None,
+                          bounds=[(None, None), (None, None)], id=None, quiet=True)
         self.fp_results = fp
         (self.phi, self.phierr, self.DM, self.DMerr, self.red_chi2) = (
-                fp.phase, fp.phase_err, fp.DM, fp.DM_err, fp.red_chi2)
+            fp.phase, fp.phase_err, fp.DM, fp.DM_err, fp.red_chi2)
         if not quiet:
-            print("Iter %d:"%(self.itern - self.niter))
-            print(" duration of %.2f min"%(self.duration /  60.))
-            print(" phase offset of %.2e +/- %.2e [rot]"%(self.phi,
-                    self.phierr))
-            print(" DM of %.6e +/- %.2e [cm**-3 pc]"%(self.DM, self.DMerr))
-            print(" red. chi**2 of %.2f."%self.red_chi2)
+            print("Iter %d:" % (self.itern - self.niter))
+            print(" duration of %.2f min" % (self.duration / 60.))
+            print(" phase offset of %.2e +/- %.2e [rot]" % (self.phi,
+                                                            self.phierr))
+            print(" DM of %.6e +/- %.2e [cm**-3 pc]" % (self.DM, self.DMerr))
+            print(" red. chi**2 of %.2f." % self.red_chi2)
         else:
-            if self.niter: #and (self.itern - self.niter) != 0:
-                print("Iter %d..."%(self.itern - self.niter + 1))
-        if min(abs(self.phi), abs(1 - self.phi)) < abs(self.phierr)*efac:
-            if abs(self.DM) < abs(self.DMerr)*efac:
+            if self.niter:  # and (self.itern - self.niter) != 0:
+                print("Iter %d..." % (self.itern - self.niter + 1))
+        if min(abs(self.phi), abs(1 - self.phi)) < abs(self.phierr) * efac:
+            if abs(self.DM) < abs(self.DMerr) * efac:
                 print("\nIteration converged.\n")
                 return 1
-                #print "\nForcing remaining iterations, if any.\n"
-                #return 0
+                # print "\nForcing remaining iterations, if any.\n"
+                # return 0
         else:
             return 0
 
@@ -350,14 +351,14 @@ class DataPortrait(DataPortrait):
         if outfile is None:
             outfile = self.datafile + ".gmodel"
         model_params = np.copy(self.model_params)
-        #Aesthetic mod?
+        # Aesthetic mod?
         model_params[2::6] = np.where(model_params[2::6] >= 1.0,
-                model_params[2::6] % 1, model_params[2::6])
-        #Convert tau (scattering timescale) to sec
+                                      model_params[2::6] % 1, model_params[2::6])
+        # Convert tau (scattering timescale) to sec
         model_params[1] *= old_div(self.Ps[0], self.nbin)
         write_model(outfile, self.model_name, self.model_code, self.nu_ref,
-                model_params, self.fit_flags, self.scattering_index,
-                self.fitalpha, append=append, quiet=quiet)
+                    model_params, self.fit_flags, self.scattering_index,
+                    self.fitalpha, append=append, quiet=quiet)
 
     def write_errfile(self, errfile=None, append=False, quiet=False):
         """
@@ -370,12 +371,13 @@ class DataPortrait(DataPortrait):
         if errfile is None:
             errfile = self.datafile + ".gmodel_errs"
         model_param_errs = np.copy(self.model_param_errs)
-        #Convert tau (scattering timescale) to sec
+        # Convert tau (scattering timescale) to sec
         model_param_errs[1] *= old_div(self.Ps[0], self.nbin)
         write_model(errfile, self.model_name + "_errors", self.model_code,
-                self.nu_ref, model_param_errs, self.fit_flags,
-                self.scattering_index_err, self.fitalpha, append=append,
-                quiet=quiet)
+                    self.nu_ref, model_param_errs, self.fit_flags,
+                    self.scattering_index_err, self.fitalpha, append=append,
+                    quiet=quiet)
+
 
 class GaussianSelector(object):
     """
@@ -385,8 +387,8 @@ class GaussianSelector(object):
     """
 
     def __init__(self, ax, profile, errs, tau=0.0, fixscat=True,
-            auto_gauss=0.0, profile_fit_flags=None, minspanx=None,
-            minspany=None, useblit=True):
+                 auto_gauss=0.0, profile_fit_flags=None, minspanx=None,
+                 minspany=None, useblit=True):
         """
         Initialize the input parameters and open the interactive window.
 
@@ -416,13 +418,13 @@ class GaussianSelector(object):
         self.proflen = len(profile)
         self.phases = old_div(np.arange(self.proflen, dtype='d'), self.proflen)
         self.errs = errs
-        self.tauguess = tau #in bins
+        self.tauguess = tau  # in bins
         self.fit_scattering = not fixscat
         if self.fit_scattering and self.tauguess == 0.0:
-            self.tauguess = 0.1 #seems to break otherwise
+            self.tauguess = 0.1  # seems to break otherwise
         self.profile_fit_flags = profile_fit_flags
         self.visible = True
-        self.DCguess = sorted(profile)[old_div(len(profile),10) + 1]
+        self.DCguess = sorted(profile)[old_div(len(profile), 10) + 1]
         self.init_params = [self.DCguess, self.tauguess]
         self.ngauss = 0
         self.canvas = ax.figure.canvas
@@ -432,9 +434,9 @@ class GaussianSelector(object):
         self.canvas.mpl_connect('draw_event', self.update_background)
         self.canvas.mpl_connect('key_press_event', self.keypress)
         self.background = None
-        self.rectprops = dict(facecolor='white', edgecolor = 'black',
+        self.rectprops = dict(facecolor='white', edgecolor='black',
                               alpha=0.5, fill=False)
-        self.to_draw = Rectangle((0,0), 0, 1, visible=False, **self.rectprops)
+        self.to_draw = Rectangle((0, 0), 0, 1, visible=False, **self.rectprops)
         self.ax.add_patch(self.to_draw)
         self.useblit = useblit
         self.minspanx = minspanx
@@ -448,23 +450,23 @@ class GaussianSelector(object):
         if self.auto_gauss:
             amp = self.profile.max()
             wid = self.auto_gauss
-            first_gauss = amp*gaussian_profile(self.proflen, 0.5, wid)
+            first_gauss = amp * gaussian_profile(self.proflen, 0.5, wid)
             loc = 0.5 + fit_phase_shift(self.profile, first_gauss,
-                    self.errs).phase
+                                        self.errs).phase
             self.init_params += [loc, wid, amp]
             self.ngauss += 1
             self.plot_gaussians(self.init_params)
             print("Auto-fitting a single Gaussian component...")
             fgp = fit_gaussian_profile(self.profile, self.init_params,
-                    np.zeros(self.proflen) + self.errs, self.profile_fit_flags,
-                    self.fit_scattering, quiet=True)
+                                       np.zeros(self.proflen) + self.errs, self.profile_fit_flags,
+                                       self.fit_scattering, quiet=True)
             self.fitted_params = fgp.fitted_params
             self.fit_errs = fgp.fit_errs
             self.chi2 = fgp.chi2
             self.dof = fgp.dof
             self.residuals = fgp.residuals
             # scaled uncertainties
-            #scaled_fit_errs = fit_errs * np.sqrt(chi_sq / dof)
+            # scaled_fit_errs = fit_errs * np.sqrt(chi_sq / dof)
 
             # Plot the best-fit profile
             self.plot_gaussians(self.fitted_params)
@@ -531,8 +533,8 @@ class GaussianSelector(object):
             yproblems = self.minspany is not None and spany < self.minspany
         # call desired function
         self.onselect()
-        self.eventpress = None                # reset the variables to their
-        self.eventrelease = None              #   inital values
+        self.eventpress = None  # reset the variables to their
+        self.eventrelease = None  # inital values
 
     def update(self):
         """draw using blit or old draw depending on useblit"""
@@ -547,15 +549,15 @@ class GaussianSelector(object):
     def onmove(self, event):
         """on move event"""
         if self.eventpress is None or self.ignore(event): return
-        x, y = event.xdata, event.ydata         # actual position 
-                                                # with button still pressed
-        minx, maxx = self.eventpress.xdata, x   # click-x and actual mouse-x
-        miny, maxy = self.eventpress.ydata, y   # click-y and actual mouse-y
-        if minx > maxx: minx, maxx = maxx, minx # get them in the right order
+        x, y = event.xdata, event.ydata  # actual position
+        # with button still pressed
+        minx, maxx = self.eventpress.xdata, x  # click-x and actual mouse-x
+        miny, maxy = self.eventpress.ydata, y  # click-y and actual mouse-y
+        if minx > maxx: minx, maxx = maxx, minx  # get them in the right order
         if miny > maxy: miny, maxy = maxy, miny
-        self.to_draw.set_x(minx)                # set lower left of box
+        self.to_draw.set_x(minx)  # set lower left of box
         self.to_draw.set_y(miny)
-        self.to_draw.set_width(maxx - minx)     # set width and height of box
+        self.to_draw.set_width(maxx - minx)  # set width and height of box
         self.to_draw.set_height(maxy - miny)
         self.update()
 
@@ -579,24 +581,24 @@ class GaussianSelector(object):
         prefit_buff = 0.1
         postfit_buff = 0.1
         if self.fit_scattering: prefit_buff = 1.0
-        ymin,ymax = plt.ylim()
-        ymin = params[0] - prefit_buff*(self.profile.max()-self.profile.min())
+        ymin, ymax = plt.ylim()
+        ymin = params[0] - prefit_buff * (self.profile.max() - self.profile.min())
         ymax = self.profile.max() + prefit_buff * \
-                (self.profile.max()-self.profile.min())
+               (self.profile.max() - self.profile.min())
         plt.ylim(ymin, ymax)
         DC = params[0]
         tau = params[1]
         # Plot the individual Gaussians
         max_amp = 0.0
         for igauss in range(self.ngauss):
-            loc, wid, amp = params[(2 + igauss*3):(5 + igauss*3)]
+            loc, wid, amp = params[(2 + igauss * 3):(5 + igauss * 3)]
             if amp >= max_amp:
                 max_amp = amp
-            plt.plot(self.phases, DC + amp*gaussian_profile(self.proflen, loc,
-                wid), '%s'%cols[igauss])
+            plt.plot(self.phases, DC + amp * gaussian_profile(self.proflen, loc,
+                                                              wid), '%s' % cols[igauss])
             if max_amp > ymax:
                 plt.ylim(ymin, max_amp + postfit_buff * \
-                        (max_amp - self.profile.min()))
+                         (max_amp - self.profile.min()))
 
     def onselect(self):
         """on select event"""
@@ -608,7 +610,7 @@ class GaussianSelector(object):
             x2, y2 = event2.xdata, event2.ydata
             loc = 0.5 * (x1 + x2)
             wid = np.fabs(x2 - x1)
-            #amp = np.fabs(1.05 * (y2 - self.init_params[0]) * (x2 - x1))
+            # amp = np.fabs(1.05 * (y2 - self.init_params[0]) * (x2 - x1))
             amp = np.fabs(1.05 * (y2 - self.init_params[0]))
             self.init_params += [loc, wid, amp]
             self.ngauss += 1
@@ -618,15 +620,15 @@ class GaussianSelector(object):
         elif event1.button == event2.button == 2:
             print("Fitting reference Gaussian profile...")
             fgp = fit_gaussian_profile(self.profile, self.init_params,
-                    np.zeros(self.proflen) + self.errs, self.profile_fit_flags,
-                    self.fit_scattering, quiet=True)
+                                       np.zeros(self.proflen) + self.errs, self.profile_fit_flags,
+                                       self.fit_scattering, quiet=True)
             self.fitted_params = fgp.fitted_params
             self.fit_errs = fgp.fit_errs
             self.chi2 = fgp.chi2
             self.dof = fgp.dof
             self.residuals = fgp.residuals
             # scaled uncertainties
-            #scaled_fit_errs = fit_errs * np.sqrt(chi_sq / dof)
+            # scaled_fit_errs = fit_errs * np.sqrt(chi_sq / dof)
 
             # Plot the best-fit profile
             self.plot_gaussians(self.fitted_params)
@@ -667,7 +669,7 @@ if __name__ == "__main__":
 
     usage = "Usage: %prog -d <datafile> [options]\n         or\n       %prog -M <metafile> [options]"
     parser = OptionParser(usage)
-    #parser.add_option("-h", "--help",
+    # parser.add_option("-h", "--help",
     #                  action="store_true", dest="help", default=False,
     #                  help="Show this help message and exit.")
     parser.add_option("-d", "--datafile",
@@ -727,7 +729,7 @@ if __name__ == "__main__":
     parser.add_option("--mcode",
                       action="store", metavar="###", dest="model_code",
                       default=default_model,
-                      help="Three-digit string specifying the evolutionary functions for each Gaussian parameter (loc,wid,amp). See evolve_parameter function for details. Not used with -I. [default=%s]"%default_model)
+                      help="Three-digit string specifying the evolutionary functions for each Gaussian parameter (loc,wid,amp). See evolve_parameter function for details. Not used with -I. [default=%s]" % default_model)
     parser.add_option("--niter",
                       action="store", metavar="int", dest="niter", default=0,
                       help="Number of iterations to loop for generating better model; ppgauss exits before niter iterations if internal convergence criteria are met. [default=0]")
@@ -764,10 +766,14 @@ if __name__ == "__main__":
     errfile = options.errfile
     joinfile = options.joinfile
     model_name = options.model_name
-    if options.nu_ref: nu_ref = np.float64(options.nu_ref)
-    else: nu_ref = options.nu_ref
-    if options.bw_ref: bw_ref = np.float64(options.bw_ref)
-    else: bw_ref = options.bw_ref
+    if options.nu_ref:
+        nu_ref = np.float64(options.nu_ref)
+    else:
+        nu_ref = options.nu_ref
+    if options.bw_ref:
+        bw_ref = np.float64(options.bw_ref)
+    else:
+        bw_ref = options.bw_ref
     tau = np.float64(options.tau)
     fixloc = options.fixloc
     fixwid = options.fixwid
@@ -787,20 +793,20 @@ if __name__ == "__main__":
     if normalize in ("mean", "max", "prof", "rms", "abs"):
         dp.normalize_portrait(normalize)
     elif normalize is not None:
-        print("Unknown normalization choice, '%s'."%normalize)
+        print("Unknown normalization choice, '%s'." % normalize)
         sys.exit()
-    #if not quiet: dp.show_data_portrait()
+    # if not quiet: dp.show_data_portrait()
     if modelfile is not None:
         dp.make_gaussian_model(modelfile=modelfile, fixalpha=fixalpha,
-                model_code=model_code, niter=niter, writemodel=True,
-                outfile=outfile, writeerrfile=True, errfile=errfile,
-                model_name=model_name, residplot=figure, quiet=quiet)
+                               model_code=model_code, niter=niter, writemodel=True,
+                               outfile=outfile, writeerrfile=True, errfile=errfile,
+                               model_name=model_name, residplot=figure, quiet=quiet)
     else:
         tau *= old_div(dp.nbin, dp.Ps[0])
         dp.make_gaussian_model(modelfile=None, ref_prof=(nu_ref, bw_ref),
-                tau=tau, fixloc=fixloc, fixwid=fixwid, fixamp=fixamp,
-                fixscat=fixscat, fixalpha=fixalpha, model_code=model_code,
-                niter=niter, fiducial_gaussian=fgauss, auto_gauss=auto_gauss,
-                writemodel=True, outfile=outfile, writeerrfile=True,
-                errfile=errfile, model_name=model_name, residplot=figure,
-                quiet=quiet)
+                               tau=tau, fixloc=fixloc, fixwid=fixwid, fixamp=fixamp,
+                               fixscat=fixscat, fixalpha=fixalpha, model_code=model_code,
+                               niter=niter, fiducial_gaussian=fgauss, auto_gauss=auto_gauss,
+                               writemodel=True, outfile=outfile, writeerrfile=True,
+                               errfile=errfile, model_name=model_name, residplot=figure,
+                               quiet=quiet)

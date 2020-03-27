@@ -4,19 +4,22 @@
 # ppzap #
 #########
 
-#ppzap is a command-line program used to flag bad channels that may have gotten
+# ppzap is a command-line program used to flag bad channels that may have gotten
 #    through other rounds of zapping.  The basic algorithm is an very simple
 #    iterative approach using the channel noise levels, and the other approach
 #    uses a fitted model and the calculated channel reduced chi-squared values.
 #    Full-functionality is obtained when using ppzap within an interactive
 #    python environment.
 
-#Written by Timothy T. Pennucci (TTP; tim.pennucci@nanograv.org).
+# Written by Timothy T. Pennucci (TTP; tim.pennucci@nanograv.org).
 
 from __future__ import print_function
+
 from builtins import map
 from builtins import range
+
 from pptoas import *
+
 
 def get_zap_channels(data, nstd=3):
     """
@@ -35,11 +38,11 @@ def get_zap_channels(data, nstd=3):
     for isub in data.ok_isubs:
         ichans = list(np.copy(data.ok_ichans[isub]))
         zap_ichans = []
-        while(len(ichans)):
-            noise_stds = data.noise_stds[isub,0,ichans]
+        while (len(ichans)):
+            noise_stds = data.noise_stds[isub, 0, ichans]
             median = np.median(noise_stds)
             std = np.std(noise_stds)
-            bad_ichans = list(np.where(noise_stds > median + nstd*std)[0])
+            bad_ichans = list(np.where(noise_stds > median + nstd * std)[0])
             if len(bad_ichans):
                 zap_ichans.extend(list(np.array(ichans)[bad_ichans]))
                 for ichan in np.array(ichans)[bad_ichans]:
@@ -50,8 +53,9 @@ def get_zap_channels(data, nstd=3):
         zap_channels.append(zap_ichans)
     return zap_channels
 
+
 def print_paz_cmds(datafiles, zap_list, all_subs=False, modify=True,
-        outfile=None, quiet=False):
+                   outfile=None, quiet=False):
     """
     Print paz commands given a list of datafiles and a zap list.
 
@@ -80,22 +84,24 @@ def print_paz_cmds(datafiles, zap_list, all_subs=False, modify=True,
                 paz_outfile = datafile
             else:
                 ii = datafile[::-1].find(".")
-                if ii < 0: paz_outfile = datafile + ".zap"
-                else: paz_outfile = datafile[:-ii] + "zap"
-                print("paz -e zap %s"%datafile)
+                if ii < 0:
+                    paz_outfile = datafile + ".zap"
+                else:
+                    paz_outfile = datafile[:-ii] + "zap"
+                print("paz -e zap %s" % datafile)
         last_line = ""
         for isub, bad_ichans in enumerate(zap_list[iarch]):
             for bad_ichan in bad_ichans:
                 if not all_subs:
-                    print("paz -m -I -z %d -w %d %s"%(bad_ichan, isub,
-                            paz_outfile))
+                    print("paz -m -I -z %d -w %d %s" % (bad_ichan, isub,
+                                                        paz_outfile))
                 else:
-                    line = "paz -m -z %d %s"%(bad_ichan, paz_outfile)
+                    line = "paz -m -z %d %s" % (bad_ichan, paz_outfile)
                     if line != last_line: print(line)
                     last_line = line
     sys.stdout = sys.__stdout__
     if outfile is not None and not quiet:
-        print("Wrote %s."%outfile)
+        print("Wrote %s." % outfile)
 
 
 if __name__ == "__main__":
@@ -104,7 +110,7 @@ if __name__ == "__main__":
 
     usage = "Usage: %prog -d <datafile or metafile> [options]"
     parser = OptionParser(usage)
-    #parser.add_option("-h", "--help",
+    # parser.add_option("-h", "--help",
     #                  action="store_true", dest="help", default=False,
     #                  help="Show this help message and exit.")
     parser.add_option("-d", "--datafiles",
@@ -173,10 +179,10 @@ if __name__ == "__main__":
         gt = GetTOAs(datafiles=datafiles, modelfile=modelfile, quiet=True)
         gt.get_TOAs(tscrunch=tscrunch, quiet=True)
         gt.get_channels_to_zap(SNR_threshold=SNR_threshold,
-                rchi2_threshold=rchi2_threshold, iterate=True, show=False)
+                               rchi2_threshold=rchi2_threshold, iterate=True, show=False)
         ok_datafiles = list(np.array(gt.datafiles)[gt.ok_idatafiles])
         print_paz_cmds(ok_datafiles, gt.zap_channels, all_subs=tscrunch,
-                modify=modify, outfile=outfile, quiet=quiet)
+                       modify=modify, outfile=outfile, quiet=quiet)
 
         nchan = 0
         nzap = 0
@@ -198,16 +204,18 @@ if __name__ == "__main__":
             plt.ylim(ymin, ymax)
             plt.xlabel(r"Reduced $\chi^2$")
             plt.ylabel("#")
-            plt.title("%s\n"%datafiles + r"%d / %d channels w/ $\chi^2_{red}$ > %.1f"%(nzap_rchi2, nchan, rchi2_threshold))
-            plt.savefig(datafiles+"_ppzap_hist.png")
+            plt.title("%s\n" % datafiles + r"%d / %d channels w/ $\chi^2_{red}$ > %.1f" % (
+            nzap_rchi2, nchan, rchi2_threshold))
+            plt.savefig(datafiles + "_ppzap_hist.png")
 
         if not quiet:
-            print("ppzap.py found %d channels to zap out of a total %d channels fit (=%.2f%%) in %s."%(nzap, nchan, 100*float(nzap)/nchan, datafiles))
+            print("ppzap.py found %d channels to zap out of a total %d channels fit (=%.2f%%) in %s." % (
+            nzap, nchan, 100 * float(nzap) / nchan, datafiles))
 
     else:
         if file_is_type(datafiles, "ASCII"):
             all_datafiles = [datafile[:-1] for datafile in \
-                    open(datafiles, "r").readlines()]
+                             open(datafiles, "r").readlines()]
         else:
             all_datafiles = [datafiles]
         nchan = 0
@@ -215,25 +223,25 @@ if __name__ == "__main__":
         for datafile in all_datafiles:
             try:
                 data = load_data(datafile, dedisperse=False,
-                        dededisperse=False, tscrunch=tscrunch, pscrunch=True,
-                        fscrunch=False, rm_baseline=rm_baseline,
-                        flux_prof=False, refresh_arch=False, return_arch=False,
-                        quiet=True)
+                                 dededisperse=False, tscrunch=tscrunch, pscrunch=True,
+                                 fscrunch=False, rm_baseline=rm_baseline,
+                                 flux_prof=False, refresh_arch=False, return_arch=False,
+                                 quiet=True)
             except RuntimeError:
                 if not quiet:
-                    print("Cannot load_data(%s).  Skipping it."%datafile)
+                    print("Cannot load_data(%s).  Skipping it." % datafile)
                 continue
             nchan += np.array(list(map(len, data.ok_ichans))).sum()
             if norm is not None:
                 for isub in data.ok_isubs:
-                    data.subints[isub,0] = normalize_portrait(
-                            data.subints[isub,0], method=norm,
-                            weights=data.weights[isub], return_norms=False)
-                    data.noise_stds[isub,0] = get_noise(data.subints[isub,0],
-                            chans=True)
+                    data.subints[isub, 0] = normalize_portrait(
+                        data.subints[isub, 0], method=norm,
+                        weights=data.weights[isub], return_norms=False)
+                    data.noise_stds[isub, 0] = get_noise(data.subints[isub, 0],
+                                                         chans=True)
             zap_channels.append(get_zap_channels(data, nstd=nstd))
         print_paz_cmds(all_datafiles, zap_channels, all_subs=tscrunch,
-                modify=modify, outfile=outfile, quiet=quiet)
+                       modify=modify, outfile=outfile, quiet=quiet)
 
         nzap = 0
         for iarch in range(len(zap_channels)):
@@ -241,4 +249,5 @@ if __name__ == "__main__":
                 nzap += len(zap_channels[iarch][isub])
 
         if not quiet:
-            print("ppzap.py found %d channels to zap out of a total %d channels (=%.2f%%) in %s."%(nzap, nchan, 100*float(nzap)/nchan, datafiles))
+            print("ppzap.py found %d channels to zap out of a total %d channels (=%.2f%%) in %s." % (
+            nzap, nchan, 100 * float(nzap) / nchan, datafiles))
