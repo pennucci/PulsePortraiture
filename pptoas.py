@@ -361,32 +361,41 @@ class GetTOAs(object):
                 P = d.Ps[isub]
                 if not self.is_FITS_model:
                     # Read model
-                    try:
-                        if not fit_scat:
-                            self.model_name, self.ngauss, model = read_model(
-                                self.modelfile, d.phases, d.freqs[isub],
-                                d.Ps[isub],
-                                quiet=bool(quiet + (itoa - 1)))
-                        else:
-                            self.model_name, self.ngauss, full_model = \
-                                read_model(self.modelfile, d.phases,
-                                           d.freqs[isub], d.Ps[isub],
-                                           quiet=bool(quiet + (itoa - 1)))
-                            self.model_name, self.model_code, \
-                            self.model_nu_ref, self.ngauss, \
-                            self.gparams, model_fit_flags, self.alpha, \
-                            model_fit_alpha = read_model(
-                                self.modelfile,
-                                quiet=bool(quiet + (itoa - 1)))
-                            unscat_params = np.copy(self.gparams)
-                            unscat_params[1] = 0.0
-                            model = unscat_model = gen_gaussian_portrait(
-                                self.model_code, unscat_params, 0.0,
-                                d.phases, d.freqs[isub], self.model_nu_ref)
-                    except UnboundLocalError:
+                    is_spline = file_is_type(self.modelfile, 'data')
+                    print(is_spline)
+                    if not is_spline:
+                        try:
+                            if not fit_scat:
+                                self.model_name, self.ngauss, model = read_model(
+                                    self.modelfile, d.phases, d.freqs[isub],
+                                    d.Ps[isub],
+                                    quiet=bool(quiet + (itoa - 1)))
+                            else:
+                                self.model_name, self.ngauss, full_model = \
+                                    read_model(self.modelfile, d.phases,
+                                               d.freqs[isub], d.Ps[isub],
+                                               quiet=bool(quiet + (itoa - 1)))
+                                self.model_name, self.model_code, \
+                                self.model_nu_ref, self.ngauss, \
+                                self.gparams, model_fit_flags, self.alpha, \
+                                model_fit_alpha = read_model(
+                                    self.modelfile,
+                                    quiet=bool(quiet + (itoa - 1)))
+                                unscat_params = np.copy(self.gparams)
+                                unscat_params[1] = 0.0
+                                model = unscat_model = gen_gaussian_portrait(
+                                    self.model_code, unscat_params, 0.0,
+                                    d.phases, d.freqs[isub], self.model_nu_ref)
+                        except UnboundLocalError:
+                            self.model_name, model = read_spline_model(
+                                self.modelfile, d.freqs[isub], nbin,
+                                quiet=True)  # bool(quiet+(itoa-1)))
+                    else:
+                    # if the model load fails because the unicode characters are wrong, it's probably a binary/pickle file
                         self.model_name, model = read_spline_model(
-                            self.modelfile, d.freqs[isub], nbin,
-                            quiet=True)  # bool(quiet+(itoa-1)))
+                                self.modelfile, d.freqs[isub], nbin,
+                                quiet=True)  # bool(quiet+(itoa-1)))
+
                 # else:
                 ##THESE FREQUENCIES WILL BE OFF IF AVERAGED CHANNELS##
                 #    print model_data.freqs[0, ok_ichans[isub]] - \
