@@ -32,6 +32,7 @@ import sys
 import subprocess
 import time
 import pickle
+import operator
 import numpy as np
 import numpy.fft as fft
 import scipy.interpolate as si
@@ -318,8 +319,11 @@ class DataPortrait(object):
                 self.data = data
                 # Unpack the data dictionary into the local namespace;
                 # see load_data for dictionary keys.
-                for key in list(self.data.keys()):
-                    exec("self." + key + " = self.data['" + key + "']")
+                # BWM: since we are updating the object attributes, it's "safe" to 
+                # directly update the object __dict__
+                self.__dict__.update(**self.data)
+                # for key in list(self.data.keys()):
+                #     exec("self." + key + " = self.data['" + key + "']")
         else:
             self.njoin = 0
             self.join_params = []
@@ -333,8 +337,9 @@ class DataPortrait(object):
                                   return_arch=True, quiet=quiet, **load_data_kwargs)
             # Unpack the data dictionary into the local namespace;
             # see load_data for dictionary keys.
-            for key in list(self.data.keys()):
-                exec("self." + key + " = self.data['" + key + "']")
+            self.__dict__.update(**self.data)
+            # for key in list(self.data.keys()):
+            #     exec("self." + key + " = self.data['" + key + "']")
             if self.source is None: self.source = "noname"
             self.port = (self.masks * self.subints)[0, 0]
             self.portx = self.port[self.ok_ichans[0]]
@@ -681,7 +686,8 @@ def set_colormap(colormap):
     im = plt.gci()
 
     if im is not None:
-        exec("im.set_cmap(plt.cm.%s)" % colormap)
+        cmap = plt.get_cmap(colormap)
+        im.set_cmap(cmap)
     plt.draw_if_interactive()
 
 
@@ -3501,11 +3507,30 @@ def filter_TOAs(TOAs, flag, cutoff, criterion=">=", pass_unflagged=False,
     """
     new_toas = []
     culled_toas = []
+
+    if criterion == ">":
+        op = operator.gt
+    elif criterion == ">=":
+        op = operator.ge
+    elif criterion == "<":
+        op = operator.lt
+    elif criterion == "<=":
+        op = operator.le
+    elif criterion == "==":
+        op = operator.eq
+    elif criterio == "!=":
+        op = operator.ne
+    else:
+        print("Undefined criterion {0}".format(criterion))
+        print("Defaulting to '=='")
+        op = operator.eq
+
     for toa in TOAs:
-        if hasattr(toa, flag):
-            exec("if toa.%s %s cutoff: new_toas.append(toa)" % (flag, criterion))
-            exec("if not(toa.%s %s cutoff): culled_toas.append(toa)" % (flag,
-                                                                        criterion))
+        if flag in toa.flags:
+            if op(toa.flags[flag], cutoff):
+                new_toas.append(toa)
+            else:
+                culled_toas.appens(toa)
         else:
             if pass_unflagged:
                 new_toas.append(toa)
@@ -3598,21 +3623,18 @@ def write_TOAs(TOAs, inf_is_zero=True, SNR_cutoff=0.0, outfile=None,
         for flag, value in toa.flags.items():
             if value is not None:
                 if hasattr(value, "lower"):
-                    exec("toa_string += ' -%s %s'" % (flag, value))
+                    toa_string += ' -%s %s' % (flag, value)
                 elif hasattr(value, "bit_length"):
-                    exec("toa_string += ' -%s %d'" % (flag, value))
+                    toa_string += ' -%s %d' % (flag, value)
                 elif flag.find("_cov") >= 0:
-                    exec("toa_string += ' -%s %.1e'" % (flag,
-                                                        toa.flags[flag]))
+                    toa_string += ' -%s %.1e' % (flag, toa.flags[flag])
                 elif flag.find("phs") >= 0:
-                    exec("toa_string += ' -%s %.8f'" % (flag,
-                                                        toa.flags[flag]))
+                    toa_string += ' -%s %.8f' % (flag, toa.flags[flag])
                 elif flag.find("flux") >= 0:
-                    exec("toa_string += ' -%s %.5f'" % (flag,
-                                                        toa.flags[flag]))
+                    toa_string += ' -%s %.5f' % (flag, toa.flags[flag])
                 else:
-                    exec("toa_string += ' -%s %.3f'" % (flag,
-                                                        toa.flags[flag]))
+                    toa_string += ' -%s %.3f' % (flag, toa.flags[flag])
+
         if outfile is not None:
             toa_string += "\n"
             of.write(toa_string)
