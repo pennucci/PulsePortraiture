@@ -22,6 +22,7 @@ from builtins import range
 from builtins import zip
 
 from past.utils import old_div
+from types import SimpleNamespace
 from pptoaslib import *
 
 # cfitsio defines a maximum number of files (NMAXFILES) that can be opened in
@@ -68,8 +69,9 @@ class TOA(object):
         self.DM = DM
         self.DM_error = DM_error
         self.flags = flags
-        for flag in list(flags.keys()):
-            exec('self.%s = flags["%s"]' % (flag, flag))
+        # This isn't necessary since other functions can just access the dictionary directly
+        # for flag in list(flags.keys()):
+        #    exec('self.%s = flags["%s"]' % (flag, flag))
 
     def write_TOA(self, inf_is_zero=True, outfile=None):
         """
@@ -287,7 +289,9 @@ class GetTOAs(object):
             # for key in list(data.keys()):
             #     exec(key + " = data['" + key + "']")
             # BWM: Python 3 no longer supports updating local namespace via exec statement/function
-            from types import SimpleNamespace
+            # Also, since we're setting local variables, it's not safe to just update the object __dict__
+            # So the best option is to instead load the dictionary into a SimpleNamespace and 
+            # access key/values as you would an object attribute
             d = SimpleNamespace(**data)
             nsub = d.nsub
             nchan = d.nchan
