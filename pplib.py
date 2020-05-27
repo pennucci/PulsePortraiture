@@ -2096,7 +2096,7 @@ def fit_phase_shift(data, model, noise=None, bounds=[-0.5, 0.5], Ns=100):
     #SNR of the fit, based on PDB's notes
     snr = pow(scale**2 * p, 0.5)
     return DataBunch(phase=phase, phase_err=phase_error, scale=scale,
-            scale_error=scale_error, snr=snr, red_chi2=red_chi2,
+            scale_err=scale_error, snr=snr, red_chi2=red_chi2,
             duration=duration)
 
 def fit_portrait(data, model, init_params, P, freqs, nu_fit=None, nu_out=None,
