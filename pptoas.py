@@ -1438,7 +1438,7 @@ if __name__ == "__main__":
                       help="Make narrowband TOAs instead.")
     parser.add_option("--psrchive",
                       action="store_true",  dest="psrchive", default=False,
-                      help="Make narrowband TOAs with psrchive.")
+                      help="Make narrowband TOAs with PSRCHIVE.")
     parser.add_option("--errfile",
                       action="store", metavar="errfile", dest="errfile",
                       default=None,
