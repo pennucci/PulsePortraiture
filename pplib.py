@@ -3035,6 +3035,8 @@ def unload_new_archive(data, arch, outfile, DM=None, dmc=0, weights=None,
     """
     Unload a PSRFITS archive containing new data values.
 
+    PSRCHIVE unloads frequencies as floats with three digits of precision.
+
     data is the nsub x npol x nchan x nbin array of amplitudes to be stored,
         which has the same shape as arch.get_data().shape.
     arch is the PSRCHIVE archive instance to be otherwise copied.
