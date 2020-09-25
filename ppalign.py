@@ -51,9 +51,9 @@ def psrsmooth_archive(archive, options="-W"):
     psrsmooth_call = sub.Popen(shlex.split(psrsmooth_cmd))
     psrsmooth_call.wait()
 
-def align_archives(metafile, initial_guess, tscrunch=False, pscrunch=True,
-        SNR_cutoff=0.0, outfile=None, norm=None, rot_phase=0.0, place=None,
-        niter=1, quiet=False):
+def align_archives(metafile, initial_guess, fit_dm=True, tscrunch=False,
+        pscrunch=True, SNR_cutoff=0.0, outfile=None, norm=None, rot_phase=0.0,
+        place=None, niter=1, quiet=False):
     """
     Iteratively align and average archives.
 
@@ -66,6 +66,7 @@ def align_archives(metafile, initial_guess, tscrunch=False, pscrunch=True,
     metafile is a file containing PSRFITS archive names to be averaged, or it
         can be a python list of archive names.
     initial_guess is the PSRFITS archive providing the initial alignment guess.
+    fit_dm=False will only align the subintegrations with a fit for phase.
     tscrunch=True will pre-average the subintegrations; recommended unless
         there is a reason to keep the invidual subints for looping over.
     pscrunch=False will return the average Stokes portraits.  Alignment and
@@ -183,9 +184,15 @@ def align_archives(metafile, initial_guess, tscrunch=False, pscrunch=True,
                     weights=data.weights[isub,ichans]), model.mean(axis=0),
                     Ns=nbin).phase
                 if len(freqs) > 1:
-                    results = fit_portrait(port, model,
-                            np.array([phase_guess, DM_guess]), P, freqs,
-                            nu_fit, None, errs, quiet=quiet)
+                    fit_phase = 1
+                    fit_dm = bool(fit_dm)
+                    fit_flags = [fit_phase, fit_dm, 0, 0, 0]
+                    results = fit_portrait_full(port, model,
+                            np.array([phase_guess, DM_guess, 0.0, 0.0, 0.0]),
+                            P, freqs, [nu_fit, nu_fit, nu_fit],
+                            [None, None, None], errs, fit_flags, quiet=quiet)
+                    results.phase = results.phi
+                    results.nu_ref = results.nu_DM
                 else:  #1-channel hack
                     results = fit_phase_shift(port[0], model[0], errs[0],
                             Ns=nbin)
@@ -257,6 +264,10 @@ if __name__ == "__main__":
                       default=None,
                       action="store", metavar="fwhm", dest="fwhm",
                       help="Use a single Gaussian component of given FWHM to align archives.  Overides -I.")
+    parser.add_option("-D", "--no_DM",
+                      default=True,
+                      action="store_false", dest="fit_dm",
+                      help="Align the subintegrations/archives with a fit for phase only.")
     parser.add_option("-T", "--tscr",
                       default=False,
                       action="store_true", dest="tscrunch",
@@ -311,6 +322,7 @@ if __name__ == "__main__":
     metafile = options.metafile
     initial_guess = options.initial_guess
     fwhm = options.fwhm
+    fit_dm = options.fit_dm
     tscrunch = options.tscrunch
     pscrunch = options.pscrunch
     SNR_cutoff = float(options.SNR_cutoff)
@@ -354,10 +366,10 @@ if __name__ == "__main__":
                     dmc=False, weights=None, quiet=quiet)
             initial_guess = tmp_file
             rm = True
-    align_archives(metafile, initial_guess=initial_guess, tscrunch=tscrunch,
-            pscrunch=pscrunch, SNR_cutoff=SNR_cutoff, outfile=outfile,
-            norm=norm, rot_phase=rot_phase, place=place, niter=niter,
-            quiet=quiet)
+    align_archives(metafile, initial_guess=initial_guess, fit_dm=fit_dm,
+            tscrunch=tscrunch, pscrunch=pscrunch, SNR_cutoff=SNR_cutoff,
+            outfile=outfile, norm=norm, rot_phase=rot_phase, place=place,
+            niter=niter, quiet=quiet)
     if smooth:
         if outfile is None:
             outfile = metafile + ".algnd.fits"
