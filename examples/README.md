@@ -10,9 +10,9 @@ Basic Examples
   - pptoas.py -h
 
 
-For a more involved example, run/examine [example.py][examplepy].
+For a more involved example, run/examine [`example.py`][examplepy].
 
-For a walk-through of basic ppalign, ppspline, and pptoas usage, try the notebook, [example_make_model_and_TOAs.ipynb][examplenb].
+For a walk-through of basic ppalign, ppspline, and pptoas usage, try the notebook, [`example_make_model_and_TOAs.ipynb`][examplenb].
 
 * Simplest command-line use with minimum arguments:
 
@@ -26,27 +26,27 @@ For a walk-through of basic ppalign, ppspline, and pptoas usage, try the noteboo
     ppspline.py -d average_psrfits_file.fits
     ```
 
-  - Make a gaussian model (based on averaged data e.g. having used psradd):
+  - Make a gaussian model (based on averaged data e.g. having used `psradd`):
     ```python
     ppgauss.py -d average_psrfits_file.fits
     ```
 
-  - Measure TOAs & DMs from an archive using a ppspline model:
+  - Measure TOAs & DMs from an archive using a `ppspline` model:
     ```python
     pptoas.py -d psrfits_archive.fits -m model_from_ppspline.spl
     ```
 
-  - Measure TOAs & DMs from an archive using a ppgauss model:
+  - Measure TOAs & DMs from an archive using a `ppgauss` model:
     ```python
     pptoas.py -d psrfits_archive.fits -m model_from_ppgauss.gmodel
     ```
 
-  - Measure TOAs, DMs, & nu**-4 delays from an archive using a ppspline model:
+  - Measure TOAs, DMs, & nu**-4 delays from an archive using a `ppspline` model:
     ```python
     pptoas.py -d psrfits_archive.fits -m model_from_ppspline.spl --fit_dt4
     ```
 
-  - Measure TOAs, DMs, taus, and alphas from an archive using a ppgauss model:
+  - Measure TOAs, DMs, taus, and alphas from an archive using a `ppgauss` model:
     ```python
     pptoas.py -d psrfits_archive.fits -m model_from_ppgauss.gmodel -fit_scat
     ```
@@ -94,7 +94,7 @@ For a walk-through of basic ppalign, ppspline, and pptoas usage, try the noteboo
     ```
 
   - Measure only TOAs in an archive and specify an output file:
-    > **NB**: DMs will still be 'barycentered' unless --no_bary is also used!
+    > **NB**: DMs will still be **barycentered** unless `--no_bary` is also used!
 
     ```python
     pptoas.py -d psrfits_archive.fits -m model_from_ppspline_or_ppgauss -o my_tim_file.tim --fix_DM --no_bary

@@ -33,21 +33,21 @@ The technical description of this work and its related papers are:
 
 ## TL;DR
 
-* [**pplib**][pplib] contains functions and classes needed for the fitting scripts.
-* [**ppspline**][ppspline] is a command-line utility to build smoothly varying model portraits based on PCA decomposition, wavelet smoothing, and B-splin einterpolation between the components.
-* [**ppgauss**][ppgauss] is a command-line utility to build Gaussian-component model portraits.
-* [**pptoaslib**][pptoaslib] contains functions needed for pptoas.
-* [**pptoas**][pptoas] is a command-line utility to measure TOAs, DMs, nu**-4 delays, and scattering parameters.
-* [**ppalign**][ppalign] is a command-line utility to average homogeneous data by measuring phases and DMs.
-* [**ppzap**][ppzap] is a command-line utility which uses pptoas to identify potentially overlooked bad channels to zap.
+* [`pplib`][pplib] contains functions and classes needed for the fitting scripts.
+* [`ppspline`][ppspline] is a command-line utility to build smoothly varying model portraits based on PCA decomposition, wavelet smoothing, and B-splin einterpolation between the components.
+* [`ppgauss`][ppgauss] is a command-line utility to build Gaussian-component model portraits.
+* [`pptoaslib`][pptoaslib] contains functions needed for pptoas.
+* [`pptoas`][pptoas] is a command-line utility to measure TOAs, DMs, nu**-4 delays, and scattering parameters.
+* [`ppalign`][ppalign] is a command-line utility to average homogeneous data by measuring phases and DMs.
+* [`ppzap`][ppzap] is a command-line utility which uses pptoas to identify potentially overlooked bad channels to zap.
 * The command-line programs can be imported into ipython for additional flexibility of use.
-* See [**examples**][examples] for simple command-line use.
-* Run and examine [**examples/example.py**][examplepy] for a more in-depth demonstration.
-* Try the notebook [**example_make_model_and_TOAs.ipynb**][examplenb] for a walk-through.
+* See the [**examples**][examples] directory for simple command-line use.
+* Run and examine [**examples/**`example.py`][examplepy] for a more in-depth demonstration.
+* Try the notebook [`example_make_model_and_TOAs.ipynb`][examplenb] for a walk-through.
 
 ## License
 
-Released under GPLv2, sans "or later" clause.
+Released under **GPLv2**, sans "or later" clause.
 
 ## Other
 
