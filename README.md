@@ -42,7 +42,7 @@ The technical description of this work and its related papers are:
 * [**ppzap**][ppzap] is a command-line utility which uses pptoas to identify potentially overlooked bad channels to zap.
 * The command-line programs can be imported into ipython for additional flexibility of use.
 * See [**examples**][examples] for simple command-line use.
-* Run and examine [**examples/example.py**][examplespy] for a more in-depth demonstration.
+* Run and examine [**examples/example.py**][examplepy] for a more in-depth demonstration.
 * Try the notebook [**example_make_model_and_TOAs.ipynb**][examplenb] for a walk-through.
 
 ## License
@@ -73,5 +73,5 @@ Code improvements are underway, as is a broad application to IPTA pulsars of int
 [ppalign]: https://github.com/pennucci/PulsePortraiture/blob/master/ppalign.py
 [ppzap]: https://github.com/pennucci/PulsePortraiture/blob/master/ppzap.py
 [examples]: https://github.com/pennucci/PulsePortraiture/tree/master/examples
-[examplespy]: https://github.com/pennucci/PulsePortraiture/blob/master/examples/example.py
+[examplepy]: https://github.com/pennucci/PulsePortraiture/blob/master/examples/example.py
 [examplenb]: https://github.com/pennucci/PulsePortraiture/blob/master/examples/example_make_model_and_TOAs.ipynb
