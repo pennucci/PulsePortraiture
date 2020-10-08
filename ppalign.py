@@ -188,9 +188,9 @@ def align_archives(metafile, initial_guess, fit_dm=True, tscrunch=False,
                     fit_dm = int(bool(fit_dm))
                     fit_flags = [fit_phase, fit_dm, 0, 0, 0]
                     results = fit_portrait_full(port, model,
-                            np.array([phase_guess, DM_guess, 0.0, 0.0, 0.0]),
-                            P, freqs, [nu_fit, nu_fit, nu_fit],
-                            [None, None, None], errs, fit_flags, quiet=quiet)
+                            [phase_guess, DM_guess, 0.0, 0.0, 0.0], P, freqs,
+                            [nu_fit, nu_fit, nu_fit], [None, None, None], errs,
+                            fit_flags, quiet=quiet)
                     results.phase = results.phi
                     results.nu_ref = results.nu_DM
                 else:  #1-channel hack
