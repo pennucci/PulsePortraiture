@@ -185,7 +185,7 @@ def align_archives(metafile, initial_guess, fit_dm=True, tscrunch=False,
                     Ns=nbin).phase
                 if len(freqs) > 1:
                     fit_phase = 1
-                    fit_dm = bool(fit_dm)
+                    fit_dm = int(bool(fit_dm))
                     fit_flags = [fit_phase, fit_dm, 0, 0, 0]
                     results = fit_portrait_full(port, model,
                             np.array([phase_guess, DM_guess, 0.0, 0.0, 0.0]),
