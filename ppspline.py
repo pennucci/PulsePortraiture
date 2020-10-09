@@ -133,7 +133,9 @@ class DataPortrait(DataPortrait):
             fp, ier, msg = None, None, None
         else:
             spl_weights = pca_weights
-            s = sfac
+            s = sfac * len(proj_port) * \
+                    np.sum((self.SNRsxs * self.noise_stdsxs)**2) / \
+                    sum(self.SNRsxs)**2
             if self.bw < 0: flip = -1   #u in si.splprep has to be increasing...
             else: flip = 1
             #Find the B-spline curve traced by the projected vectors,
