@@ -342,7 +342,7 @@ class GetTOAs:
             itoa = 1
             for isub in ok_isubs:
                 if self.is_FITS_model and \
-                        np.any(model_data.freqs[isub] - freqs[isub]):
+                        np.any(model_data.freqs[0] - freqs[isub]): # tscrunched
                             print "Frequency mismatch between template and data!"
                 sub_id = datafile + "_%d"%isub
                 epoch = epochs[isub]
@@ -879,7 +879,7 @@ class GetTOAs:
             icount = 1
             for isub in ok_isubs:
                 if self.is_FITS_model and \
-                        np.any(model_data.freqs[isub] - freqs[isub]):
+                        np.any(model_data.freqs[0] - freqs[isub]): # tscrunched
                             print "Frequency mismatch between template and data!"
                 sub_id = datafile + "_%d"%isub
                 epoch = epochs[isub]
