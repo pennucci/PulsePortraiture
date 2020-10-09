@@ -122,8 +122,8 @@ def align_archives(metafile, initial_guess, fit_dm=True, tscrunch=False,
             try:
                 data = load_data(datafiles[ifile], state=state,
                         dedisperse=False, tscrunch=tscrunch, pscrunch=pscrunch,
-                        fscrunch=False, rm_baseline=True, flux_prof=False,
-                        refresh_arch=False, return_arch=False,
+                        fscrunch=False, rm_baseline=rm_baseline,
+                        flux_prof=False, refresh_arch=False, return_arch=False,
                         quiet=load_quiet)
             except RuntimeError:
                 if not quiet:
@@ -190,7 +190,7 @@ def align_archives(metafile, initial_guess, fit_dm=True, tscrunch=False,
                     results = fit_portrait_full(port, model,
                             [phase_guess, DM_guess, 0.0, 0.0, 0.0], P, freqs,
                             [nu_fit, nu_fit, nu_fit], [None, None, None], errs,
-                            fit_flags, quiet=quiet)
+                            fit_flags, log10_tau=False, quiet=quiet)
                     results.phase = results.phi
                     results.nu_ref = results.nu_DM
                 else:  #1-channel hack
