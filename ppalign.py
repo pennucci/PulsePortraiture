@@ -203,7 +203,7 @@ def align_archives(metafile, initial_guess, fit_dm=True, tscrunch=False,
                 for ipol in range(npol):
                     aligned_port[ipol, model_ichans] += weights * \
                             rotate_data(data.subints[isub,ipol,ichans],
-                                    results.phase, results.DM, P,freqs,
+                                    results.phase, results.DM, P, freqs,
                                     results.nu_ref)
                 total_weights[model_ichans] +=  weights
             load_quiet = True
