@@ -342,25 +342,33 @@ class GetTOAs(object):
                     print(warning_message)
                     already_warned = True
                 model_data = load_data(self.modelfile, dedisperse=False,
-                                       dededisperse=False, tscrunch=True, pscrunch=True,
-                                       fscrunch=False, rm_baseline=True, flux_prof=False,
-                                       # fscrunch=False, rm_baseline=False, flux_prof=False,
-                                       refresh_arch=False, return_arch=False, quiet=True)
-                model = (model_data.masks * model_data.subints)[0, 0]
-                if model.shape[-1] != nbin:
-                    print("Model nbin %d != data nbin %d for %s; skipping it." \
-                          % (model.shape[-1], nbin, datafile))
+                    dededisperse=False, tscrunch=True, pscrunch=True,
+                    fscrunch=False, rm_baseline=True, flux_prof=False,
+                    #fscrunch=False, rm_baseline=False, flux_prof=False,
+                    refresh_arch=False, return_arch=False, quiet=True)
+                model = (model_data.masks * model_data.subints)[0,0]
+                if model_data.nbin != nbin:
+                    print("Model nbin %d != data nbin %d for %s; skipping it."\
+                            %(model_data.nbin, nbin, datafile))
                     continue
                 if model_data.nchan == 1:
-                    model = np.tile(model[0], len(d.freqs[0])).reshape(
-                        len(d.freqs[0]), nbin)
+                    model = np.tile(model[0], len(freqs[0])).reshape(
+                            len(freqs[0]), nbin)
+                if model_data.nchan != nchan:
+                    print("Model nchan %d != data nchan %d for %s; skipping it."%(model_data.nchan, nchan, datafile))
+                    continue
+
             if not quiet:
                 print("\nEach of the %d TOAs is approximately %.2f s" % (
                     len(d.ok_isubs), old_div(d.integration_length, nsub)))
             itoa = 1
-            for isub in d.ok_isubs:
-                sub_id = datafile + "_%d" % isub
-                epoch = d.epochs[isub]
+
+            for isub in ok_isubs:
+                if self.is_FITS_model and \
+                        np.any(model_data.freqs[0] - freqs[isub]): # tscrunched
+                            print("Frequency mismatch between template and data!")
+                sub_id = datafile + "_%d"%isub
+                epoch = epochs[isub]
                 MJD = MJDs[isub]
                 P = d.Ps[isub]
                 if not self.is_FITS_model:
@@ -544,7 +552,7 @@ class GetTOAs(object):
                 #    results.nfeval = 0
                 #    results.return_code = -2
                 #    results.scales = np.array([results.scale])
-                #    results.scale_errs = np.array([results.scale_error])
+                #    results.scale_errs = np.array([results.scale_err])
                 #    results.covariance_matrix = np.identity(self.nfit)
                 fit_duration += results.duration
 
@@ -679,8 +687,9 @@ class GetTOAs(object):
                     toa_flags['phs_err'] = results.phi_err
                 if print_flux:
                     toa_flags['flux'] = fluxes[isub]
-                    toa_flags['flux_err'] = flux_errs[isub]  # consistent w/ pat
-                    # toa_flags['fluxe'] = flux_errs[isub]  # consistent w/ pat
+                    # consistent with pat / psrflux
+                    toa_flags['flux_err'] = flux_errs[isub]
+                    #toa_flags['fluxe'] = flux_errs[isub]
                     toa_flags['flux_ref_freq'] = flux_freqs[isub]
                 if print_parangle:
                     toa_flags['par_angle'] = d.parallactic_angles[isub]
@@ -767,6 +776,467 @@ class GetTOAs(object):
                                                                old_div(tot_duration,
                                                                        (np.array(
                                                                            list(map(len, self.ok_isubs))).sum()))))
+
+    def get_narrowband_TOAs(self, datafile=None, tscrunch=False,
+            fit_scat=False, log10_tau=True, scat_guess=None, print_phase=False,
+            print_flux=False, print_parangle=False,
+            add_instrumental_response=False, addtnl_toa_flags={},
+            method='trust-ncg', bounds=None, show_plot=False, quiet=None):
+        """
+        Measure narrowband TOAs using internal algorithm.
+
+        datafile defaults to self.datafiles, otherwise it is a single
+            PSRCHIVE archive name
+        tscrunch=True tscrunches archive before fitting (i.e. make one set of
+            measurements per archive)
+        fit_scat=True will fit the scattering timescale for each TOA. [NOT YET
+            IMPLEMENTED]
+        log10_tau=True does the scattering fit with log10(scattering timescale)
+            as the parameter.
+        scat_guess can be a list of three numbers: a guess of the scattering
+            timescale tau [s], its reference frequency [MHz], and a guess of
+            the scattering index alpha.  Will be used for all archives;
+            supercedes other initial values.
+        print_phase=True will print the fitted parameter phi and its
+            uncertainty on the TOA line with the flags -phs and -phs_err.
+        print_flux=True will print an estimate of the flux density and its
+            uncertainty on the TOA line.
+        print_parangle=True will print the parallactic angle on the TOA line.
+        add_instrumental_response=True will account for the instrumental
+            response according to the dictionary instrumental_response_dict.
+        addtnl_toa_flags are pairs making up TOA flags to be written uniformly
+            to all IPTA-formatted TOAs. e.g. ('pta','NANOGrav','version',0.1)
+        method is the scipy.optimize.minimize method; currently can be 'TNC',
+            'Newton-CG', or 'trust-cng', which are all Newton
+            Conjugate-Gradient algorithms.
+        bounds is a list of two 2-tuples, giving the lower and upper bounds on
+            the phase and tau parameters,
+            respectively.  NB: this is only used if method=='TNC'.
+        show_plot=True will show a plot of the fitted model, data, and
+            residuals at the end of the fitting. [NOT YET IMPLEMENTED]
+        quiet=True suppresses output.
+        """
+        if quiet is None: quiet = self.quiet
+        already_warned = False
+        warning_message = \
+                "You are using an experimental functionality of pptoas!"
+        self.nfit = 1
+        if fit_scat: self.nfit += 2
+        self.fit_phi = True
+        self.fit_tau = fit_scat
+        self.fit_flags = [int(self.fit_phi), int(self.fit_tau)]
+        self.log10_tau = log10_tau
+        if not fit_scat:
+            self.log10_tau = log10_tau = False
+        if True:#fit_scat or self.fit_tau:
+            print(warning_message)
+            already_warned = True
+        self.scat_guess = scat_guess
+        start = time.time()
+        tot_duration = 0.0
+        if datafile is None:
+            datafiles = self.datafiles
+        else:
+            datafiles = [datafile]
+        self.tscrunch = tscrunch
+        self.add_instrumental_response = add_instrumental_response
+        for iarch, datafile in enumerate(datafiles):
+            fit_duration = 0.0
+            #Load data
+            try:
+                data = load_data(datafile, dedisperse=False,
+                        dededisperse=False, tscrunch=tscrunch,
+                        pscrunch=True, fscrunch=False, rm_baseline=rm_baseline,
+                        flux_prof=False, refresh_arch=False, return_arch=False,
+                        quiet=quiet)
+                if data.dmc:
+                    if not quiet:
+                        print("%s is dedispersed (dmc = 1).  Reloading it."%\
+                                datafile)
+                    #continue
+                    data = load_data(datafile, dedisperse=False,
+                            dededisperse=True, tscrunch=tscrunch,
+                            pscrunch=True, fscrunch=False,
+                            rm_baseline=rm_baseline, flux_prof=False,
+                            refresh_arch=False, return_arch=False, quiet=quiet)
+                if not len(data.ok_isubs):
+                    if not quiet:
+                        print("No subints to fit for %s.  Skipping it."%\
+                                datafile)
+                    continue
+                else: self.ok_idatafiles.append(iarch)
+            except RuntimeError:
+                if not quiet:
+                    print("Cannot load_data(%s).  Skipping it."%datafile)
+                continue
+            #Unpack the data dictionary into the local namespace; see load_data
+            #for dictionary keys.
+            for key in data.keys():
+                exec(key + " = data['" + key + "']")
+            if source is None: source = "noname"
+            #Observation info
+            obs = DataBunch(telescope=telescope, backend=backend,
+                    frontend=frontend)
+            phis = np.zeros([nsub, nchan], dtype=np.double)
+            phi_errs = np.zeros([nsub, nchan], dtype=np.double)
+            TOAs = np.zeros([nsub, nchan], dtype="object")
+            TOA_errs = np.zeros([nsub, nchan], dtype="object")
+            taus = np.zeros([nsub, nchan], dtype=np.float64)
+            tau_errs = np.zeros([nsub, nchan], dtype=np.float64)
+            scales = np.zeros([nsub, nchan], dtype=np.float64)
+            scale_errs = np.zeros([nsub, nchan], dtype=np.float64)
+            channel_snrs = np.zeros([nsub, nchan], dtype=np.float64)
+            profile_fluxes = np.zeros([nsub, nchan], dtype=np.float64)
+            profile_flux_errs = np.zeros([nsub, nchan], dtype=np.float64)
+            channel_red_chi2s = np.zeros([nsub, nchan], dtype=np.float64)
+            covariances = np.zeros([nsub, nchan, self.nfit, self.nfit],
+                    dtype=np.float64)
+            nfevals = np.zeros([nsub, nchan], dtype="int")
+            rcs = np.zeros([nsub, nchan], dtype="int")
+            #PSRCHIVE epochs are *midpoint* of the integration
+            MJDs = np.array([epochs[isub].in_days() \
+                    for isub in range(nsub)], dtype=np.double)
+            if self.is_FITS_model:
+                if not already_warned:
+                    print(warning_message)
+                    already_warned = True
+                model_data = load_data(self.modelfile, dedisperse=False,
+                    dededisperse=False, tscrunch=True, pscrunch=True,
+                    fscrunch=False, rm_baseline=True, flux_prof=False,
+                    #fscrunch=False, rm_baseline=False, flux_prof=False,
+                    refresh_arch=False, return_arch=False, quiet=True)
+                model = (model_data.masks * model_data.subints)[0,0]
+                if model_data.nbin != nbin:
+                    print("Model nbin %d != data nbin %d for %s; skipping it."\
+                            %(model_data.nbin, nbin, datafile))
+                    continue
+                if model_data.nchan == 1:
+                    model = np.tile(model[0], len(freqs[0])).reshape(
+                            len(freqs[0]), nbin)
+                if model_data.nchan != nchan:
+                    print("Model nchan %d != data nchan %d for %s; skipping it."%(model_data.nchan, nchan, datafile))
+                    continue
+            icount = 1
+            for isub in ok_isubs:
+                if self.is_FITS_model and \
+                        np.any(model_data.freqs[0] - freqs[isub]): # tscrunched
+                            print("Frequency mismatch between template and data!")
+                sub_id = datafile + "_%d"%isub
+                epoch = epochs[isub]
+                MJD = MJDs[isub]
+                P = Ps[isub]
+                if not self.is_FITS_model:
+                    #Read model
+                    try:
+                        if not fit_scat:
+                            self.model_name, self.ngauss, model = read_model(
+                                    self.modelfile, phases, freqs[isub],
+                                    Ps[isub],
+                                    quiet=bool(quiet+(icount-1)))
+                        else:
+                            self.model_name, self.ngauss, full_model = \
+                                    read_model(self.modelfile, phases,
+                                            freqs[isub], Ps[isub],
+                                            quiet=bool(quiet+(icount-1)))
+                            self.model_name, self.model_code, \
+                                    self.model_nu_ref, self.ngauss, \
+                                    self.gparams, model_fit_flags, self.alpha,\
+                                    model_fit_alpha = read_model(
+                                            self.modelfile,
+                                            quiet=bool(quiet+(icount-1)))
+                            unscat_params = np.copy(self.gparams)
+                            unscat_params[1] = 0.0
+                            model = unscat_model = gen_gaussian_portrait(
+                                    self.model_code, unscat_params, 0.0,
+                                    phases, freqs[isub], self.model_nu_ref)
+                    except UnboundLocalError:
+                        self.model_name, model = read_spline_model(
+                                self.modelfile, freqs[isub], nbin,
+                                quiet=True) #bool(quiet+(icount-1)))
+                freqsx = freqs[isub,ok_ichans[isub]]
+                weightsx = weights[isub,ok_ichans[isub]]
+                portx = subints[isub,0,ok_ichans[isub]]
+                modelx = model[ok_ichans[isub]]
+                if add_instrumental_response and \
+                        (self.ird['DM'] or len(self.ird['wids'])):
+                            inst_resp_port_FT = instrumental_response_port_FT(
+                                    nbin, freqsx, self.ird['DM'], P,
+                                    self.ird['wids'], self.ird['irf_types'])
+                            modelx = fft.irfft(inst_resp_port_FT * \
+                                    fft.rfft(modelx, axis=-1), axis=-1)
+                #NB: Time-domain uncertainties below
+                errs = noise_stds[isub,0,ok_ichans[isub]]
+
+                ###################
+                # INITIAL GUESSES #
+                ###################
+                tau_guess = 0.0
+                alpha_guess = 0.0
+                if fit_scat:
+                    if self.scat_guess is not None:
+                        tau_guess_s,tau_guess_ref,alpha_guess = self.scat_guess
+                        tau_guess = (tau_guess_s / P) * \
+                                (nu_fit_tau / tau_guess_ref)**alpha_guess
+                    else:
+                        if hasattr(self, 'alpha'): alpha_guess = self.alpha
+                        else: alpha_guess = scattering_alpha
+                        if hasattr(self, 'gparams'):
+                            tau_guess = (self.gparams[1] / P) * \
+                                    (nu_fit_tau/self.model_nu_ref)**alpha_guess
+                        else:
+                            tau_guess = 0.0  # nbin**-1?
+                            #tau_guess = guess_tau(...)
+                    model_prof_scat = fft.irfft(scattering_portrait_FT(
+                        np.array([scattering_times(tau_guess, alpha_guess,
+                            nu_fit_tau, nu_fit_tau)]), nbin)[0] * fft.rfft(
+                                modelx.mean(axis=0)))
+                    phi_guess = fit_phase_shift(rot_prof,
+                            model_prof_scat, Ns=100).phase
+                    if self.log10_tau:
+                        if tau_guess == 0.0: tau_guess = nbin**-1
+                        tau_guess = np.log10(tau_guess)
+                else:
+                    #NB: Ns should be larger than nbin for very low S/N data,
+                    #especially in the case of noisy models...
+                    #phi_guess = fit_phase_shift(rot_prof, modelx.mean(axis=0),
+                    #        Ns=100).phase
+                    phi_guess = 0.0
+                #Need a status bar?
+                param_guesses = [phi_guess, tau_guess]
+                if bounds is None and method == 'TNC':
+                    phi_bounds = (None, None)
+                    if not self.log10_tau: tau_bounds = (0.0, None)
+                    else: tau_bounds = (np.log10((10*nbin)**-1), None)
+                    bounds = [phi_bounds, tau_bounds]
+
+                ###########
+                # THE FIT #
+                ###########
+                fit_flags = list(np.copy(self.fit_flags))
+                for ichanx in range(len(ok_ichans[isub])):
+                    ichan = ok_ichans[isub][ichanx]
+                    if model_data.weights[isub,ichan] == 0: continue
+                    prof = portx[ichanx]
+                    model_prof = modelx[ichanx]
+                    err = errs[ichanx]
+                    #results = fit_phase_shift_scat(prof, model_prof,
+                    #        param_guesses, P, err, fit_flags, bounds,
+                    #        self.log10_tau, option=0, sub_id=sub_id,
+                    #        method=method, is_toa=True, quiet=quiet)
+                    results = fit_phase_shift(prof, model_prof, err,
+                            bounds=[-0.5,0.5], Ns=100)
+                    results.tau = results.tau_err = 0.0
+                    fit_duration += results.duration
+
+                    ####################
+                    #  CALCULATE  TOA  #
+                    ####################
+                    results.TOA = epoch + pr.MJD(
+                            #((results.phi * P) + backend_delay) /
+                            ((results.phase * P) + backend_delay) /
+                            (3600 * 24.))
+                    #results.TOA_err = results.phi_err * P * 1e6 # [us]
+                    results.TOA_err = results.phase_err * P * 1e6 # [us]
+
+                    #################
+                    # ESTIMATE FLUX #
+                    #################
+                    if print_flux:
+                        if results.tau != 0.0:
+                            if self.log10_tau: tau = 10**results.tau
+                            else: tau = results.tau
+                            alpha = results.alpha
+                            scat_model = fft.irfft(scattering_profile_FT(tau,
+                                data.nbin) * fft.rfft(model_prof))
+                        else: scat_model = np.copy(model_prof)
+                        scat_model_mean = scat_model.mean()
+                        profile_fluxes[isub, ichan] = scat_model_mean * \
+                                results.scale
+                        profile_flux_errs[isub, ichan] = \
+                                abs(scat_model_mean) * results.scale_err
+
+                    phis[isub, ichan] = results.phase
+                    phi_errs[isub, ichan] = results.phase_err
+                    TOAs[isub, ichan] = results.TOA
+                    TOA_errs[isub, ichan] = results.TOA_err
+                    taus[isub, ichan] = results.tau
+                    tau_errs[isub, ichan] = results.tau_err
+                    #nfevals[isub, ichan] = results.nfeval
+                    #rcs[isub, ichan] = results.return_code
+                    scales[isub, ichan] = results.scale
+                    scale_errs[isub, ichan] = results.scale_err
+                    channel_snrs[isub, ichan] = results.snr
+                    #try:
+                    #    covariances[isub, ichan] = results.covariance_matrix
+                    #except ValueError:
+                    #    for ii,ifit in enumerate(np.where(fit_flags)[0]):
+                    #        for jj,jfit in enumerate(np.where(fit_flags)[0]):
+                    #            covariances[isub, ichan][ifit,jfit] = \
+                    #                    results.covariance_matrix[ii,jj]
+                    channel_red_chi2s[isub] = results.red_chi2
+                    #Compile useful TOA flags
+                    # Add doppler_factor?
+                    toa_flags = {}
+                    if fit_flags[1]:
+                        if self.log10_tau:
+                            df = doppler_factors[isub]
+                            toa_flags['scat_time'] = 10**results.tau * \
+                                    P / df * 1e6  # usec, w/ df
+                            toa_flags['log10_scat_time'] = results.tau + \
+                                    np.log10(P / df)  # w/ df
+                            toa_flags['log10_scat_time_err'] = results.tau_err
+                        else:
+                            toa_flags['scat_time'] = results.tau * P / df * 1e6
+                                                     # usec, w/ df
+                            toa_flags['scat_time_err'] = results.tau_err * \
+                                    P / df * 1e6  # usec, w/ df
+                        toa_flags['phi_tau_cov'] = \
+                                results.covariance_matrix[0,1]
+                    toa_flags['be'] = backend
+                    toa_flags['fe'] = frontend
+                    toa_flags['f'] = frontend + "_" + backend
+                    toa_flags['nbin'] = nbin
+                    #toa_flags['nch'] = nchan
+                    toa_flags['bw'] = abs(bw) / nchan
+                    toa_flags['subint'] = isub
+                    toa_flags['chan'] = ichan
+                    toa_flags['tobs'] = subtimes[isub]
+                    toa_flags['tmplt'] = self.modelfile
+                    toa_flags['snr'] = results.snr
+                    toa_flags['gof'] = results.red_chi2
+                    if print_phase:
+                        toa_flags['phs'] = results.phi
+                        toa_flags['phs_err'] = results.phi_err
+                    if print_flux:
+                        toa_flags['flux'] = fluxes[isub]
+                        # consistent with pat / psrflux
+                        toa_flags['flux_err'] = flux_errs[isub]
+                        #toa_flags['fluxe'] = flux_errs[isub]
+                    if print_parangle:
+                        toa_flags['par_angle'] = parallactic_angles[isub]
+                    for k,v in addtnl_toa_flags.iteritems():
+                        toa_flags[k] = v
+                    self.TOA_list.append(TOA(datafile, freqs[isub,ichan],
+                        results.TOA, results.TOA_err, telescope,
+                        telescope_code, None, None, toa_flags))
+                icount += 1
+
+            self.order.append(datafile)
+            self.obs.append(obs)
+            self.doppler_fs.append(doppler_factors)
+            self.ok_isubs.append(ok_isubs)
+            self.epochs.append(epochs)
+            self.MJDs.append(MJDs)
+            self.Ps.append(Ps)
+            self.phis.append(phis)
+            self.phi_errs.append(phi_errs)
+            self.TOAs.append(TOAs)
+            self.TOA_errs.append(TOA_errs)
+            self.taus.append(taus)
+            self.tau_errs.append(tau_errs)
+            self.scales.append(scales)
+            self.scale_errs.append(scale_errs)
+            self.channel_snrs.append(channel_snrs)
+            self.profile_fluxes.append(profile_fluxes)
+            self.profile_flux_errs.append(profile_flux_errs)
+            self.covariances.append(covariances)
+            self.channel_red_chi2s.append(channel_red_chi2s)
+            self.nfevals.append(nfevals)
+            self.rcs.append(rcs)
+            self.fit_durations.append(fit_duration)
+            if not quiet:
+                print("--------------------------")
+                print(datafile)
+                print("~%.4f sec/TOA"%(fit_duration / len(self.TOA_list)))
+                print("Med. TOA error is %.3f us"%(np.median(
+                    phi_errs[ok_isubs]) * Ps.mean() * 1e6))
+            if show_plot:
+                pass
+                #stop = time.time()
+                #tot_duration += stop - start
+                #for isub in ok_isubs:
+                #    self.show_fit(datafile, isub)
+                #start = time.time()
+        if not show_plot:
+            tot_duration = time.time() - start
+        if not quiet and len(self.ok_isubs):
+            print("--------------------------")
+            print("Total time: %.2f sec, ~%.4f sec/TOA"%(tot_duration,
+                    tot_duration / len(self.TOA_list)))
+
+    def get_psrchive_TOAs(self, datafile=None, tscrunch=False, algorithm='PGS',
+            toa_format='tempo2', flags='IPTA', attributes=['chan','subint'],
+            quiet=False):
+        """
+        Measure narrowband TOAs using psrchive.
+
+        datafile defaults to self.datafiles, otherwise it is a single
+            PSRCHIVE archive name.
+        tscrunch=True tscrunches archive before fitting (i.e. make one set of
+            measurements per archive).
+        algorithm is one of the three-letter codes specifying the shift
+            algorithm; see help for 'pat' program, arguments to -A [default =
+            'PGS'].
+        toa_format and flags are the TOA format and added metadata flags; see
+            help for 'pat' program, arguments to -f [default = tempo2 format
+            with IPTA flags].
+        attributes is a list containing strings that indicate additional TOA
+            flags to be included [default = ['chan', 'subint']].
+        """
+        if quiet is None: quiet = self.quiet
+        already_warned = False
+        warning_message = \
+                "You are using an experimental functionality of pptoas!"
+        if True:
+            print(warning_message)
+            already_warned = True
+        self.psrchive_toas = []
+        arrtim = pr.ArrivalTime()
+        arrtim.set_shift_estimator(algorithm)
+        arrtim.set_format(toa_format)
+        arrtim.set_format_flags(flags)
+        arrtim.set_attributes(attributes)
+        if datafile is None:
+            datafiles = self.datafiles
+        else:
+            datafiles = [datafile]
+        if self.is_FITS_model:
+            model_arch = pr.Archive_load(self.modelfile)
+            model_arch.pscrunch()
+            arrtim.set_standard(model_arch)
+        for iarch, datafile in enumerate(datafiles):
+            arch = pr.Archive_load(datafile)
+            arch.pscrunch()
+            if tscrunch: arch.tscrunch()
+            arrtim.set_observation(arch)
+            if not self.is_FITS_model:
+                nsub,npol,nchan,nbin = arch.get_nsubint(), arch.get_npol(), \
+                        arch.get_nchan(),arch.get_nbin()
+                freqs = np.array([[sub.get_centre_frequency(ichan) for ichan \
+                        in range(nchan)] for sub in arch])
+                for isub in range(nsub):
+                    #Read model
+                    try:
+                        Ps = np.array([sub.get_folding_period() for sub in arch],
+                                dtype=np.double)
+                        phases = get_bin_centers(nbin, lo=0.0, hi=1.0)
+                        self.model_name, self.ngauss, model = read_model(
+                                self.modelfile, phases, freqs[isub], Ps[isub],
+                                quiet=True)
+                    except UnboundLocalError:
+                        self.model_name, model = read_spline_model(
+                                self.modelfile, freqs[isub], nbin, quiet=True)
+                    model_arch = arch.clone()
+                    model_arch.tscrunch()
+                    for model_isub in range(1):#nsub):
+                        sub = model_arch.get_Integration(model_isub)
+                        for ipol in range(npol):
+                            for ichan in range(nchan):
+                                prof = sub.get_Profile(ipol,ichan)
+                                prof.get_amps()[:] = model[ichan]
+                                sub.set_weight(ichan, 1.0)
+                    arrtim.set_standard(model_arch)
+            self.psrchive_toas.append(arrtim.get_toas())
 
     def get_channels_to_zap(self, SNR_threshold=8.0, rchi2_threshold=1.3,
                             iterate=True, show=False):
@@ -947,7 +1417,7 @@ class GetTOAs(object):
                                                   phases, freqs, model_nu_ref)
             except:
                 model_name, model = read_spline_model(self.modelfile,
-                                                      freqs, data.nbin, quiet=True)  # quiet=bool(quiet+(itoa-1)))
+                        freqs, data.nbin, quiet=True)
         if self.add_instrumental_response and \
                 (self.ird['DM'] or len(self.ird['wids'])):
             inst_resp_port_FT = instrumental_response_port_FT(
@@ -1002,6 +1472,12 @@ if __name__ == "__main__":
                       action="store", metavar="timfile", dest="outfile",
                       default=None,
                       help="Name of output .tim file. Will append. [default=stdout]")
+    parser.add_option("--narrowband",
+                      action="store_true",  dest="narrowband", default=False,
+                      help="Make narrowband TOAs instead.")
+    parser.add_option("--psrchive",
+                      action="store_true",  dest="psrchive", default=False,
+                      help="Make narrowband TOAs with PSRCHIVE.")
     parser.add_option("--errfile",
                       action="store", metavar="errfile", dest="errfile",
                       default=None,
@@ -1085,6 +1561,8 @@ if __name__ == "__main__":
     datafiles = options.datafiles
     modelfile = options.modelfile
     outfile = options.outfile
+    narrowband = options.narrowband
+    psrchive = options.psrchive
     errfile = options.errfile
     tscrunch = options.tscrunch
     format = options.format
@@ -1127,29 +1605,54 @@ if __name__ == "__main__":
     quiet = options.quiet
 
     gt = GetTOAs(datafiles=datafiles, modelfile=modelfile, quiet=quiet)
-    gt.get_TOAs(datafile=None, tscrunch=tscrunch, nu_refs=nu_refs, DM0=DM0,
+    if not narrowband and not psrchive:  # get wideband TOAs
+        gt.get_TOAs(datafile=None, tscrunch=tscrunch, nu_refs=nu_refs, DM0=DM0,
                 bary=bary, fit_DM=fit_DM, fit_GM=fit_GM, fit_scat=fit_scat,
-                log10_tau=log10_tau, scat_guess=scat_guess, fix_alpha=fix_alpha,
+                log10_tau=log10_tau, scat_guess=scat_guess,
+                fix_alpha=fix_alpha, print_phase=print_phase,
+                print_flux=print_flux, print_parangle=print_parangle,
+                addtnl_toa_flags=addtnl_toa_flags, method='trust-ncg',
+                bounds=None, nu_fits=None, show_plot=show_plot, quiet=quiet)
+    elif not psrchive:  # get narrowband TOAs using in-house code
+        gt.get_narrowband_TOAs(datafile=None, tscrunch=tscrunch,
+                fit_scat=fit_scat, log10_tau=log10_tau, scat_guess=scat_guess,
                 print_phase=print_phase, print_flux=print_flux,
-                print_parangle=print_parangle, addtnl_toa_flags=addtnl_toa_flags,
-                method='trust-ncg', bounds=None, nu_fits=None, show_plot=show_plot,
-                quiet=quiet)
-    if format == "princeton":
-        gt.write_princeton_TOAs(outfile=outfile, one_DM=one_DM,
-                                dmerrfile=errfile)
-    else:
-        if one_DM:
-            gt.TOA_one_DM_list = [toa for toa in gt.TOA_list]
-            for toa in gt.TOA_one_DM_list:
-                ifile = list(np.array(gt.datafiles)[gt.ok_idatafiles]).index(
-                    toa_archive)
-                DDM = gt.DeltaDM_means[ifile]
-                DDM_err = gt.DeltaDM_errs[ifile]
-                toa.DM = DDM + gt.DM0s[ifile]
-                toa.DM_error = DDM_err
-                toa.flags['DM_mean'] = True
-            write_TOAs(gt.TOA_one_DM_list, inf_is_zero=True,
-                       SNR_cutoff=snr_cutoff, outfile=outfile, append=True)
+                print_parangle=print_parangle,
+                addtnl_toa_flags=addtnl_toa_flags, method='trust-ncg',
+                bounds=None, show_plot=False, quiet=quiet)
+    else:  # get narrowband TOAs with psrchive
+        gt.get_psrchive_TOAs(datafile=None, tscrunch=False, algorithm='PGS',
+                toa_format='Tempo2', flags='IPTA',
+                attributes=['chan','subint'])#, print_toas=True, outfile=None)
+    if not psrchive:
+        if format == "princeton":
+            gt.write_princeton_TOAs(outfile=outfile, one_DM=one_DM,
+                dmerrfile=errfile)
         else:
-            write_TOAs(gt.TOA_list, inf_is_zero=True, SNR_cutoff=snr_cutoff,
-                       outfile=outfile, append=True)
+            if one_DM:
+                gt.TOA_one_DM_list = [toa for toa in gt.TOA_list]
+                for toa in gt.TOA_one_DM_list:
+                    ifile = list(
+                            np.array(gt.datafiles)[gt.ok_idatafiles]).index( \
+                                    toa_archive)
+                    DDM = gt.DeltaDM_means[ifile]
+                    DDM_err = gt.DeltaDM_errs[ifile]
+                    toa.DM = DDM + gt.DM0s[ifile]
+                    toa.DM_error = DDM_err
+                    toa.flags['DM_mean'] = True
+                write_TOAs(gt.TOA_one_DM_list, inf_is_zero=True,
+                        SNR_cutoff=snr_cutoff, outfile=outfile, append=True)
+            else:
+                write_TOAs(gt.TOA_list, inf_is_zero=True, SNR_cutoff=snr_cutoff,
+                        outfile=outfile, append=True)
+    else:
+        if outfile is not None:
+            of = open(outfile, 'a')
+        for iarch,arch in enumerate(gt.datafiles):
+            for itoa,toa in enumerate(gt.psrchive_toas[iarch]):
+                if outfile is not None:
+                    of.write(gt.psrchive_toas[iarch][itoa]+"\n")
+                else:
+                    print(gt.psrchive_toas[iarch][itoa])
+        if outfile is not None:
+            of.close()

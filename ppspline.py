@@ -139,17 +139,18 @@ class DataPortrait(DataPortrait):
             fp, ier, msg = None, None, None
         else:
             spl_weights = pca_weights
-            s = sfac
-            if self.bw < 0:
-                flip = -1  # u in si.splprep has to be increasing...
-            else:
-                flip = 1
-            # Find the B-spline curve traced by the projected vectors,
-            # parameterized by frequency
-            (tck, u), fp, ier, msg = si.splprep(proj_port[::flip].T,
-                                                w=spl_weights[::flip], u=freqs[::flip], ub=nu_lo, ue=nu_hi,
-                                                k=k, task=0, s=s, t=None, full_output=1, nest=None, per=0,
-                                                quiet=int(quiet))
+            s = sfac * len(proj_port) * \
+                    np.sum((self.SNRsxs * self.noise_stdsxs)**2) / \
+                    sum(self.SNRsxs)**2
+            if self.bw < 0: flip = -1   #u in si.splprep has to be increasing...
+            else: flip = 1
+            #Find the B-spline curve traced by the projected vectors,
+            #parameterized by frequency
+            (tck,u), fp, ier, msg = si.splprep(proj_port[::flip].T,
+                    w=spl_weights[::flip], u=freqs[::flip], ub=nu_lo, ue=nu_hi,
+                    k=k, task=0, s=s, t=None, full_output=1, nest=None, per=0,
+                    quiet=int(quiet))
+
             if max_nbreak is not None and len(np.unique(tck[0])) > max_nbreak:
                 if max_nbreak < 2:
                     print("max_nbreak not >= 2; setting max_nbreak = 2...")

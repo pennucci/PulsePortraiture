@@ -1258,7 +1258,7 @@ def fit_powlaw_function(params, freqs, nu_ref, data=None, errs=None):
     data is the array of the data values.
     errs is the array of uncertainties on the data values.
     """
-    prms = np.array([param.value for param in params.values()])
+    prms = np.array([param.value for param in list(params.values())])
     A = prms[0]
     alpha = prms[1]
     return old_div((data - powlaw(freqs, nu_ref, A, alpha)), errs)
@@ -1272,7 +1272,7 @@ def fit_gaussian_profile_function(params, data=None, errs=None):
     data is the array of data values.
     errs is the array of uncertainties on the data values.
     """
-    prms = np.array([param.value for param in params.values()])
+    prms = np.array([param.value for param in list(params.values())])
     return old_div((data - gen_gaussian_profile(prms, len(data))), errs)
 
 
@@ -1285,7 +1285,7 @@ def fit_gaussian_portrait_function(params, model_code, phases, freqs, nu_ref,
     data is the 2D array of data values.
     errs is the 2D array of the uncertainties on the data values.
     """
-    prms = np.array([param.value for param in params.values()])
+    prms = np.array([param.value for param in list(params.values())])
     deviates = np.ravel(old_div((data - gen_gaussian_portrait(model_code, prms[:-1],
                                                               prms[-1], phases, freqs, nu_ref, join_ichans, P)), errs))
     return deviates
@@ -1977,9 +1977,9 @@ def fit_gaussian_profile(data, init_params, errs, fit_flags=None,
     results = lm.minimize(fit_gaussian_profile_function, params,
                           kws=other_args)
     fitted_params = np.array([param.value for param in
-                              results.params.values()])
+                              list(results.params.values())])
     fit_errs = np.array([param.stderr for param in
-                         results.params.values()])
+                         list(results.params.values())])
     dof = results.nfree
     chi2 = results.chisqr
     red_chi2 = results.redchi
@@ -2103,11 +2103,11 @@ def fit_gaussian_portrait(model_code, data, init_params, scattering_index,
     results = lm.minimize(fit_gaussian_portrait_function, params,
                           kws=other_args)
     fitted_params = np.array([param.value for param in
-                              results.params.values()])
+                              list(results.params.values())])
     scattering_index = fitted_params[-1]
     fitted_params = fitted_params[:-1]
     fit_errs = np.array([param.stderr for param in
-                         results.params.values()])
+                         list(results.params.values())])
     scattering_index_err = fit_errs[-1]
     fit_errs = fit_errs[:-1]
     dof = results.nfree
@@ -2178,8 +2178,8 @@ def fit_phase_shift(data, model, noise=None, bounds=[-0.5, 0.5], Ns=100):
     # SNR of the fit, based on PDB's notes
     snr = pow(scale ** 2 * p, 0.5)
     return DataBunch(phase=phase, phase_err=phase_error, scale=scale,
-                     scale_error=scale_error, snr=snr, red_chi2=red_chi2,
-                     duration=duration)
+            scale_err=scale_error, snr=snr, red_chi2=red_chi2,
+            duration=duration)
 
 
 def fit_portrait(data, model, init_params, P, freqs, nu_fit=None, nu_out=None,
@@ -3144,6 +3144,8 @@ def unload_new_archive(data, arch, outfile, DM=None, dmc=0, weights=None,
     """
     Unload a PSRFITS archive containing new data values.
 
+    PSRCHIVE unloads frequencies as floats with three digits of precision.
+
     data is the nsub x npol x nchan x nbin array of amplitudes to be stored,
         which has the same shape as arch.get_data().shape.
     arch is the PSRCHIVE archive instance to be otherwise copied.
@@ -3620,7 +3622,7 @@ def write_TOAs(TOAs, inf_is_zero=True, SNR_cutoff=0.0, outfile=None,
         if toa.DM_error is not None:
             # toa_string += " -dm_err %.7f"%toa.DM_error
             toa_string += " -pp_dme %.7f" % toa.DM_error
-        for flag, value in toa.flags.items():
+        for flag, value in list(toa.flags.items()):
             if value is not None:
                 if hasattr(value, "lower"):
                     toa_string += ' -%s %s' % (flag, value)
