@@ -975,7 +975,8 @@ class GetTOAs:
                 fit_flags = list(np.copy(self.fit_flags))
                 for ichanx in range(len(ok_ichans[isub])):
                     ichan = ok_ichans[isub][ichanx]
-                    if model_data.weights[isub,ichan] == 0: continue
+                    if self.is_FITS_model:
+                        if: model_data.weights[isub,ichan] == 0: continue
                     prof = portx[ichanx]
                     model_prof = modelx[ichanx]
                     err = errs[ichanx]
