@@ -290,7 +290,7 @@ class GetTOAs(object):
             #     exec(key + " = data['" + key + "']")
             # BWM: Python 3 no longer supports updating local namespace via exec statement/function
             # Also, since we're setting local variables, it's not safe to just update the object __dict__
-            # So the best option is to instead load the dictionary into a SimpleNamespace and 
+            # So the best option is to instead load the dictionary into a SimpleNamespace and
             # access key/values as you would an object attribute
             d = SimpleNamespace(**data)
             nsub = d.nsub
@@ -363,12 +363,12 @@ class GetTOAs(object):
                     len(d.ok_isubs), old_div(d.integration_length, nsub)))
             itoa = 1
 
-            for isub in ok_isubs:
+            for isub in d.ok_isubs:
                 if self.is_FITS_model and \
-                        np.any(model_data.freqs[0] - freqs[isub]): # tscrunched
+                        np.any(model_data.freqs[0] - d.freqs[isub]): # tscrunched
                             print("Frequency mismatch between template and data!")
                 sub_id = datafile + "_%d"%isub
-                epoch = epochs[isub]
+                epoch = d.epochs[isub]
                 MJD = MJDs[isub]
                 P = d.Ps[isub]
                 if not self.is_FITS_model:
@@ -869,14 +869,23 @@ class GetTOAs(object):
                 if not quiet:
                     print("Cannot load_data(%s).  Skipping it."%datafile)
                 continue
-            #Unpack the data dictionary into the local namespace; see load_data
-            #for dictionary keys.
-            for key in data.keys():
-                exec(key + " = data['" + key + "']")
-            if source is None: source = "noname"
+            # Unpack the data dictionary into the local namespace; see load_data
+            # for dictionary keys.
+            # for key in data.keys():
+            #     exec(key + " = data['" + key + "']")
+            # BWM: Python 3 no longer supports updating local namespace via exec statement/function
+            # Also, since we're setting local variables, it's not safe to just update the object __dict__
+            # So the best option is to instead load the dictionary into a SimpleNamespace and
+            # access key/values as you would an object attribute
+            d = SimpleNamespace(**data)
+            nsub = d.nsub
+            nchan = d.nchan
+            nbin = d.nbin
+            npol = d.npol
+            if d.source is None: d.source = "noname"
             #Observation info
-            obs = DataBunch(telescope=telescope, backend=backend,
-                    frontend=frontend)
+            obs = DataBunch(telescope=d.telescope, backend=d.backend,
+                    frontend=d.frontend)
             phis = np.zeros([nsub, nchan], dtype=np.double)
             phi_errs = np.zeros([nsub, nchan], dtype=np.double)
             TOAs = np.zeros([nsub, nchan], dtype="object")
@@ -894,7 +903,7 @@ class GetTOAs(object):
             nfevals = np.zeros([nsub, nchan], dtype="int")
             rcs = np.zeros([nsub, nchan], dtype="int")
             #PSRCHIVE epochs are *midpoint* of the integration
-            MJDs = np.array([epochs[isub].in_days() \
+            MJDs = np.array([d.epochs[isub].in_days() \
                     for isub in range(nsub)], dtype=np.double)
             if self.is_FITS_model:
                 if not already_warned:
@@ -917,26 +926,26 @@ class GetTOAs(object):
                     print("Model nchan %d != data nchan %d for %s; skipping it."%(model_data.nchan, nchan, datafile))
                     continue
             icount = 1
-            for isub in ok_isubs:
+            for isub in d.ok_isubs:
                 if self.is_FITS_model and \
-                        np.any(model_data.freqs[0] - freqs[isub]): # tscrunched
+                        np.any(model_data.freqs[0] - d.freqs[isub]): # tscrunched
                             print("Frequency mismatch between template and data!")
                 sub_id = datafile + "_%d"%isub
-                epoch = epochs[isub]
+                epoch = d.epochs[isub]
                 MJD = MJDs[isub]
-                P = Ps[isub]
+                P = d.Ps[isub]
                 if not self.is_FITS_model:
                     #Read model
                     try:
                         if not fit_scat:
                             self.model_name, self.ngauss, model = read_model(
-                                    self.modelfile, phases, freqs[isub],
-                                    Ps[isub],
+                                    self.modelfile, d.phases, d.freqs[isub],
+                                    d.Ps[isub],
                                     quiet=bool(quiet+(icount-1)))
                         else:
                             self.model_name, self.ngauss, full_model = \
-                                    read_model(self.modelfile, phases,
-                                            freqs[isub], Ps[isub],
+                                    read_model(self.modelfile, d.phases,
+                                            d.freqs[isub], d.Ps[isub],
                                             quiet=bool(quiet+(icount-1)))
                             self.model_name, self.model_code, \
                                     self.model_nu_ref, self.ngauss, \
@@ -948,15 +957,15 @@ class GetTOAs(object):
                             unscat_params[1] = 0.0
                             model = unscat_model = gen_gaussian_portrait(
                                     self.model_code, unscat_params, 0.0,
-                                    phases, freqs[isub], self.model_nu_ref)
+                                    d.phases, d.freqs[isub], self.model_nu_ref)
                     except UnboundLocalError:
                         self.model_name, model = read_spline_model(
-                                self.modelfile, freqs[isub], nbin,
+                                self.modelfile, d.freqs[isub], nbin,
                                 quiet=True) #bool(quiet+(icount-1)))
-                freqsx = freqs[isub,ok_ichans[isub]]
-                weightsx = weights[isub,ok_ichans[isub]]
-                portx = subints[isub,0,ok_ichans[isub]]
-                modelx = model[ok_ichans[isub]]
+                freqsx = d.freqs[isub,d.ok_ichans[isub]]
+                weightsx = d.weights[isub,d.ok_ichans[isub]]
+                portx = d.subints[isub,0,d.ok_ichans[isub]]
+                modelx = model[d.ok_ichans[isub]]
                 if add_instrumental_response and \
                         (self.ird['DM'] or len(self.ird['wids'])):
                             inst_resp_port_FT = instrumental_response_port_FT(
@@ -965,7 +974,7 @@ class GetTOAs(object):
                             modelx = fft.irfft(inst_resp_port_FT * \
                                     fft.rfft(modelx, axis=-1), axis=-1)
                 #NB: Time-domain uncertainties below
-                errs = noise_stds[isub,0,ok_ichans[isub]]
+                errs = d.noise_stds[isub,0,d.ok_ichans[isub]]
 
                 ###################
                 # INITIAL GUESSES #
@@ -1013,9 +1022,10 @@ class GetTOAs(object):
                 # THE FIT #
                 ###########
                 fit_flags = list(np.copy(self.fit_flags))
-                for ichanx in range(len(ok_ichans[isub])):
-                    ichan = ok_ichans[isub][ichanx]
-                    if model_data.weights[isub,ichan] == 0: continue
+                for ichanx in range(len(d.ok_ichans[isub])):
+                    ichan = d.ok_ichans[isub][ichanx]
+                    if self.is_FITS_model:
+                        if model_data.weights[isub,ichan] == 0: continue
                     prof = portx[ichanx]
                     model_prof = modelx[ichanx]
                     err = errs[ichanx]
@@ -1033,7 +1043,7 @@ class GetTOAs(object):
                     ####################
                     results.TOA = epoch + pr.MJD(
                             #((results.phi * P) + backend_delay) /
-                            ((results.phase * P) + backend_delay) /
+                            ((results.phase * P) + d.backend_delay) /
                             (3600 * 24.))
                     #results.TOA_err = results.phi_err * P * 1e6 # [us]
                     results.TOA_err = results.phase_err * P * 1e6 # [us]
@@ -1092,15 +1102,15 @@ class GetTOAs(object):
                                     P / df * 1e6  # usec, w/ df
                         toa_flags['phi_tau_cov'] = \
                                 results.covariance_matrix[0,1]
-                    toa_flags['be'] = backend
-                    toa_flags['fe'] = frontend
-                    toa_flags['f'] = frontend + "_" + backend
+                    toa_flags['be'] = d.backend
+                    toa_flags['fe'] = d.frontend
+                    toa_flags['f'] = d.frontend + "_" + d.backend
                     toa_flags['nbin'] = nbin
                     #toa_flags['nch'] = nchan
-                    toa_flags['bw'] = abs(bw) / nchan
+                    toa_flags['bw'] = abs(d.bw) / nchan
                     toa_flags['subint'] = isub
                     toa_flags['chan'] = ichan
-                    toa_flags['tobs'] = subtimes[isub]
+                    toa_flags['tobs'] = d.subtimes[isub]
                     toa_flags['tmplt'] = self.modelfile
                     toa_flags['snr'] = results.snr
                     toa_flags['gof'] = results.red_chi2
@@ -1113,21 +1123,21 @@ class GetTOAs(object):
                         toa_flags['flux_err'] = flux_errs[isub]
                         #toa_flags['fluxe'] = flux_errs[isub]
                     if print_parangle:
-                        toa_flags['par_angle'] = parallactic_angles[isub]
-                    for k,v in addtnl_toa_flags.iteritems():
+                        toa_flags['par_angle'] = d.parallactic_angles[isub]
+                    for k,v in iter(addtnl_toa_flags.items()):
                         toa_flags[k] = v
-                    self.TOA_list.append(TOA(datafile, freqs[isub,ichan],
-                        results.TOA, results.TOA_err, telescope,
-                        telescope_code, None, None, toa_flags))
+                    self.TOA_list.append(TOA(datafile, d.freqs[isub,ichan],
+                        results.TOA, results.TOA_err, d.telescope,
+                        d.telescope_code, None, None, toa_flags))
                 icount += 1
 
             self.order.append(datafile)
             self.obs.append(obs)
-            self.doppler_fs.append(doppler_factors)
-            self.ok_isubs.append(ok_isubs)
-            self.epochs.append(epochs)
+            self.doppler_fs.append(d.doppler_factors)
+            self.ok_isubs.append(d.ok_isubs)
+            self.epochs.append(d.epochs)
             self.MJDs.append(MJDs)
-            self.Ps.append(Ps)
+            self.Ps.append(d.Ps)
             self.phis.append(phis)
             self.phi_errs.append(phi_errs)
             self.TOAs.append(TOAs)
@@ -1149,7 +1159,7 @@ class GetTOAs(object):
                 print(datafile)
                 print("~%.4f sec/TOA"%(fit_duration / len(self.TOA_list)))
                 print("Med. TOA error is %.3f us"%(np.median(
-                    phi_errs[ok_isubs]) * Ps.mean() * 1e6))
+                    phi_errs[d.ok_isubs]) * d.Ps.mean() * 1e6))
             if show_plot:
                 pass
                 #stop = time.time()
