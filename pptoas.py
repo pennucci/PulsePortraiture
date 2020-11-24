@@ -395,7 +395,7 @@ class GetTOAs(object):
                             model = unscat_model = gen_gaussian_portrait(
                                 self.model_code, unscat_params, 0.0,
                                 d.phases, d.freqs[isub], self.model_nu_ref)
-                    except UnboundLocalError:
+                    except (UnboundLocalError,UnicodeDecodeError):
                         self.model_name, model = read_spline_model(
                             self.modelfile, d.freqs[isub], nbin,
                             quiet=True)  # bool(quiet+(itoa-1)))
@@ -950,7 +950,7 @@ class GetTOAs(object):
                             model = unscat_model = gen_gaussian_portrait(
                                     self.model_code, unscat_params, 0.0,
                                     d.phases, d.freqs[isub], self.model_nu_ref)
-                    except UnboundLocalError:
+                    except (UnboundLocalError,UnicodeDecodeError):
                         self.model_name, model = read_spline_model(
                                 self.modelfile, d.freqs[isub], nbin,
                                 quiet=True) #bool(quiet+(icount-1)))
@@ -1225,7 +1225,7 @@ class GetTOAs(object):
                         self.model_name, self.ngauss, model = read_model(
                                 self.modelfile, phases, freqs[isub], Ps[isub],
                                 quiet=True)
-                    except UnboundLocalError:
+                    except (UnboundLocalError,UnicodeDecodeError):
                         self.model_name, model = read_spline_model(
                                 self.modelfile, freqs[isub], nbin, quiet=True)
                     model_arch = arch.clone()
