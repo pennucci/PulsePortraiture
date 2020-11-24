@@ -3083,8 +3083,12 @@ def read_spline_model(modelfile, freqs=None, nbin=None, quiet=False):
         read_only = False
     if not quiet:
         print("Reading model from %s..." % modelfile)
-    modelname, source, datafile, mean_prof, eigvec, tck = \
-        pickle.load(open(modelfile, 'rb'))
+    try:
+        modelname, source, datafile, mean_prof, eigvec, tck = \
+                pickle.load(open(modelfile, 'rb'))
+    except UnicodeDecodeError:  # python2 to python3 pickling issues
+        modelname, source, datafile, mean_prof, eigvec, tck = \
+                pickle.load(open(modelfile, 'rb'), encoding='bytes')
     if read_only:
         return (modelname, source, datafile, mean_prof, eigvec, tck)
     else:
