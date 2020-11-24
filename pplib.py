@@ -3118,7 +3118,7 @@ def get_spline_model_coords(modelfile, nfreq=1000, lo_freq=None, hi_freq=None,
         outfile = modelfile + "_coords.pick"
         print("Unloading %s..." % outfile)
         of = open(outfile, 'wb')
-        pickle.dump([model_freqs, proj_port], of)
+        pickle.dump([model_freqs, proj_port], of, protocol=2)
         of.close()
     return model_freqs, proj_port
 

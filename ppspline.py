@@ -225,18 +225,19 @@ class DataPortrait(DataPortrait):
             if len(self.ieig):
                 pickle.dump([self.model_name, self.source, self.datafile,
                              self.smooth_mean_prof, self.smooth_eigvec[:, self.ieig],
-                             self.tck], of)
+                             self.tck], of, protocol=2)
             else:
                 pickle.dump([self.model_name, self.source, self.datafile,
                              self.smooth_mean_prof, self.smooth_eigvec[:, []],
-                             self.tck], of)
+                             self.tck], of, protocol=2)
         else:
             if len(self.ieig):
                 pickle.dump([self.model_name, self.source, self.datafile,
-                             self.mean_prof, self.eigvec[:, self.ieig], self.tck], of)
+                             self.mean_prof, self.eigvec[:, self.ieig], self.tck], of, protocol=2)
             else:
                 pickle.dump([self.model_name, self.source, self.datafile,
-                             self.mean_prof, self.eigvec[:, []], self.tck], of)
+                             self.mean_prof, self.eigvec[:, []], self.tck], of,
+                             protocol=2)
 
         of.close()
         if not quiet:
