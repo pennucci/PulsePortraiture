@@ -3630,7 +3630,7 @@ def write_TOAs(TOAs, inf_is_zero=True, SNR_cutoff=0.0, outfile=None,
             if value is not None:
                 if hasattr(value, "lower"):
                     toa_string += ' -%s %s' % (flag, value)
-                elif hasattr(value, "bit_length"):
+                elif 'int' in str(type(value)):
                     toa_string += ' -%s %d' % (flag, value)
                 elif flag.find("_cov") >= 0:
                     toa_string += ' -%s %.1e' % (flag, toa.flags[flag])
