@@ -156,7 +156,7 @@ def align_archives(metafile, initial_guess, fit_dm=True, tscrunch=False,
                 else: same_freqs = False
             except:
                 same_freqs = False
-            DM_guess = data.DM
+            DM_guess = data.DM * np.logical_not(data.dmc)  # = 0.0 if de-disp'd
             for isub in data.ok_isubs:
                 if same_freqs:
                     ichans = np.intersect1d(data.ok_ichans[isub],
