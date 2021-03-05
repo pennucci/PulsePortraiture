@@ -1188,6 +1188,7 @@ class GetTOAs:
                         self.model_name, model = read_spline_model(
                                 self.modelfile, freqs[isub], nbin, quiet=True)
                     model_arch = arch.clone()
+                    model_arch.set_filename(self.modelfile)
                     model_arch.tscrunch()
                     for model_isub in range(1):#nsub):
                         sub = model_arch.get_Integration(model_isub)
