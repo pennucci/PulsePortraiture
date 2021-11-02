@@ -216,7 +216,8 @@ class GetTOAs(object):
             frequencies [MHz] are used in the fit; defaults to a guess at the
             zero-covariance frequency based on signal-to-noise ratios.
         show_plot=True will show a plot of the fitted model, data, and
-            residuals at the end of the fitting.
+            residuals at the end of the fitting.  If set to "save" will
+            save plots to files.
         quiet=True suppresses output.
         """
         if quiet is None: quiet = self.quiet
@@ -758,7 +759,11 @@ class GetTOAs(object):
                 stop = time.time()
                 tot_duration += stop - start
                 for isub in d.ok_isubs:
-                    self.show_fit(datafile, isub)
+                    if show_plot=="save":
+                        savefig = datafile + '.%d.pptoas.png' % isub
+                    else:
+                        savefig = False
+                    self.show_fit(datafile, isub, savefig=savefig)
                 start = time.time()
             if not show_plot:
                 tot_duration = time.time() - start
@@ -1549,6 +1554,9 @@ if __name__ == "__main__":
     parser.add_option("--showplot",
                       action="store_true", dest="show_plot", default=False,
                       help="Show a plot of fitted data/model/residuals for each subint.  Good for diagnostic purposes only.")
+    parser.add_option("--saveplot",
+                      action="store_true", dest="save_plot", default=False,
+                      help="Save plots of fitted data/model/residuals for each subint.")
     parser.add_option("--quiet",
                       action="store_true", dest="quiet", default=False,
                       help="Only TOAs printed to standard output, if outfile is None.")
@@ -1605,6 +1613,7 @@ if __name__ == "__main__":
     addtnl_toa_flags = dict(list(zip(k, v)))
     snr_cutoff = float(options.snr_cutoff)
     show_plot = options.show_plot
+    if options.save_plot: show_plot = "save"
     quiet = options.quiet
 
     gt = GetTOAs(datafiles=datafiles, modelfile=modelfile, quiet=quiet)
